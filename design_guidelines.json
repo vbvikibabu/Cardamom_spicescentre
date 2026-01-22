@@ -1,0 +1,102 @@
+{
+  "identity": {
+    "name": "Cardamom Export Portfolio",
+    "archetype": "Organic & Earthy",
+    "tone": "Premium, Authentic, Trustworthy, Tactile",
+    "design_principle": "Fusion of Tradition and Modern Logistics"
+  },
+  "typography": {
+    "primary_font": "Playfair Display",
+    "secondary_font": "Manrope",
+    "font_installation": "import { Playfair_Display, Manrope } from 'next/font/google' (or equivalent for React)",
+    "scale": {
+      "h1": "text-6xl md:text-8xl font-serif tracking-tight leading-[0.9]",
+      "h2": "text-4xl md:text-6xl font-serif tracking-tight",
+      "h3": "text-2xl md:text-3xl font-sans font-light tracking-wide uppercase",
+      "body": "text-base md:text-lg font-sans leading-relaxed text-muted-foreground",
+      "caption": "text-xs font-sans tracking-[0.2em] uppercase font-bold"
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "#F9F7F2",
+      "foreground": "#1A2F1C",
+      "primary": "#2D5A27",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#E8E4D9",
+      "secondary_foreground": "#1A2F1C",
+      "accent": "#D4A373",
+      "accent_foreground": "#FFFFFF",
+      "muted": "#F0EFE9",
+      "muted_foreground": "#5C6B5D",
+      "border": "#D1D5DB"
+    },
+    "usage_rules": "Use 'background' (Bone White) for main surfaces. Use 'primary' (Deep Forest Green) for CTAs and key text. Use 'accent' (Spiced Gold) sparingly for highlights."
+  },
+  "visual_enhancers": {
+    "texture": "Add a subtle noise overlay to the background: opacity-5 pointer-events-none fixed inset-0 z-50 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]",
+    "borders": "1px solid border-primary/10. Avoid heavy shadows. Use 'outline' style for cards.",
+    "shadows": "shadow-sm for interactive elements only. No heavy drop shadows.",
+    "glassmorphism": "Use backdrop-blur-md bg-white/60 border border-white/20 for sticky nav and floating modals."
+  },
+  "layout_strategies": {
+    "grid_system": "Mode A: The Tetris Grid. Use grid-cols-12. Mix col-span-4, col-span-8, and col-span-6. Never use equal 3-column grids for products.",
+    "spacing": "Generous. Section padding: py-24 or py-32. Gap: gap-8 or gap-12.",
+    "container": "max-w-7xl mx-auto px-6 md:px-12"
+  },
+  "components": {
+    "hero_section": {
+      "type": "Immersive Split",
+      "instruction": "Left: Massive typography 'The Queen of Spices'. Right: Full height macro image of Cardamom pod. Scroll triggers parallax.",
+      "image_url": "https://images.pexels.com/photos/6086300/pexels-photo-6086300.jpeg"
+    },
+    "product_grid": {
+      "type": "Bento Grid",
+      "instruction": "Asymmetrical grid showcasing different grades (Alleppey Green, Coorg Green). Use hover reveal effects for details.",
+      "images": [
+        "https://images.pexels.com/photos/6086300/pexels-photo-6086300.jpeg",
+        "https://images.pexels.com/photos/9142634/pexels-photo-9142634.jpeg"
+      ]
+    },
+    "about_section": {
+      "type": "Editorial Layout",
+      "instruction": "Text on one side, large plantation image on the other. Use 'sticky' positioning for text while images scroll.",
+      "image_url": "https://images.pexels.com/photos/16166178/pexels-photo-16166178.jpeg"
+    },
+    "contact_form": {
+      "type": "Clean Minimalist",
+      "instruction": "Use Shadcn Form. Remove default borders, use only bottom border for inputs (Material style but cleaner). Background: Transparent or very light beige.",
+      "image_url": "https://images.pexels.com/photos/4820660/pexels-photo-4820660.jpeg"
+    }
+  },
+  "motion": {
+    "library": "framer-motion",
+    "entrance": "Staggered fade-up for text. Scale-up (0.95 -> 1.0) for images on scroll.",
+    "scroll": "Use 'lenis' for smooth scrolling momentum.",
+    "hover": "Images: Scale 1.05, Grayscale -> Color. Buttons: Width expansion."
+  },
+  "image_urls": {
+    "hero_bg": "https://images.pexels.com/photos/6086300/pexels-photo-6086300.jpeg",
+    "plantation": "https://images.pexels.com/photos/16166178/pexels-photo-16166178.jpeg",
+    "export_packaging": "https://images.pexels.com/photos/4820660/pexels-photo-4820660.jpeg",
+    "product_detail_1": "https://images.pexels.com/photos/9142634/pexels-photo-9142634.jpeg",
+    "product_detail_2": "https://images.pexels.com/photos/34716137/pexels-photo-34716137.jpeg"
+  },
+  "instructions_to_main_agent": [
+    "1. INSTALL FONTS: Add Playfair Display and Manrope via Google Fonts in index.html or CSS.",
+    "2. SETUP THEME: Update tailwind.config.js with the 'colors' object defined above. Extend the theme, do not overwrite.",
+    "3. NOISE TEXTURE: Create a global CSS rule or a fixed div for the noise texture overlay.",
+    "4. COMPONENT OVERRIDES: When using Shadcn components (Button, Input, Card), strip their default 'ring' and 'shadow' classes. Apply the 'visual_enhancers' rules instead.",
+    "5. IMAGES: Use the provided image_urls. Do not use placeholders.",
+    "6. NAVIGATION: Create a floating glassmorphism navbar. It should be transparent at top, and become glass on scroll.",
+    "7. FOOTER: Massive footer with 'Get in Touch' in 10vw size font."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not use gradients for backgrounds. Use solid colors or subtle textures.",
+    "Avoid 'Inter' font for headings. Use Playfair Display.",
+    "Use 2x more padding than you think is necessary.",
+    "All interactive elements must have data-testid attributes.",
+    "Use 'sonner' for toasts.",
+    "Ensure mobile responsiveness: stack grids to 1 column, reduce font sizes slightly."
+  ]
+}
