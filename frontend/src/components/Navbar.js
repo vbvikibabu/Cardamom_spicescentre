@@ -67,7 +67,7 @@ const Navbar = () => {
                 className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-all"
                 title="Call Us"
               >
-                <i className="fas fa-phone text-sm"></i>
+                <Phone size={16} />
               </a>
               <a
                 href="https://wa.me/918838226519"
@@ -76,14 +76,14 @@ const Navbar = () => {
                 className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition-all"
                 title="WhatsApp"
               >
-                <i className="fab fa-whatsapp text-sm"></i>
+                <MessageCircle size={16} />
               </a>
               <a
                 href="mailto:cardamomspicescentre@gmail.com"
                 className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-all"
                 title="Email Us"
               >
-                <i className="fas fa-envelope text-sm"></i>
+                <Mail size={16} />
               </a>
               <a
                 href="https://www.instagram.com/cardamom_spicescentre?igsh=MTFxMGI3N2ZmenB4ZA=="
@@ -92,7 +92,7 @@ const Navbar = () => {
                 className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 text-white flex items-center justify-center hover:opacity-90 transition-all"
                 title="Instagram"
               >
-                <i className="fab fa-instagram text-sm"></i>
+                <Instagram size={16} />
               </a>
             </div>
           </div>
