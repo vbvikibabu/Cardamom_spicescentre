@@ -64,7 +64,7 @@ const Contact = () => {
               Let's Start a Conversation
             </h1>
             <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-              Whether you're interested in bulk orders, custom quotes, or have questions about our products, 
+              Whether you're interested in bulk orders, custom quotes, or have questions about our green cardamom products, 
               we're here to help.
             </p>
           </motion.div>
@@ -95,8 +95,8 @@ const Contact = () => {
                       Location
                     </h3>
                     <p className="text-muted-foreground">
-                      Kerala, India<br />
-                      Heart of the Cardamom Hills
+                      India<br />
+                      Premium Green Cardamom Supplier
                     </p>
                   </div>
                 </div>
@@ -110,8 +110,7 @@ const Contact = () => {
                       Email
                     </h3>
                     <p className="text-muted-foreground">
-                      info@cardamomexport.com<br />
-                      sales@cardamomexport.com
+                      cardamomspicescentre@gmail.com
                     </p>
                   </div>
                 </div>
@@ -125,8 +124,7 @@ const Contact = () => {
                       Phone
                     </h3>
                     <p className="text-muted-foreground">
-                      +91 123 456 7890<br />
-                      +91 098 765 4321
+                      +91-8838226519
                     </p>
                   </div>
                 </div>

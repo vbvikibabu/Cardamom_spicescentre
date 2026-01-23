@@ -15,9 +15,9 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           {/* About */}
           <div>
-            <h3 className="font-serif text-2xl font-bold mb-4">Cardamom.</h3>
+            <h3 className="font-serif text-2xl font-bold mb-4">Cardamom Spices Centre</h3>
             <p className="text-background/70 font-sans leading-relaxed">
-              Premium quality cardamom export from the finest plantations of India. 
+              Premium quality Green Cardamom (Elettaria cardamomum) export from India's finest plantations. 
               The Queen of Spices for discerning global markets.
             </p>
           </div>
@@ -66,15 +66,15 @@ const Footer = () => {
             <ul className="space-y-3 text-background/70">
               <li className="flex items-start gap-2">
                 <MapPin size={16} className="mt-1 flex-shrink-0" />
-                <span>Kerala, India</span>
+                <span>India</span>
               </li>
               <li className="flex items-start gap-2">
                 <Mail size={16} className="mt-1 flex-shrink-0" />
-                <span>info@cardamomexport.com</span>
+                <span>cardamomspicescentre@gmail.com</span>
               </li>
               <li className="flex items-start gap-2">
                 <Phone size={16} className="mt-1 flex-shrink-0" />
-                <span>+91 123 456 7890</span>
+                <span>+91-8838226519</span>
               </li>
             </ul>
           </div>
@@ -83,7 +83,7 @@ const Footer = () => {
         {/* Bottom */}
         <div className="mt-16 pt-8 border-t border-background/20">
           <p className="text-center text-background/60 text-sm">
-            &copy; {new Date().getFullYear()} Cardamom Export India. All rights reserved.
+            &copy; {new Date().getFullYear()} Cardamom Spices Centre. All rights reserved.
           </p>
         </div>
       </div>

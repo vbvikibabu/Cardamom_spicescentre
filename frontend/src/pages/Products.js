@@ -51,11 +51,11 @@ const Products = () => {
               Our Collection
             </p>
             <h1 className="font-serif text-5xl md:text-7xl tracking-tight leading-tight mb-6 text-foreground">
-              Premium Cardamom Varieties
+              Green Cardamom Varieties
             </h1>
             <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-              From the finest plantations of India, we offer a range of cardamom grades 
-              to meet diverse market requirements and culinary applications.
+              Premium quality Green Cardamom (Elettaria cardamomum) in three different size grades 
+              to meet diverse market requirements.
             </p>
           </motion.div>
         </div>
@@ -64,7 +64,7 @@ const Products = () => {
       {/* Products Grid */}
       <section className="py-24" data-testid="products-grid">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
             {products.map((product, index) => (
               <motion.div
                 key={product.id}
@@ -83,15 +83,15 @@ const Products = () => {
                 <div className="p-8">
                   <div className="flex items-center gap-2 mb-4">
                     <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full">
-                      {product.grade}
+                      {product.size}
                     </span>
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                       <Leaf size={14} />
-                      {product.origin}
+                      Elettaria cardamomum
                     </span>
                   </div>
                   
-                  <h3 className="font-serif text-3xl font-semibold mb-4 text-foreground">
+                  <h3 className="font-serif text-2xl md:text-3xl font-semibold mb-4 text-foreground">
                     {product.name}
                   </h3>
                   
@@ -100,11 +100,11 @@ const Products = () => {
                   </p>
 
                   {/* Features */}
-                  <div className="mb-6">
+                  <div>
                     <h4 className="font-sans text-xs tracking-[0.2em] uppercase font-bold mb-3 text-foreground">
                       Key Features
                     </h4>
-                    <ul className="grid grid-cols-2 gap-2">
+                    <ul className="space-y-2">
                       {product.features.map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
                           <span className="text-primary mt-1">•</span>
@@ -112,21 +112,6 @@ const Products = () => {
                         </li>
                       ))}
                     </ul>
-                  </div>
-
-                  {/* Specifications */}
-                  <div className="border-t border-border pt-6">
-                    <h4 className="font-sans text-xs tracking-[0.2em] uppercase font-bold mb-4 text-foreground">
-                      Specifications
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      {Object.entries(product.specifications).map(([key, value]) => (
-                        <div key={key}>
-                          <span className="text-muted-foreground capitalize">{key}:</span>
-                          <span className="ml-2 font-medium text-foreground">{value}</span>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 </div>
               </motion.div>

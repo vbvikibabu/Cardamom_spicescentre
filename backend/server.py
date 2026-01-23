@@ -32,22 +32,18 @@ class Product(BaseModel):
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    grade: str
-    origin: str
+    size: str
     description: str
-    specifications: dict
-    image_url: str
     features: List[str]
+    image_url: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ProductCreate(BaseModel):
     name: str
-    grade: str
-    origin: str
+    size: str
     description: str
-    specifications: dict
-    image_url: str
     features: List[str]
+    image_url: str
 
 class ContactInquiry(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -70,7 +66,7 @@ class ContactInquiryCreate(BaseModel):
 # Root endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Cardamom Export API"}
+    return {"message": "Cardamom Spices Centre API"}
 
 # Product endpoints
 @api_router.get("/products", response_model=List[Product])
@@ -132,96 +128,53 @@ async def shutdown_db_client():
 # Initialize sample products on startup
 @app.on_event("startup")
 async def initialize_products():
-    existing_products = await db.products.count_documents({})
+    # Clear existing products
+    await db.products.delete_many({})
     
-    if existing_products == 0:
-        sample_products = [
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Alleppey Green Bold (AGB)",
-                "grade": "Premium Grade",
-                "origin": "Kerala, India",
-                "description": "The finest grade of green cardamom with large, plump pods and intense aroma. Known for its bold size and superior quality.",
-                "specifications": {
-                    "size": "7-8mm",
-                    "moisture": "<10%",
-                    "purity": "99.5%",
-                    "packaging": "25kg bags"
-                },
-                "image_url": "https://images.pexels.com/photos/6086300/pexels-photo-6086300.jpeg",
-                "features": [
-                    "Large bold pods",
-                    "Deep green color",
-                    "Strong aromatic flavor",
-                    "Export quality"
-                ],
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Coorg Green Extra Bold",
-                "grade": "Premium Grade",
-                "origin": "Karnataka, India",
-                "description": "Extra bold green cardamom from Coorg region, renowned for its exceptional size and premium quality.",
-                "specifications": {
-                    "size": "8mm+",
-                    "moisture": "<10%",
-                    "purity": "99%",
-                    "packaging": "25kg bags"
-                },
-                "image_url": "https://images.pexels.com/photos/9142634/pexels-photo-9142634.jpeg",
-                "features": [
-                    "Extra bold size",
-                    "Rich aroma",
-                    "High oil content",
-                    "Premium export grade"
-                ],
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Organic Green Cardamom",
-                "grade": "Organic Certified",
-                "origin": "Kerala, India",
-                "description": "Certified organic cardamom grown without synthetic pesticides or fertilizers. Perfect for health-conscious markets.",
-                "specifications": {
-                    "size": "6-7mm",
-                    "moisture": "<12%",
-                    "purity": "98%",
-                    "certification": "USDA Organic",
-                    "packaging": "10kg bags"
-                },
-                "image_url": "https://images.pexels.com/photos/34716137/pexels-photo-34716137.jpeg",
-                "features": [
-                    "USDA Organic certified",
-                    "Pesticide-free",
-                    "Sustainable farming",
-                    "Premium quality"
-                ],
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "name": "Bleached White Cardamom",
-                "grade": "Export Grade",
-                "origin": "Kerala, India",
-                "description": "Bleached cardamom pods with neutral appearance, ideal for specific culinary applications and traditional medicines.",
-                "specifications": {
-                    "size": "6-7mm",
-                    "moisture": "<10%",
-                    "purity": "99%",
-                    "packaging": "20kg bags"
-                },
-                "image_url": "https://images.pexels.com/photos/4820660/pexels-photo-4820660.jpeg",
-                "features": [
-                    "Uniform white color",
-                    "Mild flavor",
-                    "Long shelf life",
-                    "Export quality"
-                ],
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-        ]
-        
-        await db.products.insert_many(sample_products)
-        logger.info(f"Initialized {len(sample_products)} sample products")
+    sample_products = [
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Green Cardamom – 6 mm to 7 mm",
+            "size": "6 mm to 7 mm",
+            "description": "Clean, bold green pods suitable for retail packing & wholesale trade. Perfect for everyday culinary use with consistent quality.",
+            "features": [
+                "Clean, bold green pods",
+                "Suitable for retail packing",
+                "Wholesale trade ready",
+                "Consistent quality"
+            ],
+            "image_url": "https://images.pexels.com/photos/6086300/pexels-photo-6086300.jpeg",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Green Cardamom – 7 mm to 8 mm",
+            "size": "7 mm to 8 mm",
+            "description": "Premium export quality with good aroma and uniform size. Suitable for retail, bulk & export markets with excellent market acceptance.",
+            "features": [
+                "Premium export quality",
+                "Good aroma",
+                "Uniform size",
+                "Suitable for retail, bulk & export"
+            ],
+            "image_url": "https://images.pexels.com/photos/9142634/pexels-photo-9142634.jpeg",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Green Cardamom – 8 mm & Above",
+            "size": "8 mm & Above",
+            "description": "Super bold pods with high liter weight. Preferred for export & premium buyers seeking the finest quality cardamom.",
+            "features": [
+                "Super bold pods",
+                "High liter weight",
+                "Preferred for export",
+                "Premium buyers choice"
+            ],
+            "image_url": "https://images.pexels.com/photos/34716137/pexels-photo-34716137.jpeg",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+    ]
+    
+    await db.products.insert_many(sample_products)
+    logger.info(f"Initialized {len(sample_products)} products for Cardamom Spices Centre")

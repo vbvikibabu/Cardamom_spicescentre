@@ -35,9 +35,9 @@ const Navbar = () => {
           <Link
             to="/"
             data-testid="nav-logo"
-            className="font-serif text-2xl md:text-3xl font-bold text-foreground tracking-tight"
+            className="font-serif text-xl md:text-2xl font-bold text-foreground tracking-tight"
           >
-            Cardamom<span className="text-primary">.</span>
+            Cardamom Spices Centre
           </Link>
 
           {/* Desktop Navigation */}
