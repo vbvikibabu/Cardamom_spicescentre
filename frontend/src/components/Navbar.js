@@ -137,7 +137,7 @@ const Navbar = () => {
                 href="tel:+918838226519"
                 className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg"
               >
-                <i className="fas fa-phone"></i>
+                <Phone size={18} />
                 <span>+91-8838226519</span>
               </a>
               <a
@@ -146,14 +146,14 @@ const Navbar = () => {
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 px-4 py-3 bg-green-500 text-white rounded-lg"
               >
-                <i className="fab fa-whatsapp"></i>
+                <MessageCircle size={18} />
                 <span>WhatsApp</span>
               </a>
               <a
                 href="mailto:cardamomspicescentre@gmail.com"
                 className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg"
               >
-                <i className="fas fa-envelope"></i>
+                <Mail size={18} />
                 <span>Email Us</span>
               </a>
               <a
@@ -162,7 +162,7 @@ const Navbar = () => {
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 px-4 py-3 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 text-white rounded-lg"
               >
-                <i className="fab fa-instagram"></i>
+                <Instagram size={18} />
                 <span>Instagram</span>
               </a>
             </div>
