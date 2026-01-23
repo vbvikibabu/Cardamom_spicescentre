@@ -94,7 +94,7 @@ const Home = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
-              className="relative h-[500px] lg:h-[600px]"
+              className="relative h-[400px] md:h-[500px] lg:h-[600px]"
             >
               <img
                 src="https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/br03ic3s_perennial-no-yes-elaichi-plant-h-01-1-platone-original-imahcut3yswvgzg8.jpeg"
