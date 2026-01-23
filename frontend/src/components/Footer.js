@@ -16,9 +16,12 @@ const Footer = () => {
           {/* About */}
           <div>
             <h3 className="font-serif text-2xl font-bold mb-4">Cardamom Spices Centre</h3>
+            <p className="text-background/70 font-sans leading-relaxed mb-2">
+              Spiceboard Registered Cardamom Exporter
+            </p>
             <p className="text-background/70 font-sans leading-relaxed">
-              Premium quality Green Cardamom (Elettaria cardamomum) export from India's finest plantations. 
-              The Queen of Spices for discerning global markets.
+              Premium Green Cardamom from Thevaram & Nedumkandam. 
+              Wholesale & Export Supply.
             </p>
           </div>
 
@@ -56,6 +59,15 @@ const Footer = () => {
                 </Link>
               </li>
             </ul>
+            <div className="mt-6">
+              <h4 className="font-sans text-xs tracking-[0.2em] uppercase font-bold mb-3">
+                Operating Regions
+              </h4>
+              <ul className="space-y-1 text-background/70 text-sm">
+                <li><MapPin size={14} className="inline mr-2" />Thevaram, Tamil Nadu</li>
+                <li><MapPin size={14} className="inline mr-2" />Nedumkandam, Kerala</li>
+              </ul>
+            </div>
           </div>
 
           {/* Contact Info */}
@@ -65,16 +77,28 @@ const Footer = () => {
             </h4>
             <ul className="space-y-3 text-background/70">
               <li className="flex items-start gap-2">
-                <MapPin size={16} className="mt-1 flex-shrink-0" />
-                <span>India</span>
+                <Phone size={16} className="mt-1 flex-shrink-0" />
+                <a href="tel:+918838226519" className="hover:text-background transition-colors">
+                  +91-8838226519
+                </a>
+              </li>
+              <li className="flex items-start gap-2">
+                <i className="fab fa-whatsapp mt-1 flex-shrink-0"></i>
+                <a href="https://wa.me/918838226519" target="_blank" rel="noopener noreferrer" className="hover:text-background transition-colors">
+                  WhatsApp: +91-8838226519
+                </a>
               </li>
               <li className="flex items-start gap-2">
                 <Mail size={16} className="mt-1 flex-shrink-0" />
-                <span>cardamomspicescentre@gmail.com</span>
+                <a href="mailto:cardamomspicescentre@gmail.com" className="hover:text-background transition-colors break-all">
+                  cardamomspicescentre@gmail.com
+                </a>
               </li>
               <li className="flex items-start gap-2">
-                <Phone size={16} className="mt-1 flex-shrink-0" />
-                <span>+91-8838226519</span>
+                <i className="fab fa-instagram mt-1 flex-shrink-0"></i>
+                <a href="https://www.instagram.com/cardamom_spicescentre?igsh=MTFxMGI3N2ZmenB4ZA==" target="_blank" rel="noopener noreferrer" className="hover:text-background transition-colors">
+                  @cardamom_spicescentre
+                </a>
               </li>
             </ul>
           </div>
@@ -82,8 +106,11 @@ const Footer = () => {
 
         {/* Bottom */}
         <div className="mt-16 pt-8 border-t border-background/20">
-          <p className="text-center text-background/60 text-sm">
+          <p className="text-center text-background/60 text-sm mb-2">
             &copy; {new Date().getFullYear()} Cardamom Spices Centre. All rights reserved.
+          </p>
+          <p className="text-center text-background/50 text-xs">
+            Registered Exporter - Spices Board of India | All supplies with valid GST invoice
           </p>
         </div>
       </div>
