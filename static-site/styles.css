@@ -97,16 +97,46 @@ button {
 
 .logo {
     display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.logo > div:first-child {
+    display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     font-family: 'Playfair Display', serif;
-    font-size: 20px;
+    font-size: 26px;
     font-weight: 700;
     color: var(--primary-color);
 }
 
 .logo i {
-    font-size: 24px;
+    font-size: 32px;
+}
+
+.logo-tagline {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin: 0;
+    padding-left: 44px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+@media (min-width: 1024px) {
+    .logo > div:first-child {
+        font-size: 28px;
+    }
+    
+    .logo i {
+        font-size: 36px;
+    }
+    
+    .logo-tagline {
+        font-size: 12px;
+    }
 }
 
 .nav-desktop {
