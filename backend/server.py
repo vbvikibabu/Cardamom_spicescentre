@@ -219,7 +219,7 @@ async def initialize_products():
                 "Wholesale trade ready",
                 "Consistent quality"
             ],
-            "image_url": "https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/br03ic3s_perennial-no-yes-elaichi-plant-h-01-1-platone-original-imahcut3yswvgzg8.jpeg",
+            "image_url": "https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/34s4f7a9_6-7mm.png",
             "created_at": datetime.now(timezone.utc).isoformat()
         },
         {
