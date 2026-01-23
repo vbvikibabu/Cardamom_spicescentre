@@ -67,7 +67,7 @@ const Home = () => {
                 The Queen of Spices
               </h1>
               <p className="text-base md:text-lg font-sans leading-relaxed text-muted-foreground mb-12 max-w-lg">
-                Discover the finest Green Cardamom (Elettaria cardamomum) from India's lush plantations. 
+                Discover the finest Green Cardamom (Elettaria cardamomum) from Thevaram (Tamil Nadu) and Nedumkandam (Kerala), India. 
                 We bring you premium quality in three different size grades, 
                 cultivated with care and exported with pride.
               </p>
