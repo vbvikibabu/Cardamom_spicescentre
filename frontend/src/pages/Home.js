@@ -171,19 +171,18 @@ const Home = () => {
               </h2>
               <div className="space-y-6 text-muted-foreground leading-relaxed">
                 <p>
-                  Nestled in the Western Ghats of India, our cardamom plantations 
-                  benefit from ideal climatic conditions that produce the world's 
+                  Nestled in the finest plantations of India, our Green Cardamom 
+                  benefits from ideal climatic conditions that produce the world's 
                   finest spice.
                 </p>
                 <p>
-                  With decades of experience in cultivation and export, we maintain 
-                  strict quality standards at every stage—from harvesting to packaging—ensuring 
-                  that only premium grade cardamom reaches international markets.
+                  We specialize in three premium size grades of Green Cardamom (Elettaria cardamomum): 
+                  6-7mm for retail & wholesale, 7-8mm for premium export markets, and 8mm+ super bold 
+                  pods for discerning buyers seeking the finest quality.
                 </p>
                 <p>
-                  Our commitment to sustainable farming practices and fair trade 
-                  ensures that quality never comes at the expense of our environment 
-                  or farming communities.
+                  Our commitment to quality standards at every stage—from harvesting to packaging—ensures 
+                  that only premium grade cardamom reaches international markets.
                 </p>
               </div>
             </motion.div>
