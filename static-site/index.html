@@ -380,7 +380,12 @@
                 </div>
                 
                 <div class="contact-form-wrapper" data-aos="fade-left">
+                    <!-- IMPORTANT: Replace YOUR_FORM_ID with your actual Formspree form ID -->
+                    <!-- Sign up at https://formspree.io and create a form to get your ID -->
+                    <!-- Submissions will be sent to: cardamomspicescentre@gmail.com -->
                     <form id="enquiryForm" class="contact-form" action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+                        <input type="hidden" name="_replyto" value="cardamomspicescentre@gmail.com">
+                        <input type="hidden" name="_subject" value="New Enquiry from Cardamom Spices Centre Website">
                         <div class="form-group">
                             <label for="name">Full Name *</label>
                             <input type="text" id="name" name="name" required placeholder="Your full name">
