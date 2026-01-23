@@ -80,7 +80,7 @@
     "plantation": "https://images.pexels.com/photos/16166178/pexels-photo-16166178.jpeg",
     "export_packaging": "https://images.pexels.com/photos/4820660/pexels-photo-4820660.jpeg",
     "product_detail_1": "https://images.pexels.com/photos/9142634/pexels-photo-9142634.jpeg",
-    "product_detail_2": "https://images.pexels.com/photos/34716137/pexels-photo-34716137.jpeg"
+    "product_detail_2": "https://images.pexels.com/photos/4198024/pexels-photo-4198024.jpeg"
   },
   "instructions_to_main_agent": [
     "1. INSTALL FONTS: Add Playfair Display and Manrope via Google Fonts in index.html or CSS.",
