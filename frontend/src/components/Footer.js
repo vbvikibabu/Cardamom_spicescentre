@@ -20,8 +20,7 @@ const Footer = () => {
               Spiceboard Registered Cardamom Exporter
             </p>
             <p className="text-background/70 font-sans leading-relaxed">
-              Premium Green Cardamom from Thevaram & Nedumkandam. 
-              Wholesale & Export Supply.
+              Premium Green Cardamom - Wholesale & Export Supply
             </p>
           </div>
 
