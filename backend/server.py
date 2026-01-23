@@ -143,7 +143,7 @@ async def initialize_products():
                 "Wholesale trade ready",
                 "Consistent quality"
             ],
-            "image_url": "https://images.pexels.com/photos/6086300/pexels-photo-6086300.jpeg",
+            "image_url": "https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/zgjdcolf_6-7mm.png",
             "created_at": datetime.now(timezone.utc).isoformat()
         },
         {
@@ -157,7 +157,7 @@ async def initialize_products():
                 "Uniform size",
                 "Suitable for retail, bulk & export"
             ],
-            "image_url": "https://images.pexels.com/photos/9142634/pexels-photo-9142634.jpeg",
+            "image_url": "https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/356y2nmh_7-8mm.jpg",
             "created_at": datetime.now(timezone.utc).isoformat()
         },
         {
@@ -171,7 +171,7 @@ async def initialize_products():
                 "Preferred for export",
                 "Premium buyers choice"
             ],
-            "image_url": "https://images.pexels.com/photos/4198024/pexels-photo-4198024.jpeg",
+            "image_url": "https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/sic8070t_8mm%2B.jpg",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
     ]
