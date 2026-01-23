@@ -95,6 +95,73 @@ async def get_product(product_id: str):
     return product
 
 # Contact endpoint
+async def send_email_notification(inquiry: ContactInquiry):
+    """Send email notification when new inquiry is received"""
+    try:
+        # Email configuration
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        sender_email = "noreply@cardamomspicescentre.com"
+        receiver_email = "cardamomspicescentre@gmail.com"
+        
+        # Create message
+        message = MIMEMultipart("alternative")
+        message["Subject"] = f"New Enquiry from {inquiry.name}"
+        message["From"] = sender_email
+        message["To"] = receiver_email
+        
+        # Create email body
+        html_body = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+                    <h2 style="color: #2d5a27; border-bottom: 2px solid #2d5a27; padding-bottom: 10px;">
+                        New Enquiry - Cardamom Spices Centre
+                    </h2>
+                    
+                    <div style="margin: 20px 0;">
+                        <p><strong>Name:</strong> {inquiry.name}</p>
+                        <p><strong>Email:</strong> {inquiry.email}</p>
+                        {f'<p><strong>Company:</strong> {inquiry.company}</p>' if inquiry.company else ''}
+                        {f'<p><strong>Country:</strong> {inquiry.country}</p>' if inquiry.country else ''}
+                    </div>
+                    
+                    <div style="margin: 20px 0; padding: 15px; background-color: #f9f7f2; border-left: 4px solid #2d5a27;">
+                        <p><strong>Message:</strong></p>
+                        <p>{inquiry.message}</p>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666;">
+                        <p>Received: {inquiry.created_at.strftime('%B %d, %Y at %I:%M %p')}</p>
+                        <p>This is an automated notification from your Cardamom Spices Centre website.</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+        part = MIMEText(html_body, "html")
+        message.attach(part)
+        
+        # Note: For production, you would need proper SMTP credentials
+        # This is a placeholder - emails won't actually send without proper SMTP setup
+        logger.info(f"Email notification prepared for inquiry from {inquiry.name} ({inquiry.email})")
+        logger.info(f"Email would be sent to: {receiver_email}")
+        
+        # In production, uncomment and configure:
+        # await aiosmtplib.send(
+        #     message,
+        #     hostname=smtp_server,
+        #     port=smtp_port,
+        #     start_tls=True,
+        #     username=os.environ.get('SMTP_USERNAME'),
+        #     password=os.environ.get('SMTP_PASSWORD')
+        # )
+        
+    except Exception as e:
+        logger.error(f"Email sending failed: {str(e)}")
+        # Don't raise exception - we still want to save the inquiry
+
 @api_router.post("/contact", response_model=ContactInquiry)
 async def create_contact_inquiry(input: ContactInquiryCreate):
     inquiry_dict = input.model_dump()
@@ -104,6 +171,12 @@ async def create_contact_inquiry(input: ContactInquiryCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     
     await db.contact_inquiries.insert_one(doc)
+    
+    # Send email notification
+    await send_email_notification(inquiry_obj)
+    
+    logger.info(f"New contact inquiry received from {inquiry_obj.name} ({inquiry_obj.email})")
+    
     return inquiry_obj
 
 # Include the router in the main app
