@@ -97,8 +97,8 @@ const Home = () => {
               className="relative h-[500px] lg:h-[600px]"
             >
               <img
-                src="https://images.pexels.com/photos/6086300/pexels-photo-6086300.jpeg"
-                alt="Fresh cardamom pods"
+                src="https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/br03ic3s_perennial-no-yes-elaichi-plant-h-01-1-platone-original-imahcut3yswvgzg8.jpeg"
+                alt="Fresh cardamom plant"
                 className="hero-image w-full h-full object-cover rounded-lg shadow-sm"
               />
             </motion.div>
