@@ -171,7 +171,7 @@ async def initialize_products():
                 "Preferred for export",
                 "Premium buyers choice"
             ],
-            "image_url": "https://images.pexels.com/photos/34716137/pexels-photo-34716137.jpeg",
+            "image_url": "https://images.pexels.com/photos/4198024/pexels-photo-4198024.jpeg",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
     ]
