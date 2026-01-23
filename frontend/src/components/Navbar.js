@@ -35,9 +35,12 @@ const Navbar = () => {
           <Link
             to="/"
             data-testid="nav-logo"
-            className="font-serif text-xl md:text-2xl font-bold text-foreground tracking-tight"
+            className="flex flex-col"
           >
-            Cardamom Spices Centre
+            <div className="flex items-center gap-2">
+              <span className="font-serif text-2xl md:text-3xl font-bold text-foreground tracking-tight">Cardamom Spices Centre</span>
+            </div>
+            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Spiceboard Registered Cardamom Exporter</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -56,6 +59,42 @@ const Navbar = () => {
                 {link.name}
               </Link>
             ))}
+            
+            {/* Contact Icons */}
+            <div className="flex items-center gap-2">
+              <a
+                href="tel:+918838226519"
+                className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-all"
+                title="Call Us"
+              >
+                <i className="fas fa-phone text-sm"></i>
+              </a>
+              <a
+                href="https://wa.me/918838226519"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition-all"
+                title="WhatsApp"
+              >
+                <i className="fab fa-whatsapp text-sm"></i>
+              </a>
+              <a
+                href="mailto:cardamomspicescentre@gmail.com"
+                className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-all"
+                title="Email Us"
+              >
+                <i className="fas fa-envelope text-sm"></i>
+              </a>
+              <a
+                href="https://www.instagram.com/cardamom_spicescentre?igsh=MTFxMGI3N2ZmenB4ZA=="
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 text-white flex items-center justify-center hover:opacity-90 transition-all"
+                title="Instagram"
+              >
+                <i className="fab fa-instagram text-sm"></i>
+              </a>
+            </div>
           </div>
 
           {/* Mobile menu button */}
@@ -91,6 +130,42 @@ const Navbar = () => {
                 {link.name}
               </Link>
             ))}
+            
+            {/* Mobile Contact Buttons */}
+            <div className="pt-4 space-y-2">
+              <a
+                href="tel:+918838226519"
+                className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg"
+              >
+                <i className="fas fa-phone"></i>
+                <span>+91-8838226519</span>
+              </a>
+              <a
+                href="https://wa.me/918838226519"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-3 bg-green-500 text-white rounded-lg"
+              >
+                <i className="fab fa-whatsapp"></i>
+                <span>WhatsApp</span>
+              </a>
+              <a
+                href="mailto:cardamomspicescentre@gmail.com"
+                className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg"
+              >
+                <i className="fas fa-envelope"></i>
+                <span>Email Us</span>
+              </a>
+              <a
+                href="https://www.instagram.com/cardamom_spicescentre?igsh=MTFxMGI3N2ZmenB4ZA=="
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-3 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 text-white rounded-lg"
+              >
+                <i className="fab fa-instagram"></i>
+                <span>Instagram</span>
+              </a>
+            </div>
           </div>
         </div>
       )}
