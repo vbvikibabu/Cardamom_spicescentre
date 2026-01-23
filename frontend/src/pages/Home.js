@@ -50,9 +50,9 @@ const Home = () => {
   return (
     <div data-testid="home-page" className="pt-20">
       {/* Hero Section - Immersive Split */}
-      <section className="min-h-screen flex items-center" data-testid="hero-section">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <section className="min-h-screen flex items-center pt-20" data-testid="hero-section">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 w-full py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Left: Typography */}
             <motion.div {...fadeInUp}>
               <motion.p
