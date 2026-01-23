@@ -67,8 +67,8 @@ const Home = () => {
                 The Queen of Spices
               </h1>
               <p className="text-base md:text-lg font-sans leading-relaxed text-muted-foreground mb-12 max-w-lg">
-                Discover the finest cardamom from India's lush plantations. 
-                We bring you premium quality green and white cardamom, 
+                Discover the finest Green Cardamom (Elettaria cardamomum) from India's lush plantations. 
+                We bring you premium quality in three different size grades, 
                 cultivated with care and exported with pride.
               </p>
               <div className="flex flex-wrap gap-4">
