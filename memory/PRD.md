@@ -66,9 +66,9 @@ Build a full-featured B2B e-commerce platform for a cardamom export business (si
 ## Prioritized Backlog
 
 ### P0 (Next Sprint)
-- [ ] Admin: Product management (add/edit/delete products from dashboard)
-- [ ] Admin: Quote response form with pricing fields
-- [ ] Customer: "Request a Quote" form on Products page
+- [x] Admin: Product management (add/edit/delete products from dashboard)
+- [x] Admin: Quote response form with pricing fields
+- [x] Customer: "Request a Quote" form on Products page
 
 ### P1
 - [ ] Product filtering/search by grade on Products page
