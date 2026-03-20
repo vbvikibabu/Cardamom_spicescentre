@@ -2,11 +2,19 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '../components/ui/dialog';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(true);
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
@@ -29,7 +37,7 @@ const Login = () => {
     try {
       const userData = await login(email, password);
       toast.success(`Welcome back, ${userData.full_name}!`);
-      
+
       if (userData.role === 'admin') {
         navigate('/admin');
       } else if (userData.status === 'approved') {
@@ -44,68 +52,85 @@ const Login = () => {
     }
   };
 
+  const handleClose = (isOpen) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      navigate(-1);
+    }
+  };
+
   if (isAuthenticated) return null;
 
   return (
-    <div data-testid="login-page" className="min-h-screen flex items-center justify-center bg-muted pt-20 px-4">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg">
-        <div className="text-center">
-          <h2 className="font-serif text-4xl font-bold text-foreground mb-2">Welcome Back</h2>
-          <p className="text-muted-foreground">Login to your B2B account</p>
-        </div>
-
-        <form onSubmit={handleSubmit} data-testid="login-form" className="space-y-6">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-              Email Address
-            </label>
-            <input
-              type="email"
-              id="email"
-              data-testid="login-email-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="your@email.com"
-            />
+    <div data-testid="login-page" className="min-h-screen pt-20">
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent data-testid="login-modal" className="sm:max-w-md p-0 overflow-hidden rounded-2xl border-0">
+          <div className="bg-primary px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-2xl font-bold text-white">
+                Welcome Back
+              </DialogTitle>
+              <DialogDescription className="text-white/80 text-sm">
+                Login to your B2B account
+              </DialogDescription>
+            </DialogHeader>
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              data-testid="login-password-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Enter your password"
-            />
-          </div>
+          <form onSubmit={handleSubmit} data-testid="login-modal-form" className="px-6 pb-6 pt-2 space-y-5">
+            <div>
+              <label htmlFor="page-email" className="block text-sm font-medium text-foreground mb-1.5">
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="page-email"
+                data-testid="login-modal-email-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                placeholder="your@email.com"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            data-testid="login-submit-button"
-            className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
+            <div>
+              <label htmlFor="page-password" className="block text-sm font-medium text-foreground mb-1.5">
+                Password
+              </label>
+              <input
+                type="password"
+                id="page-password"
+                data-testid="login-modal-password-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                placeholder="Enter your password"
+              />
+            </div>
 
-        <div className="text-center">
-          <p className="text-muted-foreground">
-            Don't have an account?{' '}
-            <Link to="/register" data-testid="login-register-link" className="text-primary font-semibold hover:underline">
-              Register here
-            </Link>
-          </p>
-        </div>
-      </div>
+            <button
+              type="submit"
+              disabled={loading}
+              data-testid="login-modal-submit-button"
+              className="w-full bg-primary text-white py-2.5 rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 text-sm"
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Don't have an account?{' '}
+              <Link
+                to="/register"
+                data-testid="login-modal-register-link"
+                className="text-primary font-semibold hover:underline"
+              >
+                Register here
+              </Link>
+            </p>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -50,14 +50,15 @@ Build a full-featured B2B e-commerce platform for a cardamom export business (si
 - [x] Backend JWT auth system (register, login, me endpoints)
 - [x] Admin endpoints (user management, quote management)
 - [x] Customer quote endpoints (request quote, view my quotes)
-- [x] Frontend Login page with role-based redirect
-- [x] Frontend Register page with all fields
+- [x] **Login Modal popup** — opens over current page with dark backdrop (not a separate page)
+- [x] Frontend Login page (fallback /login route also uses modal)
+- [x] Frontend Register page with all fields (separate page)
 - [x] AuthContext with login/register/logout/token persistence
 - [x] AdminDashboard with user management + quote tabs
 - [x] CustomerDashboard with quotes list
 - [x] PendingApproval page
 - [x] ProtectedRoute component for /admin and /dashboard
-- [x] Navbar with auth buttons (desktop + mobile)
+- [x] Navbar with auth buttons (desktop + mobile) — login triggers modal
 - [x] Fixed .env formatting bug (CORS_ORIGINS and JWT_SECRET_KEY merged)
 - [x] Fixed product.grade → product.size bug in Home.js
 - [x] Cleaned up obsolete static-site directory
