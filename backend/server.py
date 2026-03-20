@@ -555,9 +555,30 @@ logger = logging.getLogger(__name__)
 async def shutdown_db_client():
     client.close()
 
-# Initialize sample products on startup
+# Initialize admin user and sample products on startup
 @app.on_event("startup")
-async def initialize_products():
+async def initialize_data():
+    # Create admin user if not exists
+    admin_email = "admin@cardamomspicescentre.com"
+    existing_admin = await db.users.find_one({"email": admin_email})
+    
+    if not existing_admin:
+        admin = {
+            "id": str(uuid.uuid4()),
+            "email": admin_email,
+            "password": get_password_hash("admin123"),  # CHANGE THIS!
+            "full_name": "Admin User",
+            "company_name": "Cardamom Spices Centre",
+            "country": "India",
+            "phone": "+91-8838226519",
+            "role": "admin",
+            "status": "approved",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(admin)
+        logger.info(f"✅ Admin user created: {admin_email} / admin123")
+    
+    # Initialize products
     # Clear existing products
     await db.products.delete_many({})
     
