@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -10,17 +10,17 @@ const Login = () => {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already logged in
-  if (isAuthenticated) {
-    if (user?.role === 'admin') {
-      navigate('/admin', { replace: true });
-    } else if (user?.status === 'approved') {
-      navigate('/dashboard', { replace: true });
-    } else {
-      navigate('/pending-approval', { replace: true });
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (user.status === 'approved') {
+        navigate('/dashboard', { replace: true });
+      } else {
+        navigate('/pending-approval', { replace: true });
+      }
     }
-    return null;
-  }
+  }, [isAuthenticated, user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,6 +43,8 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  if (isAuthenticated) return null;
 
   return (
     <div data-testid="login-page" className="min-h-screen flex items-center justify-center bg-muted pt-20 px-4">
