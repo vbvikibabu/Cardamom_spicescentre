@@ -54,7 +54,11 @@ Build a full-featured B2B e-commerce platform for a cardamom export business (si
 - [x] Frontend Login page (fallback /login route also uses modal)
 - [x] Frontend Register page with all fields (separate page)
 - [x] AuthContext with login/register/logout/token persistence
-- [x] AdminDashboard with user management + quote tabs
+- [x] AdminDashboard with user management + quote tabs + **product management with file upload**
+- [x] Admin quote response form with pricing fields (base price, freight, final price, currency, notes, status)
+- [x] Customer "Request a Quote" form on Products page (modal with quantity, market, destination, shipping, notes)
+- [x] **Product media upload**: Min 1, Max 4 files (JPG, PNG, WEBP, MP4, MOV) via Emergent object storage
+- [x] **Media gallery** on Products page with navigation for multi-media products
 - [x] CustomerDashboard with quotes list
 - [x] PendingApproval page
 - [x] ProtectedRoute component for /admin and /dashboard
