@@ -226,11 +226,13 @@ const Home = () => {
                   className={`product-card bg-white rounded-lg overflow-hidden border border-primary/10 ${colSpans[index]}`}
                 >
                   <div className={index === 2 ? 'grid md:grid-cols-2' : ''}>
-                    <img
-                      src={product.image_url}
-                      alt={product.name}
-                      className="w-full h-80 object-cover"
-                    />
+                    <Link to={`/products/${product.id}`}>
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-full h-80 object-cover hover:scale-105 transition-transform duration-300"
+                      />
+                    </Link>
                     <div className="p-8">
                       <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full mb-4">
                         {product.size}
@@ -242,7 +244,7 @@ const Home = () => {
                         {product.description}
                       </p>
                       <Link
-                        to="/products"
+                        to={`/products/${product.id}`}
                         data-testid={`product-preview-link-${index}`}
                         className="inline-flex items-center gap-2 text-primary font-sans text-sm tracking-wide uppercase font-medium hover:gap-3 transition-all"
                       >

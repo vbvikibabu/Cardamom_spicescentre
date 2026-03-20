@@ -59,6 +59,8 @@ Build a full-featured B2B e-commerce platform for a cardamom export business (si
 - [x] Customer "Request a Quote" form on Products page (modal with quantity, market, destination, shipping, notes)
 - [x] **Product media upload**: Min 1, Max 4 files (JPG, PNG, WEBP, MP4, MOV) via Emergent object storage
 - [x] **Media gallery** on Products page with navigation for multi-media products
+- [x] **Product detail page** at `/products/:id` with full media gallery, features, and Request a Quote
+- [x] Clickable product cards on Products page and Home page link to detail pages
 - [x] CustomerDashboard with quotes list
 - [x] PendingApproval page
 - [x] ProtectedRoute component for /admin and /dashboard

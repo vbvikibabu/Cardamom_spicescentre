@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Leaf, Package, TrendingUp, Award, Send, ChevronLeft, ChevronRight, Film } from 'lucide-react';
 import axios from 'axios';
@@ -168,31 +168,23 @@ const Products = () => {
                 data-testid={`product-card-${index}`}
                 className="product-card bg-white rounded-lg overflow-hidden border border-primary/10"
               >
-                <MediaGallery mediaPaths={product.media_paths} imageUrl={product.image_url} name={product.name} />
-                <div className="p-8">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full">
-                      {product.size}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <Leaf size={14} /> Elettaria cardamomum
-                    </span>
+                <Link to={`/products/${product.id}`} className="block cursor-pointer">
+                  <MediaGallery mediaPaths={product.media_paths} imageUrl={product.image_url} name={product.name} />
+                  <div className="p-8 pb-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full">
+                        {product.size}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Leaf size={14} /> Elettaria cardamomum
+                      </span>
+                    </div>
+                    <h3 className="font-serif text-2xl md:text-3xl font-semibold mb-4 text-foreground">{product.name}</h3>
+                    <p className="text-muted-foreground leading-relaxed mb-4 line-clamp-3">{product.description}</p>
+                    <span className="text-primary text-sm font-semibold hover:underline">View Details</span>
                   </div>
-                  <h3 className="font-serif text-2xl md:text-3xl font-semibold mb-4 text-foreground">{product.name}</h3>
-                  <p className="text-muted-foreground leading-relaxed mb-6">{product.description}</p>
-
-                  <div className="mb-6">
-                    <h4 className="font-sans text-xs tracking-[0.2em] uppercase font-bold mb-3 text-foreground">Key Features</h4>
-                    <ul className="space-y-2">
-                      {product.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                          <span className="text-primary mt-1">•</span>
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
+                </Link>
+                <div className="px-8 pb-8">
                   <button
                     data-testid={`request-quote-btn-${index}`}
                     onClick={() => openQuoteModal(product)}
