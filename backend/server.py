@@ -25,6 +25,14 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Security Configuration
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'cardamom-secret-key-2025-change-in-production')
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_DAYS = 7
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer(auto_error=False)
+
 # Create the main app without a prefix
 app = FastAPI()
 
