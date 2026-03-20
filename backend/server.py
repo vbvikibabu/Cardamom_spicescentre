@@ -286,7 +286,7 @@ async def send_email_notification(inquiry: ContactInquiry):
                 return True
             except Exception as smtp_error:
                 logger.error(f"✗ Email sending failed: {str(smtp_error)}")
-                logger.error(f"Check SMTP credentials in .env file")
+                logger.error("Check SMTP credentials in .env file")
                 return False
         else:
             logger.warning("⚠️  SMTP credentials not configured in .env file")
