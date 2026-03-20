@@ -8,6 +8,9 @@ import Products from "@/pages/Products";
 import Contact from "@/pages/Contact";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import AdminDashboard from "@/pages/AdminDashboard";
+import CustomerDashboard from "@/pages/CustomerDashboard";
+import PendingApproval from "@/pages/PendingApproval";
 import Footer from "@/components/Footer";
 
 function App() {
@@ -25,6 +28,9 @@ function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/dashboard" element={<CustomerDashboard />} />
+            <Route path="/pending-approval" element={<PendingApproval />} />
           </Routes>
           <Footer />
         </BrowserRouter>
