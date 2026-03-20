@@ -210,7 +210,174 @@ async def get_current_admin(current_user: User = Depends(get_current_user)):
 # Root endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Cardamom Spices Centre API"}
+    return {"message": "Cardamom Spices Centre B2B API", "version": "2.0"}
+
+
+# ==================== AUTH ENDPOINTS ====================
+@api_router.post("/auth/register", response_model=UserResponse)
+async def register(user_data: UserRegister):
+    # Check if user exists
+    existing = await db.users.find_one({"email": user_data.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create user
+    user = User(
+        email=user_data.email,
+        full_name=user_data.full_name,
+        company_name=user_data.company_name,
+        country=user_data.country,
+        phone=user_data.phone,
+        role="customer",
+        status="pending"
+    )
+    
+    user_dict = user.model_dump()
+    user_dict['password'] = get_password_hash(user_data.password)
+    user_dict['created_at'] = user_dict['created_at'].isoformat()
+    
+    await db.users.insert_one(user_dict)
+    logger.info(f"New customer registered: {user.email} - Status: pending approval")
+    
+    return UserResponse(**user.model_dump())
+
+@api_router.post("/auth/login", response_model=Token)
+async def login(credentials: UserLogin):
+    user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
+    if not user or not verify_password(credentials.password, user['password']):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    # Convert datetime
+    if isinstance(user.get('created_at'), str):
+        user['created_at'] = datetime.fromisoformat(user['created_at'])
+    
+    # Remove password from response
+    user_data = {k: v for k, v in user.items() if k != 'password'}
+    
+    access_token = create_access_token(data={"sub": user['email']})
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse(**user_data)
+    )
+
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return UserResponse(**current_user.model_dump())
+
+
+# ==================== ADMIN ENDPOINTS ====================
+@api_router.get("/admin/users", response_model=List[UserResponse])
+async def get_all_users(current_admin: User = Depends(get_current_admin)):
+    users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+    
+    for user in users:
+        if isinstance(user.get('created_at'), str):
+            user['created_at'] = datetime.fromisoformat(user['created_at'])
+    
+    return [UserResponse(**u) for u in users]
+
+@api_router.patch("/admin/users/{user_id}/status")
+async def update_user_status(
+    user_id: str,
+    status: Literal["approved", "rejected"],
+    current_admin: User = Depends(get_current_admin)
+):
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"status": status}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    logger.info(f"Admin {current_admin.email} {status} user {user['email']}")
+    
+    return {"message": f"User {status}", "user": user}
+
+@api_router.get("/admin/quotes", response_model=List[Quote])
+async def get_all_quotes(current_admin: User = Depends(get_current_admin)):
+    quotes = await db.quotes.find({}, {"_id": 0}).to_list(1000)
+    
+    for quote in quotes:
+        if isinstance(quote.get('created_at'), str):
+            quote['created_at'] = datetime.fromisoformat(quote['created_at'])
+        if isinstance(quote.get('updated_at'), str):
+            quote['updated_at'] = datetime.fromisoformat(quote['updated_at'])
+    
+    return [Quote(**q) for q in quotes]
+
+@api_router.patch("/admin/quotes/{quote_id}")
+async def update_quote(
+    quote_id: str,
+    quote_update: QuoteUpdate,
+    current_admin: User = Depends(get_current_admin)
+):
+    update_data = {k: v for k, v in quote_update.model_dump().items() if v is not None}
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.quotes.update_one(
+        {"id": quote_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    
+    quote = await db.quotes.find_one({"id": quote_id}, {"_id": 0})
+    logger.info(f"Admin updated quote {quote_id}")
+    
+    return {"message": "Quote updated", "quote": quote}
+
+
+# ==================== QUOTE ENDPOINTS ====================
+@api_router.post("/quotes/request", response_model=Quote)
+async def create_quote_request(
+    quote_data: QuoteRequest,
+    current_user: User = Depends(get_current_approved_customer)
+):
+    # Get product details
+    product = await db.products.find_one({"id": quote_data.product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    quote = Quote(
+        customer_id=current_user.id,
+        customer_name=current_user.full_name,
+        customer_email=current_user.email,
+        product_id=quote_data.product_id,
+        product_name=product['name'],
+        quantity=quote_data.quantity,
+        market_type=quote_data.market_type,
+        destination_country=quote_data.destination_country,
+        shipping_method=quote_data.shipping_method,
+        additional_notes=quote_data.additional_notes,
+        status="pending"
+    )
+    
+    quote_dict = quote.model_dump()
+    quote_dict['created_at'] = quote_dict['created_at'].isoformat()
+    quote_dict['updated_at'] = quote_dict['updated_at'].isoformat()
+    
+    await db.quotes.insert_one(quote_dict)
+    logger.info(f"New quote request: {current_user.email} - Product: {product['name']} - Qty: {quote_data.quantity}")
+    
+    return quote
+
+@api_router.get("/quotes/my-quotes", response_model=List[Quote])
+async def get_my_quotes(current_user: User = Depends(get_current_approved_customer)):
+    quotes = await db.quotes.find({"customer_id": current_user.id}, {"_id": 0}).to_list(1000)
+    
+    for quote in quotes:
+        if isinstance(quote.get('created_at'), str):
+            quote['created_at'] = datetime.fromisoformat(quote['created_at'])
+        if isinstance(quote.get('updated_at'), str):
+            quote['updated_at'] = datetime.fromisoformat(quote['updated_at'])
+    
+    return [Quote(**q) for q in quotes]
+
 
 # Product endpoints
 @api_router.get("/products", response_model=List[Product])
