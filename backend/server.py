@@ -59,6 +59,85 @@ class ProductCreate(BaseModel):
     features: List[str]
     image_url: str
 
+# ==================== USER MODELS ====================
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    company_name: Optional[str] = None
+    country: Optional[str] = None
+    phone: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    full_name: str
+    company_name: Optional[str] = None
+    country: Optional[str] = None
+    phone: Optional[str] = None
+    role: Literal["customer", "admin"] = "customer"
+    status: Literal["pending", "approved", "rejected"] = "pending"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    full_name: str
+    company_name: Optional[str]
+    country: Optional[str]
+    phone: Optional[str]
+    role: str
+    status: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
+# ==================== QUOTE MODELS ====================
+class QuoteRequest(BaseModel):
+    product_id: str
+    quantity: int
+    market_type: Literal["domestic", "export"]
+    destination_country: Optional[str] = None
+    shipping_method: Optional[Literal["air", "sea"]] = None
+    additional_notes: Optional[str] = None
+
+class Quote(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    customer_id: str
+    customer_name: str
+    customer_email: str
+    product_id: str
+    product_name: str
+    quantity: int
+    market_type: Literal["domestic", "export"]
+    destination_country: Optional[str] = None
+    shipping_method: Optional[Literal["air", "sea"]] = None
+    additional_notes: Optional[str] = None
+    status: Literal["pending", "quoted", "accepted", "rejected"] = "pending"
+    base_price: Optional[float] = None
+    freight_cost: Optional[float] = None
+    admin_notes: Optional[str] = None
+    final_price: Optional[float] = None
+    currency: Literal["INR", "USD"] = "INR"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class QuoteUpdate(BaseModel):
+    status: Optional[Literal["pending", "quoted", "accepted", "rejected"]] = None
+    base_price: Optional[float] = None
+    freight_cost: Optional[float] = None
+    admin_notes: Optional[str] = None
+    final_price: Optional[float] = None
+    currency: Optional[Literal["INR", "USD"]] = None
+
 class ContactInquiry(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
