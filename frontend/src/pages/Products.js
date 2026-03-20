@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, Package, TrendingUp, Award, Send } from 'lucide-react';
+import { Leaf, Package, TrendingUp, Award, Send, ChevronLeft, ChevronRight, Film } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,52 @@ import LoginModal from '../components/LoginModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+const getMediaUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${API}/files/${path}`;
+};
+
+const isVideoPath = (path) => {
+  const lower = (path || '').toLowerCase();
+  return lower.endsWith('.mp4') || lower.endsWith('.mov');
+};
+
+const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
+  const [current, setCurrent] = useState(0);
+  const paths = mediaPaths && mediaPaths.length > 0 ? mediaPaths : (imageUrl ? [imageUrl] : []);
+  
+  if (paths.length === 0) return <div className="w-full h-80 bg-gray-100 flex items-center justify-center text-muted-foreground">No media</div>;
+
+  const src = getMediaUrl(paths[current]);
+  const video = isVideoPath(paths[current]);
+
+  return (
+    <div className="relative group">
+      {video ? (
+        <video src={src} controls className="w-full h-80 object-cover bg-black" />
+      ) : (
+        <img src={src} alt={name} className="w-full h-80 object-cover" />
+      )}
+      {paths.length > 1 && (
+        <>
+          <button onClick={() => setCurrent((current - 1 + paths.length) % paths.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronLeft size={18} />
+          </button>
+          <button onClick={() => setCurrent((current + 1) % paths.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronRight size={18} />
+          </button>
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+            {paths.map((_, i) => (
+              <button key={i} onClick={() => setCurrent(i)} className={`w-2 h-2 rounded-full transition-colors ${i === current ? 'bg-white' : 'bg-white/50'}`} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -122,7 +168,7 @@ const Products = () => {
                 data-testid={`product-card-${index}`}
                 className="product-card bg-white rounded-lg overflow-hidden border border-primary/10"
               >
-                <img src={product.image_url} alt={product.name} className="w-full h-80 object-cover" />
+                <MediaGallery mediaPaths={product.media_paths} imageUrl={product.image_url} name={product.name} />
                 <div className="p-8">
                   <div className="flex items-center gap-2 mb-4">
                     <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full">

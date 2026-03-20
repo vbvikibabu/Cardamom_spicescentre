@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -15,6 +16,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import jwt
 from passlib.context import CryptContext
+import requests as http_requests
 
 
 ROOT_DIR = Path(__file__).parent
@@ -33,6 +35,46 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
 
+# ==================== OBJECT STORAGE ====================
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+APP_NAME = "cardamom-spices"
+storage_key = None
+
+ALLOWED_MEDIA_TYPES = {
+    "image/jpeg", "image/png", "image/webp",
+    "video/mp4", "video/quicktime"
+}
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+
+def init_storage():
+    global storage_key
+    if storage_key:
+        return storage_key
+    resp = http_requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+    resp.raise_for_status()
+    storage_key = resp.json()["storage_key"]
+    return storage_key
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    resp = http_requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=120
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+def get_object(path: str):
+    key = init_storage()
+    resp = http_requests.get(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key}, timeout=60
+    )
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
 # Create the main app without a prefix
 app = FastAPI()
 
@@ -49,7 +91,8 @@ class Product(BaseModel):
     size: str
     description: str
     features: List[str]
-    image_url: str
+    image_url: str = ""
+    media_paths: List[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ProductCreate(BaseModel):
@@ -57,7 +100,8 @@ class ProductCreate(BaseModel):
     size: str
     description: str
     features: List[str]
-    image_url: str
+    image_url: str = ""
+    media_paths: List[str] = Field(default_factory=list)
 
 # ==================== USER MODELS ====================
 class UserRegister(BaseModel):
@@ -577,6 +621,49 @@ async def create_contact_inquiry(input: ContactInquiryCreate):
     
     return inquiry_obj
 
+
+# ==================== FILE UPLOAD & SERVE ====================
+@api_router.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    current_admin: User = Depends(get_current_admin)
+):
+    if file.content_type not in ALLOWED_MEDIA_TYPES:
+        raise HTTPException(status_code=400, detail=f"File type '{file.content_type}' not allowed. Accepted: JPG, PNG, WEBP, MP4, MOV")
+    
+    data = await file.read()
+    if len(data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="File too large. Max 50MB.")
+    
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+    path = f"{APP_NAME}/products/{uuid.uuid4()}.{ext}"
+    
+    result = put_object(path, data, file.content_type)
+    
+    file_record = {
+        "id": str(uuid.uuid4()),
+        "storage_path": result["path"],
+        "original_filename": file.filename,
+        "content_type": file.content_type,
+        "size": result.get("size", len(data)),
+        "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.files.insert_one(file_record)
+    
+    logger.info(f"File uploaded: {file.filename} -> {result['path']}")
+    return {"path": result["path"], "content_type": file.content_type, "original_filename": file.filename}
+
+@api_router.get("/files/{path:path}")
+async def serve_file(path: str):
+    record = await db.files.find_one({"storage_path": path, "is_deleted": False}, {"_id": 0})
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    data, content_type = get_object(path)
+    return Response(content=data, media_type=record.get("content_type", content_type))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
@@ -602,6 +689,13 @@ async def shutdown_db_client():
 # Initialize admin user and sample products on startup
 @app.on_event("startup")
 async def initialize_data():
+    # Initialize object storage
+    try:
+        init_storage()
+        logger.info("Object storage initialized")
+    except Exception as e:
+        logger.warning(f"Object storage init deferred: {e}")
+    
     # Create admin user if not exists
     admin_email = "admin@cardamomspicescentre.com"
     existing_admin = await db.users.find_one({"email": admin_email})
@@ -639,6 +733,7 @@ async def initialize_data():
                 "Consistent quality"
             ],
             "image_url": "https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/34s4f7a9_6-7mm.png",
+            "media_paths": [],
             "created_at": datetime.now(timezone.utc).isoformat()
         },
         {
@@ -653,6 +748,7 @@ async def initialize_data():
                 "Suitable for retail, bulk & export"
             ],
             "image_url": "https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/356y2nmh_7-8mm.jpg",
+            "media_paths": [],
             "created_at": datetime.now(timezone.utc).isoformat()
         },
         {
@@ -667,6 +763,7 @@ async def initialize_data():
                 "Premium buyers choice"
             ],
             "image_url": "https://customer-assets.emergentagent.com/job_21ff2258-a2aa-405e-b346-3b2451a93f14/artifacts/sic8070t_8mm%2B.jpg",
+            "media_paths": [],
             "created_at": datetime.now(timezone.utc).isoformat()
         }
     ]

@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { User, CheckCircle, XCircle, FileText, Package, Plus, Pencil, Trash2, X, Send } from 'lucide-react';
+import { User, CheckCircle, XCircle, FileText, Package, Plus, Pencil, Trash2, X, Send, Upload, Image, Film } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'];
+const ACCEPT_STRING = '.jpg,.jpeg,.png,.webp,.mp4,.mov';
 
 const AdminDashboard = () => {
   const { user, token } = useAuth();
@@ -17,7 +20,11 @@ const AdminDashboard = () => {
   // Product form state
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '', image_url: '' });
+  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '' });
+  const [mediaFiles, setMediaFiles] = useState([]); // { file, preview, uploading, path, type }
+  const [existingMedia, setExistingMedia] = useState([]); // paths from existing product
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Quote response state
   const [respondingQuote, setRespondingQuote] = useState(null);
@@ -61,23 +68,117 @@ const AdminDashboard = () => {
         name: product.name,
         size: product.size,
         description: product.description,
-        features: product.features.join(', '),
-        image_url: product.image_url
+        features: product.features.join(', ')
       });
+      setExistingMedia(product.media_paths || []);
+      // If legacy product has image_url but no media_paths, show image_url
+      if ((!product.media_paths || product.media_paths.length === 0) && product.image_url) {
+        setExistingMedia([product.image_url]);
+      }
     } else {
       setEditingProduct(null);
-      setProductForm({ name: '', size: '', description: '', features: '', image_url: '' });
+      setProductForm({ name: '', size: '', description: '', features: '' });
+      setExistingMedia([]);
     }
+    setMediaFiles([]);
     setShowProductForm(true);
+  };
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    const totalCount = mediaFiles.length + existingMedia.length + files.length;
+    
+    if (totalCount > 4) {
+      toast.error(`Maximum 4 files allowed. You already have ${mediaFiles.length + existingMedia.length}.`);
+      return;
+    }
+
+    const newMedia = files.filter(f => {
+      if (!ALLOWED_TYPES.includes(f.type)) {
+        toast.error(`${f.filename || f.name}: Unsupported format. Use JPG, PNG, WEBP, MP4, or MOV.`);
+        return false;
+      }
+      if (f.size > 50 * 1024 * 1024) {
+        toast.error(`${f.name}: File too large. Max 50MB.`);
+        return false;
+      }
+      return true;
+    }).map(f => ({
+      file: f,
+      preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
+      type: f.type.startsWith('video/') ? 'video' : 'image',
+      uploading: false,
+      path: null,
+      name: f.name
+    }));
+
+    setMediaFiles(prev => [...prev, ...newMedia]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeNewFile = (index) => {
+    setMediaFiles(prev => {
+      const updated = [...prev];
+      if (updated[index].preview) URL.revokeObjectURL(updated[index].preview);
+      updated.splice(index, 1);
+      return updated;
+    });
+  };
+
+  const removeExistingMedia = (index) => {
+    setExistingMedia(prev => {
+      const updated = [...prev];
+      updated.splice(index, 1);
+      return updated;
+    });
+  };
+
+  const uploadSingleFile = async (mediaItem) => {
+    const formData = new FormData();
+    formData.append('file', mediaItem.file);
+    const res = await axios.post(`${API_URL}/api/upload`, formData, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data.path;
   };
 
   const saveProduct = async (e) => {
     e.preventDefault();
-    const payload = {
-      ...productForm,
-      features: productForm.features.split(',').map(f => f.trim()).filter(Boolean)
-    };
+    const totalMedia = existingMedia.length + mediaFiles.length;
+    if (totalMedia < 1) {
+      toast.error('Please add at least 1 image or video.');
+      return;
+    }
+    if (totalMedia > 4) {
+      toast.error('Maximum 4 files allowed.');
+      return;
+    }
+
+    setSaving(true);
     try {
+      // Upload new files
+      const uploadedPaths = [];
+      for (let i = 0; i < mediaFiles.length; i++) {
+        setMediaFiles(prev => prev.map((m, idx) => idx === i ? { ...m, uploading: true } : m));
+        const path = await uploadSingleFile(mediaFiles[i]);
+        uploadedPaths.push(path);
+        setMediaFiles(prev => prev.map((m, idx) => idx === i ? { ...m, uploading: false, path } : m));
+      }
+
+      const allMediaPaths = [...existingMedia, ...uploadedPaths];
+      // Use first image as image_url for backward compatibility
+      const firstImagePath = allMediaPaths[0] || '';
+      const imageUrl = firstImagePath.startsWith('http') ? firstImagePath : (firstImagePath ? `${API_URL}/api/files/${firstImagePath}` : '');
+
+      const payload = {
+        name: productForm.name,
+        size: productForm.size,
+        description: productForm.description,
+        features: productForm.features.split(',').map(f => f.trim()).filter(Boolean),
+        image_url: imageUrl,
+        media_paths: allMediaPaths
+      };
+
       if (editingProduct) {
         await axios.put(`${API_URL}/api/admin/products/${editingProduct.id}`, payload, authHeaders);
         toast.success('Product updated!');
@@ -89,6 +190,8 @@ const AdminDashboard = () => {
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to save product');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -131,6 +234,17 @@ const AdminDashboard = () => {
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to update quote');
     }
+  };
+
+  // ─── Helper: get display URL for a media path ───
+  const getMediaUrl = (path) => {
+    if (path.startsWith('http')) return path;
+    return `${API_URL}/api/files/${path}`;
+  };
+
+  const isVideo = (path) => {
+    const lower = path.toLowerCase();
+    return lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.includes('video');
   };
 
   if (loading) {
@@ -261,8 +375,6 @@ const AdminDashboard = () => {
                         {quote.admin_notes && <span className="text-muted-foreground ml-3">— {quote.admin_notes}</span>}
                       </div>
                     )}
-
-                    {/* Inline quote response form */}
                     {respondingQuote?.id === quote.id ? (
                       <form onSubmit={submitQuoteResponse} data-testid={`quote-response-form-${quote.id}`} className="border-t border-border pt-4 mt-3 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -327,7 +439,7 @@ const AdminDashboard = () => {
                   </button>
                 </div>
 
-                {/* Product Form (inline) */}
+                {/* Product Form */}
                 {showProductForm && (
                   <form onSubmit={saveProduct} data-testid="product-form" className="border border-primary rounded-xl p-6 mb-6 bg-primary/5 space-y-4">
                     <div className="flex justify-between items-center">
@@ -337,27 +449,112 @@ const AdminDashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-foreground mb-1">Product Name *</label>
-                        <input type="text" required data-testid="product-name-input" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Green Cardamom – 6 mm to 7 mm" />
+                        <input type="text" required data-testid="product-name-input" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="Green Cardamom – 6 mm to 7 mm" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-foreground mb-1">Size / Grade *</label>
-                        <input type="text" required data-testid="product-size-input" value={productForm.size} onChange={e => setProductForm({...productForm, size: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="6 mm to 7 mm" />
+                        <input type="text" required data-testid="product-size-input" value={productForm.size} onChange={e => setProductForm({...productForm, size: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="6 mm to 7 mm" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground mb-1">Description *</label>
-                      <textarea required data-testid="product-desc-input" value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} rows={2} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
+                      <textarea required data-testid="product-desc-input" value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} rows={2} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none bg-white" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground mb-1">Features (comma-separated) *</label>
-                      <input type="text" required data-testid="product-features-input" value={productForm.features} onChange={e => setProductForm({...productForm, features: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Clean pods, Good aroma, Export quality" />
+                      <input type="text" required data-testid="product-features-input" value={productForm.features} onChange={e => setProductForm({...productForm, features: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="Clean pods, Good aroma, Export quality" />
                     </div>
+
+                    {/* ─── Media Upload ─── */}
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">Image URL *</label>
-                      <input type="url" required data-testid="product-image-input" value={productForm.image_url} onChange={e => setProductForm({...productForm, image_url: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="https://..." />
+                      <label className="block text-xs font-medium text-foreground mb-2">
+                        Photos & Videos * <span className="text-muted-foreground font-normal">(Min 1, Max 4 — JPG, PNG, WEBP, MP4, MOV)</span>
+                      </label>
+
+                      {/* Existing media previews */}
+                      {existingMedia.length > 0 && (
+                        <div className="flex flex-wrap gap-3 mb-3">
+                          {existingMedia.map((path, idx) => (
+                            <div key={`existing-${idx}`} className="relative group w-24 h-24 rounded-lg overflow-hidden border border-border bg-white">
+                              {isVideo(path) ? (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                  <Film size={24} className="text-muted-foreground" />
+                                </div>
+                              ) : (
+                                <img src={getMediaUrl(path)} alt="" className="w-full h-full object-cover" />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeExistingMedia(idx)}
+                                className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* New file previews */}
+                      {mediaFiles.length > 0 && (
+                        <div className="flex flex-wrap gap-3 mb-3">
+                          {mediaFiles.map((m, idx) => (
+                            <div key={`new-${idx}`} className="relative group w-24 h-24 rounded-lg overflow-hidden border-2 border-dashed border-primary/40 bg-white">
+                              {m.type === 'video' ? (
+                                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
+                                  <Film size={20} className="text-primary mb-1" />
+                                  <span className="text-[10px] text-muted-foreground px-1 truncate w-full text-center">{m.name}</span>
+                                </div>
+                              ) : (
+                                <img src={m.preview} alt="" className="w-full h-full object-cover" />
+                              )}
+                              {m.uploading && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeNewFile(idx)}
+                                className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Upload button */}
+                      {(existingMedia.length + mediaFiles.length) < 4 && (
+                        <button
+                          type="button"
+                          data-testid="media-upload-btn"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-primary/40 rounded-lg text-sm text-primary font-medium hover:bg-primary/5 transition-colors"
+                        >
+                          <Upload size={16} />
+                          Add {existingMedia.length + mediaFiles.length === 0 ? 'Photos/Videos' : 'More'}
+                          <span className="text-muted-foreground font-normal">({existingMedia.length + mediaFiles.length}/4)</span>
+                        </button>
+                      )}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept={ACCEPT_STRING}
+                        multiple
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        data-testid="media-file-input"
+                      />
                     </div>
-                    <button type="submit" data-testid="product-save-btn" className="bg-primary text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors">
-                      {editingProduct ? 'Update Product' : 'Create Product'}
+
+                    <button type="submit" disabled={saving} data-testid="product-save-btn" className="bg-primary text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2">
+                      {saving ? (
+                        <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> Saving...</>
+                      ) : (
+                        editingProduct ? 'Update Product' : 'Create Product'
+                      )}
                     </button>
                   </form>
                 )}
@@ -367,10 +564,27 @@ const AdminDashboard = () => {
                   {products.map(p => (
                     <div key={p.id} data-testid={`product-row-${p.id}`} className="border border-border rounded-lg p-4 hover:border-primary transition-colors">
                       <div className="flex items-center gap-4">
-                        <img src={p.image_url} alt={p.name} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
+                        <div className="flex gap-1 flex-shrink-0">
+                          {(p.media_paths && p.media_paths.length > 0 ? p.media_paths.slice(0, 2) : [p.image_url]).map((path, idx) => (
+                            path && (
+                              isVideo(path) ? (
+                                <div key={idx} className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center">
+                                  <Film size={18} className="text-muted-foreground" />
+                                </div>
+                              ) : (
+                                <img key={idx} src={getMediaUrl(path)} alt={p.name} className="w-14 h-14 rounded-lg object-cover" />
+                              )
+                            )
+                          ))}
+                          {p.media_paths && p.media_paths.length > 2 && (
+                            <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-xs text-muted-foreground font-medium">
+                              +{p.media_paths.length - 2}
+                            </div>
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground truncate">{p.name}</h3>
-                          <p className="text-sm text-muted-foreground">{p.size} — {p.features.length} features</p>
+                          <p className="text-sm text-muted-foreground">{p.size} — {(p.media_paths?.length || 1)} media, {p.features.length} features</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button data-testid={`edit-product-${p.id}`} onClick={() => openProductForm(p)} className="p-2 border border-border rounded-lg hover:bg-muted transition-colors" title="Edit">
