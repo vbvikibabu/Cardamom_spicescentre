@@ -1,0 +1,18 @@
+# Add to backend/.env file - IMPORTANT!
+# Copy these to your /app/backend/.env file:
+
+# JWT Secret Key (change in production!)
+JWT_SECRET_KEY=cardamom-secret-key-change-this-in-production-2025
+
+# Razorpay Credentials (get from https://dashboard.razorpay.com/)
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_secret_key
+
+# Email SMTP (for notifications)
+SMTP_USERNAME=cardamomspicescentre@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
+
+# Existing
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=test_database
+CORS_ORIGINS=*
