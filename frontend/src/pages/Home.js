@@ -233,7 +233,7 @@ const Home = () => {
                     />
                     <div className="p-8">
                       <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full mb-4">
-                        {product.grade}
+                        {product.size}
                       </span>
                       <h3 className="font-serif text-2xl md:text-3xl font-semibold mb-3 text-foreground">
                         {product.name}

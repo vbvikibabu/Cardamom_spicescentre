@@ -13,8 +13,13 @@ const Register = () => {
     phone: ''
   });
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  if (isAuthenticated) {
+    navigate('/', { replace: true });
+    return null;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,20 +41,21 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted pt-20 px-4 py-12">
+    <div data-testid="register-page" className="min-h-screen flex items-center justify-center bg-muted pt-20 px-4 py-12">
       <div className="max-w-2xl w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg">
         <div className="text-center">
           <h2 className="font-serif text-4xl font-bold text-foreground mb-2">Create B2B Account</h2>
           <p className="text-muted-foreground">Register for wholesale cardamom trading</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} data-testid="register-form" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Full Name *</label>
               <input
                 type="text"
                 name="full_name"
+                data-testid="register-fullname-input"
                 value={formData.full_name}
                 onChange={handleChange}
                 required
@@ -62,6 +68,7 @@ const Register = () => {
               <input
                 type="email"
                 name="email"
+                data-testid="register-email-input"
                 value={formData.email}
                 onChange={handleChange}
                 required
@@ -74,6 +81,7 @@ const Register = () => {
               <input
                 type="password"
                 name="password"
+                data-testid="register-password-input"
                 value={formData.password}
                 onChange={handleChange}
                 required
@@ -87,6 +95,7 @@ const Register = () => {
               <input
                 type="tel"
                 name="phone"
+                data-testid="register-phone-input"
                 value={formData.phone}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -98,6 +107,7 @@ const Register = () => {
               <input
                 type="text"
                 name="company_name"
+                data-testid="register-company-input"
                 value={formData.company_name}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -109,6 +119,7 @@ const Register = () => {
               <input
                 type="text"
                 name="country"
+                data-testid="register-country-input"
                 value={formData.country}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -119,6 +130,7 @@ const Register = () => {
           <button
             type="submit"
             disabled={loading}
+            data-testid="register-submit-button"
             className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             {loading ? 'Registering...' : 'Register'}
@@ -128,7 +140,7 @@ const Register = () => {
         <div className="text-center">
           <p className="text-muted-foreground">
             Already have an account?{' '}
-            <Link to="/login" className="text-primary font-semibold hover:underline">
+            <Link to="/login" data-testid="register-login-link" className="text-primary font-semibold hover:underline">
               Login here
             </Link>
           </p>

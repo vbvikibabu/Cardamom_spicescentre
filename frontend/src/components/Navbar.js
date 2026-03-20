@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Phone, Mail, MessageCircle, Instagram, LogIn, LogOut, User } from 'lucide-react';
+import { Menu, X, Phone, Mail, MessageCircle, Instagram, LogIn, LogOut, User, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
@@ -14,7 +14,6 @@ const Navbar = () => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -24,6 +23,12 @@ const Navbar = () => {
     { name: 'Products', path: '/products' },
     { name: 'Contact', path: '/contact' },
   ];
+
+  const handleLogout = () => {
+    logout();
+    setIsMobileMenuOpen(false);
+    navigate('/');
+  };
 
   return (
     <nav
@@ -35,11 +40,7 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-6 md:px-12">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link
-            to="/"
-            data-testid="nav-logo"
-            className="flex flex-col"
-          >
+          <Link to="/" data-testid="nav-logo" className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className="font-serif text-2xl md:text-3xl font-bold text-foreground tracking-tight">Cardamom Spices Centre</span>
             </div>
@@ -103,13 +104,15 @@ const Navbar = () => {
                 <>
                   <Link
                     to={user?.role === 'admin' ? '/admin' : '/dashboard'}
+                    data-testid="nav-dashboard-button"
                     className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent/90 transition-all"
                     title="Dashboard"
                   >
-                    <User size={16} />
+                    <LayoutDashboard size={16} />
                   </Link>
                   <button
-                    onClick={() => { logout(); navigate('/'); }}
+                    onClick={handleLogout}
+                    data-testid="nav-logout-button"
                     className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all"
                     title="Logout"
                   >
@@ -119,6 +122,7 @@ const Navbar = () => {
               ) : (
                 <Link
                   to="/login"
+                  data-testid="nav-login-button"
                   className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent/90 transition-all"
                   title="Login"
                 >
@@ -141,10 +145,7 @@ const Navbar = () => {
 
       {/* Mobile Navigation */}
       {isMobileMenuOpen && (
-        <div
-          data-testid="mobile-menu"
-          className="md:hidden navbar-glass border-t border-border"
-        >
+        <div data-testid="mobile-menu" className="md:hidden navbar-glass border-t border-border">
           <div className="px-6 py-4 space-y-4">
             {navLinks.map((link) => (
               <Link
@@ -161,38 +162,68 @@ const Navbar = () => {
                 {link.name}
               </Link>
             ))}
+
+            {/* Mobile Auth Buttons */}
+            <div className="pt-4 border-t border-border space-y-2">
+              {isAuthenticated ? (
+                <>
+                  <Link
+                    to={user?.role === 'admin' ? '/admin' : '/dashboard'}
+                    data-testid="mobile-dashboard-button"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 bg-accent text-white rounded-lg"
+                  >
+                    <LayoutDashboard size={18} />
+                    <span>Dashboard</span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    data-testid="mobile-logout-button"
+                    className="flex items-center gap-3 px-4 py-3 bg-red-500 text-white rounded-lg w-full"
+                  >
+                    <LogOut size={18} />
+                    <span>Logout</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    data-testid="mobile-login-button"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 bg-accent text-white rounded-lg"
+                  >
+                    <LogIn size={18} />
+                    <span>Login</span>
+                  </Link>
+                  <Link
+                    to="/register"
+                    data-testid="mobile-register-button"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg"
+                  >
+                    <User size={18} />
+                    <span>Register</span>
+                  </Link>
+                </>
+              )}
+            </div>
             
             {/* Mobile Contact Buttons */}
-            <div className="pt-4 space-y-2">
-              <a
-                href="tel:+918838226519"
-                className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg"
-              >
+            <div className="pt-2 space-y-2">
+              <a href="tel:+918838226519" className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg">
                 <Phone size={18} />
                 <span>+91-8838226519</span>
               </a>
-              <a
-                href="https://wa.me/918838226519"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 px-4 py-3 bg-green-500 text-white rounded-lg"
-              >
+              <a href="https://wa.me/918838226519" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-3 bg-green-500 text-white rounded-lg">
                 <MessageCircle size={18} />
                 <span>WhatsApp</span>
               </a>
-              <a
-                href="mailto:cardamomspicescentre@gmail.com"
-                className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg"
-              >
+              <a href="mailto:cardamomspicescentre@gmail.com" className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg">
                 <Mail size={18} />
                 <span>Email Us</span>
               </a>
-              <a
-                href="https://www.instagram.com/cardamom_spicescentre?igsh=MTFxMGI3N2ZmenB4ZA=="
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 px-4 py-3 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 text-white rounded-lg"
-              >
+              <a href="https://www.instagram.com/cardamom_spicescentre?igsh=MTFxMGI3N2ZmenB4ZA==" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-3 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 text-white rounded-lg">
                 <Instagram size={18} />
                 <span>Instagram</span>
               </a>

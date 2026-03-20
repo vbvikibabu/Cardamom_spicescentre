@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import Home from "@/pages/Home";
 import Products from "@/pages/Products";
@@ -17,7 +18,6 @@ function App() {
   return (
     <AuthProvider>
       <div className="App">
-        {/* Noise texture overlay */}
         <div className="noise-overlay" />
         
         <BrowserRouter>
@@ -28,8 +28,16 @@ function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/dashboard" element={<CustomerDashboard />} />
+            <Route path="/admin" element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard" element={
+              <ProtectedRoute requiredRole="customer">
+                <CustomerDashboard />
+              </ProtectedRoute>
+            } />
             <Route path="/pending-approval" element={<PendingApproval />} />
           </Routes>
           <Footer />

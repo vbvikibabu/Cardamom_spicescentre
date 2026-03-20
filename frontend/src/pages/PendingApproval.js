@@ -12,7 +12,7 @@ const PendingApproval = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted pt-20 px-4">
+    <div data-testid="pending-approval-page" className="min-h-screen flex items-center justify-center bg-muted pt-20 px-4">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg text-center">
         <div className="flex justify-center">
           <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center">

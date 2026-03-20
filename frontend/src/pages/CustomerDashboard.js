@@ -14,16 +14,12 @@ const CustomerDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user?.role === 'admin') {
-      navigate('/admin');
-      return;
-    }
     if (!isApproved) {
       navigate('/pending-approval');
       return;
     }
     fetchQuotes();
-  }, [user, isApproved, navigate]);
+  }, [isApproved, navigate]);
 
   const fetchQuotes = async () => {
     try {
@@ -50,7 +46,7 @@ const CustomerDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-muted pt-20">
+    <div data-testid="customer-dashboard" className="min-h-screen bg-muted pt-20">
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
         {/* Header */}
         <div className="mb-8">

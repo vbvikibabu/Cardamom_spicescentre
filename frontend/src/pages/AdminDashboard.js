@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -8,20 +7,15 @@ import { User, CheckCircle, XCircle, FileText, Package } from 'lucide-react';
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const AdminDashboard = () => {
-  const { user, token, isAdmin } = useAuth();
-  const navigate = useNavigate();
+  const { user, token } = useAuth();
   const [users, setUsers] = useState([]);
   const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('users');
 
   useEffect(() => {
-    if (!isAdmin) {
-      navigate('/');
-      return;
-    }
     fetchData();
-  }, [isAdmin, navigate]);
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -68,7 +62,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-muted pt-20">
+    <div data-testid="admin-dashboard" className="min-h-screen bg-muted pt-20">
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
         {/* Header */}
         <div className="mb-8">
