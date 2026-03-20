@@ -379,6 +379,50 @@ async def get_my_quotes(current_user: User = Depends(get_current_approved_custom
     return [Quote(**q) for q in quotes]
 
 
+# ==================== ADMIN PRODUCT ENDPOINTS ====================
+@api_router.post("/admin/products", response_model=Product)
+async def create_product(
+    product_data: ProductCreate,
+    current_admin: User = Depends(get_current_admin)
+):
+    product = Product(**product_data.model_dump())
+    product_dict = product.model_dump()
+    product_dict['created_at'] = product_dict['created_at'].isoformat()
+    await db.products.insert_one(product_dict)
+    logger.info(f"Admin created product: {product.name}")
+    return product
+
+@api_router.put("/admin/products/{product_id}", response_model=Product)
+async def update_product(
+    product_id: str,
+    product_data: ProductCreate,
+    current_admin: User = Depends(get_current_admin)
+):
+    result = await db.products.update_one(
+        {"id": product_id},
+        {"$set": product_data.model_dump()}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    updated = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if isinstance(updated.get('created_at'), str):
+        updated['created_at'] = datetime.fromisoformat(updated['created_at'])
+    logger.info(f"Admin updated product: {product_id}")
+    return Product(**updated)
+
+@api_router.delete("/admin/products/{product_id}")
+async def delete_product(
+    product_id: str,
+    current_admin: User = Depends(get_current_admin)
+):
+    result = await db.products.delete_one({"id": product_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+    logger.info(f"Admin deleted product: {product_id}")
+    return {"message": "Product deleted"}
+
+
 # Product endpoints
 @api_router.get("/products", response_model=List[Product])
 async def get_products():
