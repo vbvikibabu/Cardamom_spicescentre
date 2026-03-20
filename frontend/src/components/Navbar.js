@@ -97,6 +97,34 @@ const Navbar = () => {
               >
                 <Instagram size={16} />
               </a>
+              
+              {/* Auth Buttons */}
+              {isAuthenticated ? (
+                <>
+                  <Link
+                    to={user?.role === 'admin' ? '/admin' : '/dashboard'}
+                    className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent/90 transition-all"
+                    title="Dashboard"
+                  >
+                    <User size={16} />
+                  </Link>
+                  <button
+                    onClick={() => { logout(); navigate('/'); }}
+                    className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all"
+                    title="Logout"
+                  >
+                    <LogOut size={16} />
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent/90 transition-all"
+                  title="Login"
+                >
+                  <LogIn size={16} />
+                </Link>
+              )}
             </div>
           </div>
 
