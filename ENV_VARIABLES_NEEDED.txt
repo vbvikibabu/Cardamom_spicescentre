@@ -13,6 +13,6 @@ SMTP_USERNAME=cardamomspicescentre@gmail.com
 SMTP_PASSWORD=your_gmail_app_password
 
 # Existing
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=test_database
+MONGO_URL="mongodb+srv://babuklu:doqLu2WQK2y4vAy9@vbcluster.59ix4.mongodb.net/"
+DB_NAME="SpiceOneMerchants"
 CORS_ORIGINS=*

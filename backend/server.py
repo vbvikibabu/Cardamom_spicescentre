@@ -16,7 +16,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import jwt
 from passlib.context import CryptContext
-import requests as http_requests
+import cloudinary
+import cloudinary.uploader
+from io import BytesIO
 
 
 ROOT_DIR = Path(__file__).parent
@@ -35,46 +37,43 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
 
-# ==================== OBJECT STORAGE ====================
-STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
-EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
-APP_NAME = "cardamom-spices"
-storage_key = None
+# ==================== CLOUDINARY STORAGE ====================
 
+# ==================== UPLOAD CONSTANTS ====================
 ALLOWED_MEDIA_TYPES = {
     "image/jpeg", "image/png", "image/webp",
     "video/mp4", "video/quicktime"
 }
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
-def init_storage():
-    global storage_key
-    if storage_key:
-        return storage_key
-    resp = http_requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
-    resp.raise_for_status()
-    storage_key = resp.json()["storage_key"]
-    return storage_key
+
+APP_NAME = "cardamom-spices"
+
+
+cloudinary.config(
+    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.environ.get("CLOUDINARY_API_KEY"),
+    api_secret=os.environ.get("CLOUDINARY_API_SECRET")
+)
 
 def put_object(path: str, data: bytes, content_type: str) -> dict:
-    key = init_storage()
-    resp = http_requests.put(
-        f"{STORAGE_URL}/objects/{path}",
-        headers={"X-Storage-Key": key, "Content-Type": content_type},
-        data=data, timeout=120
+    # Upload to cloudinary
+    result = cloudinary.uploader.upload(
+        BytesIO(data),
+        public_id=path.replace("/", "_"),
+        resource_type="auto"  # handles images and videos
     )
-    resp.raise_for_status()
-    return resp.json()
+    return {
+        "path": result["secure_url"],  # public URL
+        "size": result.get("bytes", len(data))
+    }
 
 def get_object(path: str):
-    key = init_storage()
-    resp = http_requests.get(
-        f"{STORAGE_URL}/objects/{path}",
-        headers={"X-Storage-Key": key}, timeout=60
-    )
-    resp.raise_for_status()
-    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
-
+    # With Cloudinary, files are served via public URL directly
+    # This function won't be needed but kept for compatibility
+    import urllib.request
+    with urllib.request.urlopen(path) as response:
+        return response.read(), response.headers.get_content_type()
 # Create the main app without a prefix
 app = FastAPI()
 
@@ -690,12 +689,7 @@ async def shutdown_db_client():
 @app.on_event("startup")
 async def initialize_data():
     # Initialize object storage
-    try:
-        init_storage()
-        logger.info("Object storage initialized")
-    except Exception as e:
-        logger.warning(f"Object storage init deferred: {e}")
-    
+
     # Create admin user if not exists
     admin_email = "admin@cardamomspicescentre.com"
     existing_admin = await db.users.find_one({"email": admin_email})
