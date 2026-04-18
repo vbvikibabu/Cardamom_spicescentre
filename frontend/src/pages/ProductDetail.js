@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, Send, ArrowLeft, ChevronLeft, ChevronRight, Film, Check } from 'lucide-react';
+import { Leaf, Send, ArrowLeft, ChevronLeft, ChevronRight, Film, Check, Gavel } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -33,8 +33,12 @@ const ProductDetail = () => {
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [showBidModal, setShowBidModal] = useState(false);
   const [quoteForm, setQuoteForm] = useState({
     quantity: '', market_type: 'domestic', destination_country: '', shipping_method: '', additional_notes: ''
+  });
+  const [bidForm, setBidForm] = useState({
+    quantity_kg: '', quantity_lot: '', price_per_kg: '', price_per_lot: '', currency: 'INR', market_type: 'domestic', additional_notes: ''
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,12 +56,21 @@ const ProductDetail = () => {
     fetchProduct();
   }, [id]);
 
-  const openQuoteModal = () => {
+  const requireAuth = (callback) => {
     if (!isAuthenticated) { setShowLoginModal(true); return; }
     if (!isApproved) { toast.error('Your account is pending approval.'); return; }
+    callback();
+  };
+
+  const openQuoteModal = () => requireAuth(() => {
     setQuoteForm({ quantity: '', market_type: 'domestic', destination_country: '', shipping_method: '', additional_notes: '' });
     setShowQuoteModal(true);
-  };
+  });
+
+  const openBidModal = () => requireAuth(() => {
+    setBidForm({ quantity_kg: '', quantity_lot: '', price_per_kg: '', price_per_lot: '', currency: 'INR', market_type: 'domestic', additional_notes: '' });
+    setShowBidModal(true);
+  });
 
   const submitQuote = async (e) => {
     e.preventDefault();
@@ -75,6 +88,37 @@ const ProductDetail = () => {
       setShowQuoteModal(false);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to submit quote request');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitBid = async (e) => {
+    e.preventDefault();
+    const hasQty = bidForm.quantity_kg || bidForm.quantity_lot;
+    const hasPrice = bidForm.price_per_kg || bidForm.price_per_lot;
+    if (!hasQty || !hasPrice) {
+      toast.error('Please enter at least one quantity (kg or lot) and one price (per kg or per lot).');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const payload = {
+        product_id: product.id,
+        currency: bidForm.currency,
+        market_type: bidForm.market_type,
+        additional_notes: bidForm.additional_notes || undefined
+      };
+      if (bidForm.quantity_kg) payload.quantity_kg = parseFloat(bidForm.quantity_kg);
+      if (bidForm.quantity_lot) payload.quantity_lot = parseFloat(bidForm.quantity_lot);
+      if (bidForm.price_per_kg) payload.price_per_kg = parseFloat(bidForm.price_per_kg);
+      if (bidForm.price_per_lot) payload.price_per_lot = parseFloat(bidForm.price_per_lot);
+
+      await axios.post(`${API}/bids`, payload, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Bid placed successfully! You will be notified when the admin reviews it.');
+      setShowBidModal(false);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to place bid');
     } finally {
       setSubmitting(false);
     }
@@ -101,23 +145,16 @@ const ProductDetail = () => {
 
   return (
     <div data-testid="product-detail-page" className="min-h-screen pt-20 bg-white">
-      {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-6 md:px-12 pt-8">
         <Link to="/products" data-testid="back-to-products" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
           <ArrowLeft size={16} /> Back to Products
         </Link>
       </div>
 
-      {/* Product Content */}
       <section className="max-w-7xl mx-auto px-6 md:px-12 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
           {/* Media Gallery */}
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            {/* Main Image/Video */}
+          <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
             <div data-testid="product-media-gallery" className="relative group rounded-2xl overflow-hidden bg-muted mb-4">
               {mediaPaths.length > 0 && (
                 isVideoPath(mediaPaths[currentMedia]) ? (
@@ -137,19 +174,10 @@ const ProductDetail = () => {
                 </>
               )}
             </div>
-
-            {/* Thumbnails */}
             {mediaPaths.length > 1 && (
               <div className="flex gap-3">
                 {mediaPaths.map((path, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentMedia(i)}
-                    data-testid={`media-thumbnail-${i}`}
-                    className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
-                      i === currentMedia ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
-                    }`}
-                  >
+                  <button key={i} onClick={() => setCurrentMedia(i)} data-testid={`media-thumbnail-${i}`} className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${i === currentMedia ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}>
                     {isVideoPath(path) ? (
                       <div className="w-full h-full flex items-center justify-center bg-gray-100"><Film size={20} className="text-muted-foreground" /></div>
                     ) : (
@@ -162,68 +190,106 @@ const ProductDetail = () => {
           </motion.div>
 
           {/* Product Info */}
-          <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="flex flex-col"
-          >
+          <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="flex flex-col">
             <div className="flex items-center gap-3 mb-4">
-              <span className="inline-block px-4 py-1.5 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-bold rounded-full">
-                {product.size}
-              </span>
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <Leaf size={14} /> Elettaria cardamomum
-              </span>
+              <span className="inline-block px-4 py-1.5 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-bold rounded-full">{product.size}</span>
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Leaf size={14} /> Elettaria cardamomum</span>
             </div>
 
-            <h1 data-testid="product-detail-name" className="font-serif text-4xl sm:text-5xl font-bold text-foreground mb-6 leading-tight">
-              {product.name}
-            </h1>
+            <h1 data-testid="product-detail-name" className="font-serif text-4xl sm:text-5xl font-bold text-foreground mb-6 leading-tight">{product.name}</h1>
+            <p className="text-base text-muted-foreground leading-relaxed mb-8">{product.description}</p>
 
-            <p className="text-base text-muted-foreground leading-relaxed mb-8">
-              {product.description}
-            </p>
-
-            {/* Features */}
             <div className="mb-10">
               <h3 className="font-sans text-xs tracking-[0.2em] uppercase font-bold mb-4 text-foreground">Key Features</h3>
               <ul className="space-y-3">
                 {product.features.map((feature, idx) => (
                   <li key={idx} className="flex items-center gap-3 text-sm text-foreground">
-                    <span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Check size={12} className="text-primary" />
-                    </span>
+                    <span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0"><Check size={12} className="text-primary" /></span>
                     {feature}
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* CTA */}
-            <div className="mt-auto space-y-4">
-              <button
-                data-testid="product-detail-request-quote"
-                onClick={openQuoteModal}
-                className="w-full inline-flex items-center justify-center gap-3 bg-primary text-white py-4 rounded-xl font-semibold text-base hover:bg-primary/90 transition-colors"
-              >
-                <Send size={18} /> Request a Quote
+            {/* CTA Buttons */}
+            <div className="mt-auto space-y-3">
+              <button data-testid="product-detail-place-bid" onClick={openBidModal} className="w-full inline-flex items-center justify-center gap-3 bg-foreground text-white py-4 rounded-xl font-semibold text-base hover:bg-foreground/90 transition-colors">
+                <Gavel size={18} /> Place a Bid
               </button>
-              <p className="text-xs text-center text-muted-foreground">
-                Pricing is quote-based for bulk orders. Submit your requirements and we'll respond within 24 hours.
-              </p>
+              <button data-testid="product-detail-request-quote" onClick={openQuoteModal} className="w-full inline-flex items-center justify-center gap-3 border-2 border-primary text-primary py-3.5 rounded-xl font-semibold text-sm hover:bg-primary/5 transition-colors">
+                <Send size={16} /> Request a Quote
+              </button>
+              <p className="text-xs text-center text-muted-foreground">Bids are reviewed daily. Quotes are responded to within 24 hours.</p>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Quote Request Modal */}
+      {/* ─── Bid Modal ─── */}
+      <Dialog open={showBidModal} onOpenChange={setShowBidModal}>
+        <DialogContent data-testid="bid-modal" className="sm:max-w-lg p-0 overflow-hidden rounded-2xl border-0">
+          <div className="bg-foreground px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-2xl font-bold text-white">Place a Bid</DialogTitle>
+              <DialogDescription className="text-white/70 text-sm">{product?.name} — {product?.size}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <form onSubmit={submitBid} data-testid="bid-form" className="px-6 pb-6 pt-3 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Quantity (kg)</label>
+                <input type="number" min="0" step="0.01" data-testid="bid-quantity-kg" value={bidForm.quantity_kg} onChange={e => setBidForm({...bidForm, quantity_kg: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Quantity (lots)</label>
+                <input type="number" min="0" step="0.01" data-testid="bid-quantity-lot" value={bidForm.quantity_lot} onChange={e => setBidForm({...bidForm, quantity_lot: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 10" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Price per kg</label>
+                <input type="number" min="0" step="0.01" data-testid="bid-price-kg" value={bidForm.price_per_kg} onChange={e => setBidForm({...bidForm, price_per_kg: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 2500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Price per lot</label>
+                <input type="number" min="0" step="0.01" data-testid="bid-price-lot" value={bidForm.price_per_lot} onChange={e => setBidForm({...bidForm, price_per_lot: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 50000" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Currency *</label>
+                <select data-testid="bid-currency" value={bidForm.currency} onChange={e => setBidForm({...bidForm, currency: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option value="INR">INR</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Market Type *</label>
+                <select data-testid="bid-market-type" value={bidForm.market_type} onChange={e => setBidForm({...bidForm, market_type: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option value="domestic">Domestic</option>
+                  <option value="export">Export</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1">Additional Notes</label>
+              <textarea data-testid="bid-notes" value={bidForm.additional_notes} onChange={e => setBidForm({...bidForm, additional_notes: e.target.value})} rows={2} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Delivery terms, packaging, etc." />
+            </div>
+            <p className="text-xs text-muted-foreground">Fill at least one quantity (kg or lot) and one price (per kg or per lot).</p>
+            <button type="submit" disabled={submitting} data-testid="bid-submit-btn" className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-foreground/90 transition-colors disabled:opacity-50">
+              <Gavel size={16} /> {submitting ? 'Placing Bid...' : 'Place Bid'}
+            </button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Quote Modal ─── */}
       <Dialog open={showQuoteModal} onOpenChange={setShowQuoteModal}>
         <DialogContent data-testid="quote-request-modal" className="sm:max-w-lg p-0 overflow-hidden rounded-2xl border-0">
           <div className="bg-primary px-6 py-5">
             <DialogHeader>
               <DialogTitle className="font-serif text-2xl font-bold text-white">Request a Quote</DialogTitle>
-              <DialogDescription className="text-white/80 text-sm">{product.name}</DialogDescription>
+              <DialogDescription className="text-white/80 text-sm">{product?.name}</DialogDescription>
             </DialogHeader>
           </div>
           <form onSubmit={submitQuote} data-testid="quote-request-form" className="px-6 pb-6 pt-3 space-y-4">
@@ -256,7 +322,7 @@ const ProductDetail = () => {
             )}
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">Additional Notes</label>
-              <textarea data-testid="quote-notes-input" value={quoteForm.additional_notes} onChange={e => setQuoteForm({...quoteForm, additional_notes: e.target.value})} rows={3} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Packaging preferences, delivery timeline, special requirements..." />
+              <textarea data-testid="quote-notes-input" value={quoteForm.additional_notes} onChange={e => setQuoteForm({...quoteForm, additional_notes: e.target.value})} rows={3} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Packaging preferences, delivery timeline..." />
             </div>
             <button type="submit" disabled={submitting} data-testid="quote-submit-btn" className="w-full inline-flex items-center justify-center gap-2 bg-primary text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50">
               <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Quote Request'}

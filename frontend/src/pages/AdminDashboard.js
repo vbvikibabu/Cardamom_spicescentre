@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { User, CheckCircle, XCircle, FileText, Package, Plus, Pencil, Trash2, X, Send, Upload, Image, Film } from 'lucide-react';
+import { User, CheckCircle, XCircle, FileText, Package, Plus, Pencil, Trash2, X, Send, Upload, Image, Film, Gavel } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -14,6 +14,9 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [quotes, setQuotes] = useState([]);
   const [products, setProducts] = useState([]);
+  const [bids, setBids] = useState([]);
+  const [bidsSummary, setBidsSummary] = useState({ total: 0, today: 0, pending: 0, accepted: 0, rejected: 0 });
+  const [bidsFilter, setBidsFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('users');
 
@@ -30,20 +33,27 @@ const AdminDashboard = () => {
   const [respondingQuote, setRespondingQuote] = useState(null);
   const [quoteForm, setQuoteForm] = useState({ base_price: '', freight_cost: '', final_price: '', currency: 'INR', admin_notes: '', status: 'quoted' });
 
+  // Bid response state
+  const [bidNotes, setBidNotes] = useState({});
+
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
-      const [usersRes, quotesRes, productsRes] = await Promise.all([
+      const [usersRes, quotesRes, productsRes, bidsRes, bidsSumRes] = await Promise.all([
         axios.get(`${API_URL}/api/admin/users`, authHeaders),
         axios.get(`${API_URL}/api/admin/quotes`, authHeaders),
-        axios.get(`${API_URL}/api/products`)
+        axios.get(`${API_URL}/api/products`),
+        axios.get(`${API_URL}/api/bids`, authHeaders),
+        axios.get(`${API_URL}/api/bids/summary`, authHeaders)
       ]);
       setUsers(usersRes.data);
       setQuotes(quotesRes.data);
       setProducts(productsRes.data);
+      setBids(bidsRes.data);
+      setBidsSummary(bidsSumRes.data);
     } catch (error) {
       toast.error('Failed to load data');
     } finally {
@@ -236,6 +246,28 @@ const AdminDashboard = () => {
     }
   };
 
+  // ─── Bid Actions ───
+  const handleBidAction = async (bidId, status) => {
+    try {
+      await axios.put(`${API_URL}/api/bids/${bidId}`, {
+        status,
+        admin_notes: bidNotes[bidId] || null
+      }, authHeaders);
+      toast.success(`Bid ${status}!`);
+      setBidNotes(prev => { const n = {...prev}; delete n[bidId]; return n; });
+      fetchData();
+    } catch { toast.error('Failed to update bid'); }
+  };
+
+  const fetchFilteredBids = async (filter) => {
+    setBidsFilter(filter);
+    try {
+      const url = filter === 'all' ? `${API_URL}/api/bids` : `${API_URL}/api/bids?status=${filter}`;
+      const res = await axios.get(url, authHeaders);
+      setBids(res.data);
+    } catch { toast.error('Failed to filter bids'); }
+  };
+
   // ─── Helper: get display URL for a media path ───
   const getMediaUrl = (path) => {
     if (path.startsWith('http')) return path;
@@ -258,6 +290,7 @@ const AdminDashboard = () => {
   const tabs = [
     { key: 'users', label: 'Users Management' },
     { key: 'quotes', label: 'Quote Requests' },
+    { key: 'bids', label: 'Bids' },
     { key: 'products', label: 'Products' }
   ];
 
@@ -426,6 +459,111 @@ const AdminDashboard = () => {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+
+            {/* ═══ BIDS TAB ═══ */}
+            {activeTab === 'bids' && (
+              <div>
+                {/* Bid Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                  {[
+                    { label: 'Total', value: bidsSummary.total, bg: 'bg-blue-50', color: 'text-blue-700' },
+                    { label: 'Today', value: bidsSummary.today, bg: 'bg-purple-50', color: 'text-purple-700' },
+                    { label: 'Pending', value: bidsSummary.pending, bg: 'bg-yellow-50', color: 'text-yellow-700' },
+                    { label: 'Accepted', value: bidsSummary.accepted, bg: 'bg-green-50', color: 'text-green-700' },
+                    { label: 'Rejected', value: bidsSummary.rejected, bg: 'bg-red-50', color: 'text-red-700' }
+                  ].map((s, i) => (
+                    <div key={i} className={`${s.bg} rounded-lg p-3 text-center`}>
+                      <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                      <p className="text-xs text-muted-foreground">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Filter */}
+                <div className="flex gap-2 mb-4">
+                  {['all', 'pending', 'accepted', 'rejected'].map(f => (
+                    <button key={f} data-testid={`bids-filter-${f}`} onClick={() => fetchFilteredBids(f)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors capitalize ${bidsFilter === f ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+                      {f}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Bids Table */}
+                {bids.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No bids found</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table data-testid="admin-bids-table" className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-2 font-semibold text-foreground">Customer</th>
+                          <th className="text-left py-3 px-2 font-semibold text-foreground">Product</th>
+                          <th className="text-left py-3 px-2 font-semibold text-foreground">Qty</th>
+                          <th className="text-left py-3 px-2 font-semibold text-foreground">Price</th>
+                          <th className="text-left py-3 px-2 font-semibold text-foreground">Market</th>
+                          <th className="text-left py-3 px-2 font-semibold text-foreground">Date</th>
+                          <th className="text-left py-3 px-2 font-semibold text-foreground">Status</th>
+                          <th className="text-left py-3 px-2 font-semibold text-foreground">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bids.map(b => {
+                          const qty = [b.quantity_kg && `${b.quantity_kg} kg`, b.quantity_lot && `${b.quantity_lot} lots`].filter(Boolean).join(' / ');
+                          const price = [b.price_per_kg && `${b.currency} ${b.price_per_kg}/kg`, b.price_per_lot && `${b.currency} ${b.price_per_lot}/lot`].filter(Boolean).join(' / ');
+                          return (
+                            <tr key={b.id} data-testid={`admin-bid-${b.id}`} className="border-b border-border last:border-0 hover:bg-muted/50">
+                              <td className="py-3 px-2">
+                                <div className="font-medium text-foreground">{b.customer_name}</div>
+                                <div className="text-xs text-muted-foreground">{b.customer_company}</div>
+                              </td>
+                              <td className="py-3 px-2">
+                                <div className="font-medium text-foreground">{b.product_name}</div>
+                                <div className="text-xs text-muted-foreground">{b.product_size}</div>
+                              </td>
+                              <td className="py-3 px-2 text-foreground">{qty}</td>
+                              <td className="py-3 px-2 font-medium text-foreground">{price}</td>
+                              <td className="py-3 px-2 capitalize text-foreground">{b.market_type}</td>
+                              <td className="py-3 px-2 text-muted-foreground">{b.bid_date}</td>
+                              <td className="py-3 px-2">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                  b.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : b.status === 'accepted' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                }`}>{b.status}</span>
+                              </td>
+                              <td className="py-3 px-2">
+                                {b.status === 'pending' ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Admin notes..."
+                                      data-testid={`bid-notes-${b.id}`}
+                                      value={bidNotes[b.id] || ''}
+                                      onChange={e => setBidNotes({...bidNotes, [b.id]: e.target.value})}
+                                      className="w-full px-2 py-1.5 border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                                    />
+                                    <div className="flex gap-1">
+                                      <button data-testid={`accept-bid-${b.id}`} onClick={() => handleBidAction(b.id, 'accepted')} className="px-2.5 py-1 bg-green-500 text-white rounded text-xs font-semibold hover:bg-green-600 transition-colors">
+                                        Accept
+                                      </button>
+                                      <button data-testid={`reject-bid-${b.id}`} onClick={() => handleBidAction(b.id, 'rejected')} className="px-2.5 py-1 bg-red-500 text-white rounded text-xs font-semibold hover:bg-red-600 transition-colors">
+                                        Reject
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">{b.admin_notes || '—'}</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 

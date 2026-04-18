@@ -213,6 +213,45 @@ class QuoteUpdate(BaseModel):
     final_price: Optional[float] = None
     currency: Optional[Literal["INR", "USD"]] = None
 
+# ==================== BID MODELS ====================
+class BidCreate(BaseModel):
+    product_id: str
+    quantity_kg: Optional[float] = None
+    quantity_lot: Optional[float] = None
+    price_per_kg: Optional[float] = None
+    price_per_lot: Optional[float] = None
+    currency: Literal["INR", "USD"] = "INR"
+    market_type: Literal["domestic", "export"] = "domestic"
+    additional_notes: Optional[str] = None
+
+class Bid(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    customer_id: str
+    customer_name: str
+    customer_email: str
+    customer_phone: Optional[str] = None
+    customer_company: Optional[str] = None
+    product_id: str
+    product_name: str
+    product_size: str
+    quantity_kg: Optional[float] = None
+    quantity_lot: Optional[float] = None
+    price_per_kg: Optional[float] = None
+    price_per_lot: Optional[float] = None
+    currency: Literal["INR", "USD"] = "INR"
+    market_type: Literal["domestic", "export"] = "domestic"
+    additional_notes: Optional[str] = None
+    status: Literal["pending", "accepted", "rejected"] = "pending"
+    admin_notes: Optional[str] = None
+    bid_date: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class BidUpdate(BaseModel):
+    status: Literal["accepted", "rejected"]
+    admin_notes: Optional[str] = None
+
 class ContactInquiry(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -476,6 +515,168 @@ async def get_my_quotes(current_user: User = Depends(get_current_approved_custom
             quote['updated_at'] = datetime.fromisoformat(quote['updated_at'])
     
     return [Quote(**q) for q in quotes]
+
+
+# ==================== BID ENDPOINTS ====================
+@api_router.post("/bids", response_model=Bid)
+async def create_bid(
+    bid_data: BidCreate,
+    current_user: User = Depends(get_current_approved_customer)
+):
+    # Validate at least one quantity and one price
+    has_qty = bid_data.quantity_kg or bid_data.quantity_lot
+    has_price = bid_data.price_per_kg or bid_data.price_per_lot
+    if not has_qty or not has_price:
+        raise HTTPException(status_code=400, detail="At least one quantity (kg or lot) and one price (per kg or per lot) must be provided")
+
+    product = await db.products.find_one({"id": bid_data.product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    bid = Bid(
+        customer_id=current_user.id,
+        customer_name=current_user.full_name,
+        customer_email=current_user.email,
+        customer_phone=current_user.phone,
+        customer_company=current_user.company_name,
+        product_id=bid_data.product_id,
+        product_name=product["name"],
+        product_size=product["size"],
+        quantity_kg=bid_data.quantity_kg,
+        quantity_lot=bid_data.quantity_lot,
+        price_per_kg=bid_data.price_per_kg,
+        price_per_lot=bid_data.price_per_lot,
+        currency=bid_data.currency,
+        market_type=bid_data.market_type,
+        additional_notes=bid_data.additional_notes
+    )
+    bid_dict = bid.model_dump()
+    bid_dict["created_at"] = bid_dict["created_at"].isoformat()
+    bid_dict["updated_at"] = bid_dict["updated_at"].isoformat()
+    await db.bids.insert_one(bid_dict)
+    logger.info(f"New bid: {current_user.email} on {product['name']}")
+
+    try:
+        await send_push_to_admins(
+            "New Bid Placed",
+            f"{current_user.full_name} bid on {product['name']} ({bid_data.currency} {bid_data.price_per_kg or bid_data.price_per_lot}/{'kg' if bid_data.price_per_kg else 'lot'})",
+            "/admin"
+        )
+    except Exception as e:
+        logger.warning(f"Push notification failed: {e}")
+
+    return bid
+
+@api_router.get("/bids/my", response_model=List[Bid])
+async def get_my_bids(current_user: User = Depends(get_current_approved_customer)):
+    bids = await db.bids.find({"customer_id": current_user.id}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    for b in bids:
+        if isinstance(b.get("created_at"), str):
+            b["created_at"] = datetime.fromisoformat(b["created_at"])
+        if isinstance(b.get("updated_at"), str):
+            b["updated_at"] = datetime.fromisoformat(b["updated_at"])
+    return [Bid(**b) for b in bids]
+
+@api_router.get("/bids/summary")
+async def get_bids_summary(current_admin: User = Depends(get_current_admin)):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    total = await db.bids.count_documents({})
+    today_count = await db.bids.count_documents({"bid_date": today})
+    pending = await db.bids.count_documents({"status": "pending"})
+    accepted = await db.bids.count_documents({"status": "accepted"})
+    rejected = await db.bids.count_documents({"status": "rejected"})
+    return {"total": total, "today": today_count, "pending": pending, "accepted": accepted, "rejected": rejected}
+
+@api_router.get("/bids", response_model=List[Bid])
+async def get_all_bids(
+    status: Optional[str] = Query(None),
+    current_admin: User = Depends(get_current_admin)
+):
+    query = {}
+    if status and status in ("pending", "accepted", "rejected"):
+        query["status"] = status
+    bids = await db.bids.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    for b in bids:
+        if isinstance(b.get("created_at"), str):
+            b["created_at"] = datetime.fromisoformat(b["created_at"])
+        if isinstance(b.get("updated_at"), str):
+            b["updated_at"] = datetime.fromisoformat(b["updated_at"])
+    return [Bid(**b) for b in bids]
+
+@api_router.put("/bids/{bid_id}")
+async def update_bid(
+    bid_id: str,
+    bid_update: BidUpdate,
+    current_admin: User = Depends(get_current_admin)
+):
+    update_data = {"status": bid_update.status, "updated_at": datetime.now(timezone.utc).isoformat()}
+    if bid_update.admin_notes is not None:
+        update_data["admin_notes"] = bid_update.admin_notes
+
+    result = await db.bids.update_one({"id": bid_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Bid not found")
+
+    bid = await db.bids.find_one({"id": bid_id}, {"_id": 0})
+    logger.info(f"Admin {bid_update.status} bid {bid_id}")
+
+    # Send email notification to customer
+    try:
+        status_label = "Accepted" if bid_update.status == "accepted" else "Rejected"
+        qty_str = ""
+        if bid.get("quantity_kg"):
+            qty_str += f"{bid['quantity_kg']} kg"
+        if bid.get("quantity_lot"):
+            qty_str += f"{' / ' if qty_str else ''}{bid['quantity_lot']} lots"
+        price_str = ""
+        if bid.get("price_per_kg"):
+            price_str += f"{bid['currency']} {bid['price_per_kg']}/kg"
+        if bid.get("price_per_lot"):
+            price_str += f"{' / ' if price_str else ''}{bid['currency']} {bid['price_per_lot']}/lot"
+
+        email_body = f"""
+        <h2>Bid {status_label}</h2>
+        <p>Dear {bid.get('customer_name', 'Customer')},</p>
+        <p>Your bid on <strong>{bid.get('product_name', '')}</strong> ({bid.get('product_size', '')}) has been <strong>{status_label.lower()}</strong>.</p>
+        <table style="border-collapse:collapse;margin:16px 0;">
+            <tr><td style="padding:6px 16px 6px 0;font-weight:bold;">Quantity:</td><td>{qty_str}</td></tr>
+            <tr><td style="padding:6px 16px 6px 0;font-weight:bold;">Your Price:</td><td>{price_str}</td></tr>
+            <tr><td style="padding:6px 16px 6px 0;font-weight:bold;">Status:</td><td><strong>{status_label}</strong></td></tr>
+            {f'<tr><td style="padding:6px 16px 6px 0;font-weight:bold;">Admin Notes:</td><td>{bid_update.admin_notes}</td></tr>' if bid_update.admin_notes else ''}
+        </table>
+        <p>Thank you for trading with Cardamom Spices Centre.</p>
+        """
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"Bid {status_label} - {bid.get('product_name', 'Cardamom')}"
+        msg["From"] = os.environ.get("SMTP_FROM", "noreply@cardamomspicescentre.com")
+        msg["To"] = bid.get("customer_email", "")
+        msg.attach(MIMEText(email_body, "html"))
+
+        smtp_host = os.environ.get("SMTP_HOST")
+        smtp_user = os.environ.get("SMTP_USER")
+        smtp_pass = os.environ.get("SMTP_PASS")
+        if smtp_host and smtp_user and smtp_pass:
+            await aiosmtplib.send(msg, hostname=smtp_host, port=587, username=smtp_user, password=smtp_pass, start_tls=True)
+            logger.info(f"Bid email sent to {bid.get('customer_email')}")
+        else:
+            logger.info(f"SMTP not configured. Bid email to {bid.get('customer_email')} skipped.")
+    except Exception as e:
+        logger.warning(f"Bid email failed: {e}")
+
+    # Push notification to customer
+    try:
+        customer_id = bid.get("customer_id")
+        if customer_id:
+            await send_push_to_user(
+                customer_id,
+                f"Bid {status_label}",
+                f"Your bid on {bid.get('product_name', '')} has been {status_label.lower()}",
+                "/dashboard"
+            )
+    except Exception as e:
+        logger.warning(f"Push notification failed: {e}")
+
+    return {"message": f"Bid {bid_update.status}", "bid": bid}
 
 
 # ==================== ADMIN PRODUCT ENDPOINTS ====================
