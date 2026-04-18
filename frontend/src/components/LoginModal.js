@@ -31,7 +31,13 @@ const LoginModal = ({ open, onOpenChange }) => {
       if (userData.role === 'admin') {
         navigate('/admin');
       } else if (userData.status === 'approved') {
-        navigate('/dashboard');
+        if (userData.role === 'seller') {
+          navigate('/seller');
+        } else if (userData.role === 'both') {
+          navigate('/seller');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         navigate('/pending-approval');
       }

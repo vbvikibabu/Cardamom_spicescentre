@@ -115,7 +115,7 @@ const ProductDetail = () => {
       if (bidForm.price_per_lot) payload.price_per_lot = parseFloat(bidForm.price_per_lot);
 
       await axios.post(`${API}/bids`, payload, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success('Bid placed successfully! You will be notified when the admin reviews it.');
+      toast.success('Bid placed successfully! The seller will review your bid.');
       setShowBidModal(false);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to place bid');
@@ -196,7 +196,12 @@ const ProductDetail = () => {
               <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Leaf size={14} /> Elettaria cardamomum</span>
             </div>
 
-            <h1 data-testid="product-detail-name" className="font-serif text-4xl sm:text-5xl font-bold text-foreground mb-6 leading-tight">{product.name}</h1>
+            <h1 data-testid="product-detail-name" className="font-serif text-4xl sm:text-5xl font-bold text-foreground mb-4 leading-tight">{product.name}</h1>
+            {product.seller_name && (
+              <p data-testid="product-seller-name" className="text-sm text-muted-foreground mb-4">
+                Sold by <span className="font-semibold text-foreground">{product.seller_name}</span>
+              </p>
+            )}
             <p className="text-base text-muted-foreground leading-relaxed mb-8">{product.description}</p>
 
             <div className="mb-10">

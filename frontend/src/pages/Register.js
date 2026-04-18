@@ -10,7 +10,8 @@ const Register = () => {
     full_name: '',
     company_name: '',
     country: '',
-    phone: ''
+    phone: '',
+    role: 'buyer'
   });
   const [loading, setLoading] = useState(false);
   const { register, isAuthenticated } = useAuth();
@@ -127,6 +128,33 @@ const Register = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               />
+            </div>
+          </div>
+
+          {/* Role Selection */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-3">I want to *</label>
+            <div className="grid grid-cols-3 gap-3" data-testid="register-role-selector">
+              {[
+                { value: 'buyer', label: 'Buy', desc: 'Browse & bid on products' },
+                { value: 'seller', label: 'Sell', desc: 'List & sell your products' },
+                { value: 'both', label: 'Both', desc: 'Buy and sell products' }
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  data-testid={`register-role-${opt.value}`}
+                  onClick={() => setFormData({ ...formData, role: opt.value })}
+                  className={`p-4 rounded-xl border-2 text-center transition-all ${
+                    formData.role === opt.value
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-border text-muted-foreground hover:border-primary/50'
+                  }`}
+                >
+                  <div className="font-semibold text-sm">{opt.label}</div>
+                  <div className="text-xs mt-1 opacity-70">{opt.desc}</div>
+                </button>
+              ))}
             </div>
           </div>
 

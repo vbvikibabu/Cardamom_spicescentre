@@ -10,7 +10,7 @@ const Navbar = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isSeller, isAdmin } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -111,7 +111,7 @@ const Navbar = () => {
                 {isAuthenticated ? (
                   <>
                     <Link
-                      to={user?.role === 'admin' ? '/admin' : '/dashboard'}
+                      to={isAdmin ? '/admin' : isSeller ? '/seller' : '/dashboard'}
                       data-testid="nav-dashboard-button"
                       className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent/90 transition-all"
                       title="Dashboard"
@@ -176,7 +176,7 @@ const Navbar = () => {
                 {isAuthenticated ? (
                   <>
                     <Link
-                      to={user?.role === 'admin' ? '/admin' : '/dashboard'}
+                      to={isAdmin ? '/admin' : isSeller ? '/seller' : '/dashboard'}
                       data-testid="mobile-dashboard-button"
                       onClick={() => setIsMobileMenuOpen(false)}
                       className="flex items-center gap-3 px-4 py-3 bg-accent text-white rounded-lg"

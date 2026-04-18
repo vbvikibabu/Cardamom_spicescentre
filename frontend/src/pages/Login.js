@@ -23,7 +23,11 @@ const Login = () => {
       if (user.role === 'admin') {
         navigate('/admin', { replace: true });
       } else if (user.status === 'approved') {
-        navigate('/dashboard', { replace: true });
+        if (user.role === 'seller' || user.role === 'both') {
+          navigate('/seller', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
       } else {
         navigate('/pending-approval', { replace: true });
       }
@@ -41,7 +45,11 @@ const Login = () => {
       if (userData.role === 'admin') {
         navigate('/admin');
       } else if (userData.status === 'approved') {
-        navigate('/dashboard');
+        if (userData.role === 'seller' || userData.role === 'both') {
+          navigate('/seller');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         navigate('/pending-approval');
       }

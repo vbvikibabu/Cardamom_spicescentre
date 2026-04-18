@@ -12,7 +12,8 @@ import Contact from "@/pages/Contact";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import AdminDashboard from "@/pages/AdminDashboard";
-import CustomerDashboard from "@/pages/CustomerDashboard";
+import BuyerDashboard from "@/pages/BuyerDashboard";
+import SellerDashboard from "@/pages/SellerDashboard";
 import PendingApproval from "@/pages/PendingApproval";
 import Footer from "@/components/Footer";
 
@@ -38,8 +39,13 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="/dashboard" element={
-              <ProtectedRoute requiredRole="customer">
-                <CustomerDashboard />
+              <ProtectedRoute requiredRole="buyer">
+                <BuyerDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/seller" element={
+              <ProtectedRoute requiredRole="seller">
+                <SellerDashboard />
               </ProtectedRoute>
             } />
             <Route path="/pending-approval" element={<PendingApproval />} />

@@ -45,7 +45,7 @@ const AdminDashboard = () => {
       const [usersRes, quotesRes, productsRes, bidsRes, bidsSumRes] = await Promise.all([
         axios.get(`${API_URL}/api/admin/users`, authHeaders),
         axios.get(`${API_URL}/api/admin/quotes`, authHeaders),
-        axios.get(`${API_URL}/api/products`),
+        axios.get(`${API_URL}/api/admin/products`, authHeaders),
         axios.get(`${API_URL}/api/bids`, authHeaders),
         axios.get(`${API_URL}/api/bids/summary`, authHeaders)
       ]);
@@ -214,6 +214,15 @@ const AdminDashboard = () => {
     } catch { toast.error('Failed to delete product'); }
   };
 
+  // ─── Product Approval Actions ───
+  const approveProduct = async (productId, approvalStatus) => {
+    try {
+      await axios.patch(`${API_URL}/api/admin/products/${productId}/status?approval_status=${approvalStatus}`, {}, authHeaders);
+      toast.success(`Product ${approvalStatus}!`);
+      fetchData();
+    } catch { toast.error('Failed to update product status'); }
+  };
+
   // ─── Quote Actions ───
   const openQuoteResponse = (quote) => {
     setRespondingQuote(quote);
@@ -251,7 +260,7 @@ const AdminDashboard = () => {
     try {
       await axios.put(`${API_URL}/api/bids/${bidId}`, {
         status,
-        admin_notes: bidNotes[bidId] || null
+        notes: bidNotes[bidId] || null
       }, authHeaders);
       toast.success(`Bid ${status}!`);
       setBidNotes(prev => { const n = {...prev}; delete n[bidId]; return n; });
@@ -288,10 +297,11 @@ const AdminDashboard = () => {
   }
 
   const tabs = [
-    { key: 'users', label: 'Users Management' },
-    { key: 'quotes', label: 'Quote Requests' },
+    { key: 'users', label: 'Users' },
+    { key: 'pending-products', label: `Pending Products (${products.filter(p => p.approval_status === 'pending').length})` },
+    { key: 'quotes', label: 'Quotes' },
     { key: 'bids', label: 'Bids' },
-    { key: 'products', label: 'Products' }
+    { key: 'products', label: 'All Products' }
   ];
 
   return (
@@ -360,6 +370,7 @@ const AdminDashboard = () => {
                         <p className="text-xs text-muted-foreground mt-1">{u.company_name} {u.country && `• ${u.country}`}</p>
                       </div>
                       <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 capitalize">{u.role}</span>
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                           u.status === 'approved' ? 'bg-green-100 text-green-700' : u.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
                         }`}>{u.status}</span>
@@ -374,6 +385,53 @@ const AdminDashboard = () => {
                           </>
                         )}
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ═══ PENDING PRODUCTS TAB ═══ */}
+            {activeTab === 'pending-products' && (
+              <div className="space-y-4">
+                {products.filter(p => p.approval_status === 'pending').length === 0 && (
+                  <p className="text-center text-muted-foreground py-8">No products pending approval</p>
+                )}
+                {products.filter(p => p.approval_status === 'pending').map(p => (
+                  <div key={p.id} data-testid={`pending-product-${p.id}`} className="border border-yellow-200 bg-yellow-50/50 rounded-lg p-5">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-4">
+                        <div className="flex gap-1 flex-shrink-0">
+                          {(p.media_paths && p.media_paths.length > 0 ? p.media_paths.slice(0, 2) : [p.image_url]).map((path, idx) => (
+                            path && (
+                              isVideo(path) ? (
+                                <div key={idx} className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center"><Film size={18} className="text-muted-foreground" /></div>
+                              ) : (
+                                <img key={idx} src={getMediaUrl(path)} alt={p.name} className="w-14 h-14 rounded-lg object-cover" />
+                              )
+                            )
+                          ))}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-foreground">{p.name}</h3>
+                          <p className="text-sm text-muted-foreground">{p.size}</p>
+                          <p className="text-xs text-muted-foreground mt-1">By: {p.seller_name || 'Unknown'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button data-testid={`approve-product-${p.id}`} onClick={() => approveProduct(p.id, 'approved')} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors inline-flex items-center gap-1">
+                          <CheckCircle size={14} /> Approve
+                        </button>
+                        <button data-testid={`reject-product-${p.id}`} onClick={() => approveProduct(p.id, 'rejected')} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors inline-flex items-center gap-1">
+                          <XCircle size={14} /> Reject
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">{p.description}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {p.features?.map((f, i) => (
+                        <span key={i} className="px-2 py-1 bg-white rounded text-xs text-foreground border border-border">{f}</span>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -500,7 +558,7 @@ const AdminDashboard = () => {
                     <table data-testid="admin-bids-table" className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="text-left py-3 px-2 font-semibold text-foreground">Customer</th>
+                          <th className="text-left py-3 px-2 font-semibold text-foreground">Buyer</th>
                           <th className="text-left py-3 px-2 font-semibold text-foreground">Product</th>
                           <th className="text-left py-3 px-2 font-semibold text-foreground">Qty</th>
                           <th className="text-left py-3 px-2 font-semibold text-foreground">Price</th>
@@ -517,8 +575,8 @@ const AdminDashboard = () => {
                           return (
                             <tr key={b.id} data-testid={`admin-bid-${b.id}`} className="border-b border-border last:border-0 hover:bg-muted/50">
                               <td className="py-3 px-2">
-                                <div className="font-medium text-foreground">{b.customer_name}</div>
-                                <div className="text-xs text-muted-foreground">{b.customer_company}</div>
+                                <div className="font-medium text-foreground">{b.buyer_name}</div>
+                                <div className="text-xs text-muted-foreground">{b.buyer_company}</div>
                               </td>
                               <td className="py-3 px-2">
                                 <div className="font-medium text-foreground">{b.product_name}</div>
@@ -722,8 +780,11 @@ const AdminDashboard = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground truncate">{p.name}</h3>
-                          <p className="text-sm text-muted-foreground">{p.size} — {(p.media_paths?.length || 1)} media, {p.features.length} features</p>
+                          <p className="text-sm text-muted-foreground">{p.size} — {p.seller_name || 'Admin'}</p>
                         </div>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          p.approval_status === 'approved' ? 'bg-green-100 text-green-700' : p.approval_status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                        }`}>{p.approval_status || 'approved'}</span>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button data-testid={`edit-product-${p.id}`} onClick={() => openProductForm(p)} className="p-2 border border-border rounded-lg hover:bg-muted transition-colors" title="Edit">
                             <Pencil size={16} className="text-foreground" />

@@ -20,8 +20,14 @@ export const ProtectedRoute = ({ children, requiredRole }) => {
     return <Navigate to="/" replace />;
   }
 
-  if (requiredRole === 'customer' && user?.role === 'admin') {
-    return <Navigate to="/admin" replace />;
+  if (requiredRole === 'seller' && !['seller', 'both'].includes(user?.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (requiredRole === 'buyer' && !['buyer', 'both'].includes(user?.role)) {
+    if (user?.role === 'admin') return <Navigate to="/admin" replace />;
+    if (user?.role === 'seller') return <Navigate to="/seller" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return children;
