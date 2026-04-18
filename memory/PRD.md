@@ -64,6 +64,10 @@ Build a full-featured B2B e-commerce platform for a cardamom export business (si
 - [x] ScrollToTop component for proper page navigation
 - [x] **PWA**: Installable app with manifest, service worker, offline fallback page, custom cardamom app icons
 - [x] **Push Notifications**: Web Push via VAPID — admin notified on new quotes, customers notified on quote responses
+- [x] **Bidding System**: Private B2B bids on products — customers bid, admin reviews EOD, accepts/rejects with notifications
+  - Backend: POST /api/bids, GET /api/bids/my, GET /api/bids (admin), PUT /api/bids/{id}, GET /api/bids/summary
+  - Frontend: Bid modal on ProductDetail, My Bids tab on CustomerDashboard, Bids tab on AdminDashboard with summary + filters
+  - Email notification on bid accept/reject (SMTP required), Push notifications on bid events
 - [x] CustomerDashboard with quotes list
 - [x] PendingApproval page
 - [x] ProtectedRoute component for /admin and /dashboard
