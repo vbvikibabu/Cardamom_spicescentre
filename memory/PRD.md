@@ -61,6 +61,9 @@ Build a full-featured B2B e-commerce platform for a cardamom export business (si
 - [x] **Media gallery** on Products page with navigation for multi-media products
 - [x] **Product detail page** at `/products/:id` with full media gallery, features, and Request a Quote
 - [x] Clickable product cards on Products page and Home page link to detail pages
+- [x] ScrollToTop component for proper page navigation
+- [x] **PWA**: Installable app with manifest, service worker, offline fallback page, custom cardamom app icons
+- [x] **Push Notifications**: Web Push via VAPID — admin notified on new quotes, customers notified on quote responses
 - [x] CustomerDashboard with quotes list
 - [x] PendingApproval page
 - [x] ProtectedRoute component for /admin and /dashboard

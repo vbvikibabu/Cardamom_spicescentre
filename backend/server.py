@@ -17,6 +17,8 @@ from email.mime.multipart import MIMEMultipart
 import jwt
 from passlib.context import CryptContext
 import requests as http_requests
+from pywebpush import webpush, WebPushException
+import json
 
 
 ROOT_DIR = Path(__file__).parent
@@ -80,6 +82,35 @@ app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
+
+# ==================== PUSH NOTIFICATIONS ====================
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
+VAPID_EMAIL = os.environ.get("VAPID_EMAIL", "mailto:cardamomspicescentre@gmail.com")
+
+async def send_push_to_user(user_id: str, title: str, body: str, url: str = "/"):
+    """Send push notification to all subscriptions for a user."""
+    subscriptions = await db.push_subscriptions.find({"user_id": user_id}, {"_id": 0}).to_list(50)
+    for sub in subscriptions:
+        try:
+            webpush(
+                subscription_info=sub["subscription"],
+                data=json.dumps({"title": title, "body": body, "url": url}),
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": VAPID_EMAIL}
+            )
+        except WebPushException as e:
+            if e.response and e.response.status_code in (404, 410):
+                await db.push_subscriptions.delete_one({"_id": sub.get("_id")})
+            logger.warning(f"Push failed for user {user_id}: {e}")
+        except Exception as e:
+            logger.warning(f"Push error: {e}")
+
+async def send_push_to_admins(title: str, body: str, url: str = "/admin"):
+    """Send push notification to all admin users."""
+    admins = await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(50)
+    for admin in admins:
+        await send_push_to_user(admin["id"], title, body, url)
 
 
 # Define Models
@@ -373,6 +404,20 @@ async def update_quote(
     quote = await db.quotes.find_one({"id": quote_id}, {"_id": 0})
     logger.info(f"Admin updated quote {quote_id}")
     
+    # Push notify customer about quote response
+    try:
+        customer_id = quote.get("customer_id")
+        if customer_id and update_data.get("status") in ("quoted", "accepted", "rejected"):
+            status_msg = {"quoted": "Your quote has been priced", "accepted": "Your quote has been accepted", "rejected": "Your quote status updated"}
+            await send_push_to_user(
+                customer_id,
+                "Quote Update",
+                f"{status_msg.get(update_data['status'], 'Quote updated')} for {quote.get('product_name', 'your order')}",
+                "/dashboard"
+            )
+    except Exception as e:
+        logger.warning(f"Push notification failed: {e}")
+    
     return {"message": "Quote updated", "quote": quote}
 
 
@@ -407,6 +452,16 @@ async def create_quote_request(
     
     await db.quotes.insert_one(quote_dict)
     logger.info(f"New quote request: {current_user.email} - Product: {product['name']} - Qty: {quote_data.quantity}")
+    
+    # Push notify admins about new quote
+    try:
+        await send_push_to_admins(
+            "New Quote Request",
+            f"{current_user.full_name} requested {quote_data.quantity}kg of {product['name']}",
+            "/admin"
+        )
+    except Exception as e:
+        logger.warning(f"Push notification failed: {e}")
     
     return quote
 
@@ -662,6 +717,34 @@ async def serve_file(path: str):
     
     data, content_type = get_object(path)
     return Response(content=data, media_type=record.get("content_type", content_type))
+
+
+# ==================== PUSH SUBSCRIPTION ENDPOINTS ====================
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: dict
+
+@api_router.post("/push/subscribe")
+async def subscribe_push(
+    subscription: PushSubscription,
+    current_user: User = Depends(get_current_user)
+):
+    sub_data = subscription.model_dump()
+    # Upsert subscription per endpoint per user
+    await db.push_subscriptions.update_one(
+        {"user_id": current_user.id, "subscription.endpoint": sub_data["endpoint"]},
+        {"$set": {
+            "user_id": current_user.id,
+            "subscription": sub_data,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    return {"message": "Subscribed"}
+
+@api_router.get("/push/vapid-key")
+async def get_vapid_key():
+    return {"public_key": VAPID_PUBLIC_KEY}
 
 
 # Include the router in the main app

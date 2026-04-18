@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
+import { requestNotificationPermission, subscribeToPush } from '../utils/pushNotifications';
 
 const AuthContext = createContext();
 
@@ -25,6 +26,17 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   }, [token]);
+
+  // Subscribe to push when user is authenticated
+  useEffect(() => {
+    if (user && token) {
+      requestNotificationPermission().then((permission) => {
+        if (permission === 'granted') {
+          subscribeToPush(token);
+        }
+      });
+    }
+  }, [user, token]);
 
   const fetchUser = async () => {
     try {
