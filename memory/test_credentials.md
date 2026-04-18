@@ -6,20 +6,14 @@
 - Role: admin
 - Status: approved
 
-## Test Seller (create during testing)
-- Email: testseller@test.com
-- Password: test123
-- Role: seller
-- Status: pending (needs admin approval)
+## Test Users (created by testing agent during iteration 6)
+- TEST_seller_* / test123 (seller role, approved by admin during tests)
+- TEST_buyer_* / test123 (buyer role, approved by admin during tests)
+- TEST_both_* / test123 (both role, approved by admin during tests)
 
-## Test Buyer (create during testing)
-- Email: testbuyer@test.com
-- Password: test123
-- Role: buyer
-- Status: pending (needs admin approval)
-
-## Notes
-- New registrations default to "pending" status
-- Admin must approve users before they can access dashboards
-- Sellers need approval before uploading products
-- Seller-uploaded products need admin approval before visible to buyers
+## Registration Flow
+- New users register with role: buyer/seller/both
+- Default status: pending (requires admin approval)
+- Admin approves via PATCH /api/admin/users/{id}/status?status=approved
+- Sellers must be approved before uploading products
+- Products must be approved by admin before visible to buyers

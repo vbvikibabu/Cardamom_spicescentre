@@ -1,95 +1,98 @@
-# Cardamom Spices Centre - B2B E-Commerce Platform
+# Cardamom Spices Centre - B2B Marketplace Platform
 
 ## Problem Statement
-Build a full-featured B2B e-commerce platform for a cardamom export business (similar to bodiemart.com). Single seller model with admin and customer roles.
+Build a full-featured B2B e-commerce marketplace for cardamom trading with a **3-role system**: Admin, Seller, Buyer (and "Both" for combined Buyer+Seller).
 
 ## User Personas
-- **Admin**: Manages inventory, updates daily rates, approves B2B buyer accounts, generates invoices, manages quotes
-- **Customer (B2B Buyer)**: Views daily rates, filters products by grade, requests bulk quotes, views order history
+- **Admin**: Full control — approves/rejects users and products, manages all bids/quotes, creates products (auto-approved)
+- **Seller**: Uploads products (pending admin approval), manages bids received on their products (accept/reject)
+- **Buyer**: Browses approved products, places bids (kg/lots, price, currency, market type), requests quotes
+- **Both**: A trader acting as both Buyer and Seller using the same account
 
 ## Core Requirements
-1. **Auth System**: JWT-based with admin/customer roles, admin approval for new customers
-2. **Product Catalog**: Cardamom varieties by grade (6-7mm, 7-8mm, 8mm+)
-3. **Quote System**: Request a Quote for bulk orders, admin responds with pricing
-4. **Admin Dashboard**: User management, quote management, product management
-5. **Customer Dashboard**: View quotes, request new quotes, order history
-6. **Payment**: Razorpay (domestic + intl), Wire Transfer, L/C offline options
-7. **Contact Form**: Email notifications on inquiry submission
-8. **Invoice Generation**: Commercial invoices for export orders
+1. **Auth System**: JWT-based with 4 roles (admin/seller/buyer/both), admin approval for new users
+2. **Product Catalog**: Cardamom varieties, seller-uploaded with admin approval workflow
+3. **Bidding System**: Buyers bid → Sellers review → Admin has full oversight
+4. **Quote System**: Request a Quote for bulk orders, admin/seller responds with pricing
+5. **Media Upload**: Up to 4 images/videos per product via object storage
+6. **PWA**: Installable app with push notifications for bid/quote status updates
+7. **Admin Dashboard**: User management, product approvals, bid/quote management
+8. **Seller Dashboard**: My products, bids received, product upload
+9. **Buyer Dashboard**: My bids, my quotes
 
 ## Tech Stack
 - **Frontend**: React, Tailwind CSS, Shadcn UI, Framer Motion
 - **Backend**: FastAPI, Motor (async MongoDB driver)
 - **Database**: MongoDB
 - **Auth**: JWT (python-jose), bcrypt (passlib)
+- **Storage**: Emergent Integrations Object Storage
+- **Notifications**: Web Push via VAPID (pywebpush)
 
 ## Architecture
 ```
 /app/
 ├── backend/
-│   ├── server.py          # All backend logic
+│   ├── server.py          # All backend logic (~1225 lines)
 │   ├── tests/             # Pytest test files
 │   └── .env               # Backend env vars
 ├── frontend/
 │   └── src/
-│       ├── components/    # Navbar, Footer, ProtectedRoute, ui/
-│       ├── context/       # AuthContext.js
-│       └── pages/         # Home, Products, Contact, Login, Register, AdminDashboard, CustomerDashboard, PendingApproval
+│       ├── components/    # Navbar, Footer, LoginModal, ProtectedRoute, ScrollToTop, ui/
+│       ├── context/       # AuthContext.js (isSeller, isBuyer, isAdmin helpers)
+│       ├── pages/         # Home, Products, ProductDetail, Contact, Login, Register,
+│       │                  # AdminDashboard, BuyerDashboard, SellerDashboard, PendingApproval
+│       └── utils/         # pushNotifications.js
 └── memory/
-    └── PRD.md
+    ├── PRD.md
+    └── test_credentials.md
 ```
 
 ## Admin Credentials (Dev)
 - Email: admin@cardamomspicescentre.com
 - Password: admin123
 
-## What's Been Implemented (as of Mar 20, 2026)
+## What's Been Implemented (as of Apr 18, 2026)
+
+### Phase 1 - Foundation (Completed)
 - [x] Static homepage with hero, features, about, product preview, CTA sections
-- [x] Products page with 3 cardamom varieties
+- [x] Products page with cardamom varieties
 - [x] Contact page with inquiry form
 - [x] Backend JWT auth system (register, login, me endpoints)
-- [x] Admin endpoints (user management, quote management)
-- [x] Customer quote endpoints (request quote, view my quotes)
-- [x] **Login Modal popup** — opens over current page with dark backdrop (not a separate page)
-- [x] Frontend Login page (fallback /login route also uses modal)
-- [x] Frontend Register page with all fields (separate page)
+- [x] Login Modal popup
+- [x] Frontend Register page
 - [x] AuthContext with login/register/logout/token persistence
-- [x] AdminDashboard with user management + quote tabs + **product management with file upload**
-- [x] Admin quote response form with pricing fields (base price, freight, final price, currency, notes, status)
-- [x] Customer "Request a Quote" form on Products page (modal with quantity, market, destination, shipping, notes)
-- [x] **Product media upload**: Min 1, Max 4 files (JPG, PNG, WEBP, MP4, MOV) via Emergent object storage
-- [x] **Media gallery** on Products page with navigation for multi-media products
-- [x] **Product detail page** at `/products/:id` with full media gallery, features, and Request a Quote
-- [x] Clickable product cards on Products page and Home page link to detail pages
-- [x] ScrollToTop component for proper page navigation
-- [x] **PWA**: Installable app with manifest, service worker, offline fallback page, custom cardamom app icons
-- [x] **Push Notifications**: Web Push via VAPID — admin notified on new quotes, customers notified on quote responses
-- [x] **Bidding System**: Private B2B bids on products — customers bid, admin reviews EOD, accepts/rejects with notifications
-  - Backend: POST /api/bids, GET /api/bids/my, GET /api/bids (admin), PUT /api/bids/{id}, GET /api/bids/summary
-  - Frontend: Bid modal on ProductDetail, My Bids tab on CustomerDashboard, Bids tab on AdminDashboard with summary + filters
-  - Email notification on bid accept/reject (SMTP required), Push notifications on bid events
-- [x] CustomerDashboard with quotes list
-- [x] PendingApproval page
-- [x] ProtectedRoute component for /admin and /dashboard
-- [x] Navbar with auth buttons (desktop + mobile) — login triggers modal
-- [x] Fixed .env formatting bug (CORS_ORIGINS and JWT_SECRET_KEY merged)
-- [x] Fixed product.grade → product.size bug in Home.js
-- [x] Cleaned up obsolete static-site directory
+- [x] Product media upload: Min 1, Max 4 files via Emergent object storage
+- [x] Product detail pages with media gallery
+- [x] ScrollToTop component
+- [x] PWA: manifest, service worker, offline fallback, custom icons
+- [x] Push Notifications: VAPID-based push for bid/quote events
+
+### Phase 2 - 3-Role Marketplace Migration (Completed Apr 18, 2026)
+- [x] **User Model**: Roles: admin/seller/buyer/both, Status: pending/approved/rejected
+- [x] **Registration**: Role selector (Buy/Sell/Both) on register page
+- [x] **Product Model**: seller_id, seller_name, approval_status (pending/approved/rejected)
+- [x] **Bid Model**: buyer_id/buyer_name + seller_id/seller_name linking, reviewed_by, seller_notes
+- [x] **Seller Endpoints**: POST/GET/PUT/DELETE /api/seller/products, GET/PUT /api/seller/bids
+- [x] **Admin Endpoints**: GET/POST/PUT/DELETE /api/admin/products, PATCH approval status
+- [x] **Product Approval Workflow**: Seller creates (pending) → Admin approves → Public listing
+- [x] **Bid Flow**: Buyer places bid → Seller reviews → Admin can override
+- [x] **Seller Dashboard** (/seller): My Products (with status), Bids Received, product upload
+- [x] **Buyer Dashboard** (/dashboard): My Bids, My Quotes
+- [x] **Admin Dashboard**: Users (with role badges), Pending Products (approve/reject), Quotes, Bids, All Products
+- [x] **Role-based Routing**: Navbar, LoginModal, Login page route to correct dashboard
+- [x] **ProtectedRoute**: Updated for seller/buyer/both/admin role checking
+- [x] **Data Migration**: Auto-migrate old "customer" users → "buyer", old bids customer_* → buyer_*
+- [x] **Startup Seed Fix**: Products only seeded when collection is empty (no more data wipe)
+- [x] File upload allowed for sellers (not just admins)
 
 ## Prioritized Backlog
 
-### P0 (Next Sprint)
-- [x] Admin: Product management (add/edit/delete products from dashboard)
-- [x] Admin: Quote response form with pricing fields
-- [x] Customer: "Request a Quote" form on Products page
-
 ### P1
 - [ ] Product filtering/search by grade on Products page
-- [ ] Customer order history view
-- [ ] Admin dashboard: daily rate management
+- [ ] "Both" role users: dual dashboard view (switch between buyer/seller views)
 
 ### P2
-- [ ] Razorpay payment integration
+- [ ] Razorpay payment integration for accepted bids
 - [ ] Offline payment options (Wire Transfer, L/C)
 - [ ] Contact form email (SMTP) - needs user credentials
 
@@ -99,6 +102,7 @@ Build a full-featured B2B e-commerce platform for a cardamom export business (si
 - [ ] Shipping cost calculator
 
 ## Testing
-- Backend: 21/21 API tests passed (iteration 2)
-- Frontend: 16/16 features verified (iteration 2)
-- Test reports: /app/test_reports/iteration_1.json, /app/test_reports/iteration_2.json
+- Backend: 22/22 API tests passed (iteration 6) - full 3-role system
+- Frontend: All targeted flows verified (iteration 6)
+- Test reports: /app/test_reports/iteration_6.json
+- Test files: /app/backend/tests/test_three_role_system.py
