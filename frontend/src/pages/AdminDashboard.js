@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { User, CheckCircle, XCircle, FileText, Package, Plus, Pencil, Trash2, X, Send, Upload, Image, Film, Gavel } from 'lucide-react';
+import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, Film, Gavel } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -12,7 +12,6 @@ const ACCEPT_STRING = '.jpg,.jpeg,.png,.webp,.mp4,.mov';
 const AdminDashboard = () => {
   const { user, token } = useAuth();
   const [users, setUsers] = useState([]);
-  const [quotes, setQuotes] = useState([]);
   const [products, setProducts] = useState([]);
   const [bids, setBids] = useState([]);
   const [bidsSummary, setBidsSummary] = useState({ total: 0, today: 0, pending: 0, accepted: 0, rejected: 0 });
@@ -29,10 +28,6 @@ const AdminDashboard = () => {
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Quote response state
-  const [respondingQuote, setRespondingQuote] = useState(null);
-  const [quoteForm, setQuoteForm] = useState({ base_price: '', freight_cost: '', final_price: '', currency: 'INR', admin_notes: '', status: 'quoted' });
-
   // Bid response state
   const [bidNotes, setBidNotes] = useState({});
 
@@ -42,15 +37,13 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [usersRes, quotesRes, productsRes, bidsRes, bidsSumRes] = await Promise.all([
+      const [usersRes, productsRes, bidsRes, bidsSumRes] = await Promise.all([
         axios.get(`${API_URL}/api/admin/users`, authHeaders),
-        axios.get(`${API_URL}/api/admin/quotes`, authHeaders),
         axios.get(`${API_URL}/api/admin/products`, authHeaders),
         axios.get(`${API_URL}/api/bids`, authHeaders),
         axios.get(`${API_URL}/api/bids/summary`, authHeaders)
       ]);
       setUsers(usersRes.data);
-      setQuotes(quotesRes.data);
       setProducts(productsRes.data);
       setBids(bidsRes.data);
       setBidsSummary(bidsSumRes.data);
@@ -223,38 +216,6 @@ const AdminDashboard = () => {
     } catch { toast.error('Failed to update product status'); }
   };
 
-  // ─── Quote Actions ───
-  const openQuoteResponse = (quote) => {
-    setRespondingQuote(quote);
-    setQuoteForm({
-      base_price: quote.base_price || '',
-      freight_cost: quote.freight_cost || '',
-      final_price: quote.final_price || '',
-      currency: quote.currency || 'INR',
-      admin_notes: quote.admin_notes || '',
-      status: quote.status === 'pending' ? 'quoted' : quote.status
-    });
-  };
-
-  const submitQuoteResponse = async (e) => {
-    e.preventDefault();
-    const payload = {};
-    if (quoteForm.base_price) payload.base_price = parseFloat(quoteForm.base_price);
-    if (quoteForm.freight_cost) payload.freight_cost = parseFloat(quoteForm.freight_cost);
-    if (quoteForm.final_price) payload.final_price = parseFloat(quoteForm.final_price);
-    payload.currency = quoteForm.currency;
-    payload.admin_notes = quoteForm.admin_notes;
-    payload.status = quoteForm.status;
-    try {
-      await axios.patch(`${API_URL}/api/admin/quotes/${respondingQuote.id}`, payload, authHeaders);
-      toast.success('Quote updated!');
-      setRespondingQuote(null);
-      fetchData();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to update quote');
-    }
-  };
-
   // ─── Bid Actions ───
   const handleBidAction = async (bidId, status) => {
     try {
@@ -299,7 +260,6 @@ const AdminDashboard = () => {
   const tabs = [
     { key: 'users', label: 'Users' },
     { key: 'pending-products', label: `Pending Products (${products.filter(p => p.approval_status === 'pending').length})` },
-    { key: 'quotes', label: 'Quotes' },
     { key: 'bids', label: 'Bids' },
     { key: 'products', label: 'All Products' }
   ];
@@ -318,7 +278,7 @@ const AdminDashboard = () => {
           {[
             { icon: User, color: 'primary', value: users.length, label: 'Total Users' },
             { icon: User, color: 'yellow-600', bg: 'yellow-100', value: users.filter(u => u.status === 'pending').length, label: 'Pending Approval' },
-            { icon: FileText, color: 'blue-600', bg: 'blue-100', value: quotes.length, label: 'Total Quotes' },
+            { icon: Gavel, color: 'blue-600', bg: 'blue-100', value: bids.length, label: 'Total Bids' },
             { icon: Package, color: 'orange-600', bg: 'orange-100', value: products.length, label: 'Products' }
           ].map((s, i) => (
             <div key={i} className="bg-white p-5 rounded-xl shadow-sm">
@@ -438,87 +398,6 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* ═══ QUOTES TAB ═══ */}
-            {activeTab === 'quotes' && (
-              <div className="space-y-4">
-                {quotes.length === 0 && <p className="text-center text-muted-foreground py-8">No quote requests yet</p>}
-                {quotes.map(quote => (
-                  <div key={quote.id} data-testid={`quote-row-${quote.id}`} className="border border-border rounded-lg p-5 hover:border-primary transition-colors">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-foreground">{quote.product_name}</h3>
-                        <p className="text-sm text-muted-foreground">{quote.customer_name} ({quote.customer_email})</p>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        quote.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : quote.status === 'quoted' ? 'bg-blue-100 text-blue-700' : quote.status === 'accepted' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                      }`}>{quote.status}</span>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
-                      <div><span className="text-muted-foreground">Quantity:</span> <span className="font-medium">{quote.quantity} kg</span></div>
-                      <div><span className="text-muted-foreground">Market:</span> <span className="font-medium capitalize">{quote.market_type}</span></div>
-                      {quote.destination_country && <div><span className="text-muted-foreground">Destination:</span> <span className="font-medium">{quote.destination_country}</span></div>}
-                      {quote.shipping_method && <div><span className="text-muted-foreground">Shipping:</span> <span className="font-medium capitalize">{quote.shipping_method}</span></div>}
-                    </div>
-                    {quote.additional_notes && <p className="text-sm text-muted-foreground mb-3">Note: {quote.additional_notes}</p>}
-                    {quote.final_price && (
-                      <div className="bg-green-50 rounded-lg p-3 mb-3 text-sm">
-                        <span className="font-semibold text-green-700">Quoted: {quote.currency} {quote.final_price.toLocaleString()}</span>
-                        {quote.admin_notes && <span className="text-muted-foreground ml-3">— {quote.admin_notes}</span>}
-                      </div>
-                    )}
-                    {respondingQuote?.id === quote.id ? (
-                      <form onSubmit={submitQuoteResponse} data-testid={`quote-response-form-${quote.id}`} className="border-t border-border pt-4 mt-3 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <label className="block text-xs font-medium text-foreground mb-1">Base Price</label>
-                            <input type="number" step="0.01" data-testid="quote-base-price" value={quoteForm.base_price} onChange={e => setQuoteForm({...quoteForm, base_price: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0.00" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-foreground mb-1">Freight Cost</label>
-                            <input type="number" step="0.01" data-testid="quote-freight-cost" value={quoteForm.freight_cost} onChange={e => setQuoteForm({...quoteForm, freight_cost: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0.00" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-foreground mb-1">Final Price *</label>
-                            <input type="number" step="0.01" required data-testid="quote-final-price" value={quoteForm.final_price} onChange={e => setQuoteForm({...quoteForm, final_price: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0.00" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-medium text-foreground mb-1">Currency</label>
-                            <select data-testid="quote-currency" value={quoteForm.currency} onChange={e => setQuoteForm({...quoteForm, currency: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                              <option value="INR">INR</option>
-                              <option value="USD">USD</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-foreground mb-1">Status</label>
-                            <select data-testid="quote-status" value={quoteForm.status} onChange={e => setQuoteForm({...quoteForm, status: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                              <option value="quoted">Quoted</option>
-                              <option value="accepted">Accepted</option>
-                              <option value="rejected">Rejected</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-foreground mb-1">Admin Notes</label>
-                          <textarea data-testid="quote-admin-notes" value={quoteForm.admin_notes} onChange={e => setQuoteForm({...quoteForm, admin_notes: e.target.value})} rows={2} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Add pricing notes, terms, validity..." />
-                        </div>
-                        <div className="flex gap-2">
-                          <button type="submit" data-testid="quote-submit-response" className="inline-flex items-center gap-2 bg-primary text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors">
-                            <Send size={14} /> Send Response
-                          </button>
-                          <button type="button" onClick={() => setRespondingQuote(null)} className="px-5 py-2 rounded-lg text-sm font-semibold border border-border hover:bg-muted transition-colors">Cancel</button>
-                        </div>
-                      </form>
-                    ) : (
-                      <button data-testid={`quote-respond-btn-${quote.id}`} onClick={() => openQuoteResponse(quote)} className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors mt-1">
-                        <Send size={14} /> {quote.status === 'pending' ? 'Respond to Quote' : 'Update Quote'}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
 
 
             {/* ═══ BIDS TAB ═══ */}

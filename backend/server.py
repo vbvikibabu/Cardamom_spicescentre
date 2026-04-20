@@ -180,47 +180,6 @@ class Token(BaseModel):
     token_type: str
     user: UserResponse
 
-# ==================== QUOTE MODELS ====================
-class QuoteRequest(BaseModel):
-    product_id: str
-    quantity: int
-    market_type: Literal["domestic", "export"]
-    destination_country: Optional[str] = None
-    shipping_method: Optional[Literal["air", "sea"]] = None
-    additional_notes: Optional[str] = None
-
-class Quote(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    customer_id: str
-    customer_name: str
-    customer_email: str
-    seller_id: str = ""
-    seller_name: str = ""
-    product_id: str
-    product_name: str
-    quantity: int
-    market_type: Literal["domestic", "export"]
-    destination_country: Optional[str] = None
-    shipping_method: Optional[Literal["air", "sea"]] = None
-    additional_notes: Optional[str] = None
-    status: Literal["pending", "quoted", "accepted", "rejected"] = "pending"
-    base_price: Optional[float] = None
-    freight_cost: Optional[float] = None
-    admin_notes: Optional[str] = None
-    final_price: Optional[float] = None
-    currency: Literal["INR", "USD"] = "INR"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class QuoteUpdate(BaseModel):
-    status: Optional[Literal["pending", "quoted", "accepted", "rejected"]] = None
-    base_price: Optional[float] = None
-    freight_cost: Optional[float] = None
-    admin_notes: Optional[str] = None
-    final_price: Optional[float] = None
-    currency: Optional[Literal["INR", "USD"]] = None
-
 # ==================== BID MODELS ====================
 class BidCreate(BaseModel):
     product_id: str
@@ -532,56 +491,6 @@ async def update_product_status(
     logger.info(f"Admin {approval_status} product: {product_id}")
     return {"message": f"Product {approval_status}", "product": product}
 
-# Admin: all quotes
-@api_router.get("/admin/quotes")
-async def get_all_quotes(current_admin: User = Depends(get_current_admin)):
-    quotes = await db.quotes.find({}, {"_id": 0}).to_list(1000)
-    for quote in quotes:
-        if isinstance(quote.get('created_at'), str):
-            quote['created_at'] = datetime.fromisoformat(quote['created_at'])
-        if isinstance(quote.get('updated_at'), str):
-            quote['updated_at'] = datetime.fromisoformat(quote['updated_at'])
-    return [Quote(**q).model_dump() for q in quotes]
-
-@api_router.patch("/admin/quotes/{quote_id}")
-async def update_quote(
-    quote_id: str,
-    quote_update: QuoteUpdate,
-    current_admin: User = Depends(get_current_admin)
-):
-    update_data = {k: v for k, v in quote_update.model_dump().items() if v is not None}
-    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
-
-    result = await db.quotes.update_one(
-        {"id": quote_id},
-        {"$set": update_data}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Quote not found")
-
-    quote = await db.quotes.find_one({"id": quote_id}, {"_id": 0})
-    logger.info(f"Admin updated quote {quote_id}")
-
-    # Push notify buyer
-    try:
-        customer_id = quote.get("customer_id")
-        if customer_id and update_data.get("status") in ("quoted", "accepted", "rejected"):
-            status_msg = {
-                "quoted": "Your quote has been priced",
-                "accepted": "Your quote has been accepted",
-                "rejected": "Your quote status updated"
-            }
-            await send_push_to_user(
-                customer_id,
-                "Quote Update",
-                f"{status_msg.get(update_data['status'], 'Quote updated')} for {quote.get('product_name', 'your order')}",
-                "/dashboard"
-            )
-    except Exception as e:
-        logger.warning(f"Push notification failed: {e}")
-
-    return {"message": "Quote updated", "quote": quote}
-
 # Admin: bid summary
 @api_router.get("/bids/summary")
 async def get_bids_summary(current_admin: User = Depends(get_current_admin)):
@@ -864,60 +773,6 @@ async def get_my_bids(current_user: User = Depends(get_current_approved_buyer)):
         if isinstance(b.get("updated_at"), str):
             b["updated_at"] = datetime.fromisoformat(b["updated_at"])
     return [Bid(**b).model_dump() for b in bids]
-
-# Buyer: request quote
-@api_router.post("/quotes/request")
-async def create_quote_request(
-    quote_data: QuoteRequest,
-    current_user: User = Depends(get_current_approved_buyer)
-):
-    product = await db.products.find_one({"id": quote_data.product_id, "approval_status": "approved"}, {"_id": 0})
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-
-    quote = Quote(
-        customer_id=current_user.id,
-        customer_name=current_user.full_name,
-        customer_email=current_user.email,
-        seller_id=product.get("seller_id", ""),
-        seller_name=product.get("seller_name", ""),
-        product_id=quote_data.product_id,
-        product_name=product['name'],
-        quantity=quote_data.quantity,
-        market_type=quote_data.market_type,
-        destination_country=quote_data.destination_country,
-        shipping_method=quote_data.shipping_method,
-        additional_notes=quote_data.additional_notes,
-        status="pending"
-    )
-
-    quote_dict = quote.model_dump()
-    quote_dict['created_at'] = quote_dict['created_at'].isoformat()
-    quote_dict['updated_at'] = quote_dict['updated_at'].isoformat()
-
-    await db.quotes.insert_one(quote_dict)
-    logger.info(f"New quote request: {current_user.email} for {product['name']}")
-
-    try:
-        await send_push_to_admins(
-            "New Quote Request",
-            f"{current_user.full_name} requested {quote_data.quantity}kg of {product['name']}",
-            "/admin"
-        )
-    except Exception as e:
-        logger.warning(f"Push notification failed: {e}")
-
-    return quote.model_dump()
-
-@api_router.get("/quotes/my-quotes")
-async def get_my_quotes(current_user: User = Depends(get_current_approved_buyer)):
-    quotes = await db.quotes.find({"customer_id": current_user.id}, {"_id": 0}).to_list(1000)
-    for quote in quotes:
-        if isinstance(quote.get('created_at'), str):
-            quote['created_at'] = datetime.fromisoformat(quote['created_at'])
-        if isinstance(quote.get('updated_at'), str):
-            quote['updated_at'] = datetime.fromisoformat(quote['updated_at'])
-    return [Quote(**q).model_dump() for q in quotes]
 
 
 # ==================== FILE UPLOAD & SERVE ====================

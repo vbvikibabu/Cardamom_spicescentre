@@ -84,7 +84,7 @@ const Home = () => {
                   data-testid="hero-cta-contact"
                   className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-8 py-4 rounded-full font-sans text-sm tracking-wide uppercase font-medium hover:bg-secondary/80 transition-colors"
                 >
-                  Get Quote
+                  Contact Us
                 </Link>
               </div>
             </motion.div>

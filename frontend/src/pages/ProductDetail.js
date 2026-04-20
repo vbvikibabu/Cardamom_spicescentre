@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, Send, ArrowLeft, ChevronLeft, ChevronRight, Film, Check, Gavel } from 'lucide-react';
+import { Leaf, ArrowLeft, ChevronLeft, ChevronRight, Film, Check, Gavel } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -32,11 +32,7 @@ const ProductDetail = () => {
   const { user, token, isAuthenticated, isApproved } = useAuth();
 
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [showBidModal, setShowBidModal] = useState(false);
-  const [quoteForm, setQuoteForm] = useState({
-    quantity: '', market_type: 'domestic', destination_country: '', shipping_method: '', additional_notes: ''
-  });
   const [bidForm, setBidForm] = useState({
     quantity_kg: '', quantity_lot: '', price_per_kg: '', price_per_lot: '', currency: 'INR', market_type: 'domestic', additional_notes: ''
   });
@@ -62,36 +58,10 @@ const ProductDetail = () => {
     callback();
   };
 
-  const openQuoteModal = () => requireAuth(() => {
-    setQuoteForm({ quantity: '', market_type: 'domestic', destination_country: '', shipping_method: '', additional_notes: '' });
-    setShowQuoteModal(true);
-  });
-
   const openBidModal = () => requireAuth(() => {
     setBidForm({ quantity_kg: '', quantity_lot: '', price_per_kg: '', price_per_lot: '', currency: 'INR', market_type: 'domestic', additional_notes: '' });
     setShowBidModal(true);
   });
-
-  const submitQuote = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      await axios.post(`${API}/quotes/request`, {
-        product_id: product.id,
-        quantity: parseInt(quoteForm.quantity),
-        market_type: quoteForm.market_type,
-        destination_country: quoteForm.market_type === 'export' ? quoteForm.destination_country : undefined,
-        shipping_method: quoteForm.market_type === 'export' && quoteForm.shipping_method ? quoteForm.shipping_method : undefined,
-        additional_notes: quoteForm.additional_notes || undefined
-      }, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success('Quote request submitted! We will get back to you soon.');
-      setShowQuoteModal(false);
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to submit quote request');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const submitBid = async (e) => {
     e.preventDefault();
@@ -221,10 +191,7 @@ const ProductDetail = () => {
               <button data-testid="product-detail-place-bid" onClick={openBidModal} className="w-full inline-flex items-center justify-center gap-3 bg-foreground text-white py-4 rounded-xl font-semibold text-base hover:bg-foreground/90 transition-colors">
                 <Gavel size={18} /> Place a Bid
               </button>
-              <button data-testid="product-detail-request-quote" onClick={openQuoteModal} className="w-full inline-flex items-center justify-center gap-3 border-2 border-primary text-primary py-3.5 rounded-xl font-semibold text-sm hover:bg-primary/5 transition-colors">
-                <Send size={16} /> Request a Quote
-              </button>
-              <p className="text-xs text-center text-muted-foreground">Bids are reviewed daily. Quotes are responded to within 24 hours.</p>
+              <p className="text-xs text-center text-muted-foreground">Bids are reviewed by the seller. You will be notified of the outcome.</p>
             </div>
           </motion.div>
         </div>
@@ -283,54 +250,6 @@ const ProductDetail = () => {
             <p className="text-xs text-muted-foreground">Fill at least one quantity (kg or lot) and one price (per kg or per lot).</p>
             <button type="submit" disabled={submitting} data-testid="bid-submit-btn" className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-foreground/90 transition-colors disabled:opacity-50">
               <Gavel size={16} /> {submitting ? 'Placing Bid...' : 'Place Bid'}
-            </button>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── Quote Modal ─── */}
-      <Dialog open={showQuoteModal} onOpenChange={setShowQuoteModal}>
-        <DialogContent data-testid="quote-request-modal" className="sm:max-w-lg p-0 overflow-hidden rounded-2xl border-0">
-          <div className="bg-primary px-6 py-5">
-            <DialogHeader>
-              <DialogTitle className="font-serif text-2xl font-bold text-white">Request a Quote</DialogTitle>
-              <DialogDescription className="text-white/80 text-sm">{product?.name}</DialogDescription>
-            </DialogHeader>
-          </div>
-          <form onSubmit={submitQuote} data-testid="quote-request-form" className="px-6 pb-6 pt-3 space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Quantity (kg) *</label>
-              <input type="number" min="1" required data-testid="quote-quantity-input" value={quoteForm.quantity} onChange={e => setQuoteForm({...quoteForm, quantity: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Market Type *</label>
-              <select data-testid="quote-market-type" value={quoteForm.market_type} onChange={e => setQuoteForm({...quoteForm, market_type: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                <option value="domestic">Domestic (India)</option>
-                <option value="export">Export (International)</option>
-              </select>
-            </div>
-            {quoteForm.market_type === 'export' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">Destination Country</label>
-                  <input type="text" data-testid="quote-destination-input" value={quoteForm.destination_country} onChange={e => setQuoteForm({...quoteForm, destination_country: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. UAE, USA" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">Shipping Method</label>
-                  <select data-testid="quote-shipping-method" value={quoteForm.shipping_method} onChange={e => setQuoteForm({...quoteForm, shipping_method: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                    <option value="">Select...</option>
-                    <option value="air">Air Freight</option>
-                    <option value="sea">Sea Freight</option>
-                  </select>
-                </div>
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Additional Notes</label>
-              <textarea data-testid="quote-notes-input" value={quoteForm.additional_notes} onChange={e => setQuoteForm({...quoteForm, additional_notes: e.target.value})} rows={3} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Packaging preferences, delivery timeline..." />
-            </div>
-            <button type="submit" disabled={submitting} data-testid="quote-submit-btn" className="w-full inline-flex items-center justify-center gap-2 bg-primary text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50">
-              <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Quote Request'}
             </button>
           </form>
         </DialogContent>

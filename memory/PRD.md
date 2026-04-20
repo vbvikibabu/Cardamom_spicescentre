@@ -13,12 +13,11 @@ Build a full-featured B2B e-commerce marketplace for cardamom trading with a **3
 1. **Auth System**: JWT-based with 4 roles (admin/seller/buyer/both), admin approval for new users
 2. **Product Catalog**: Cardamom varieties, seller-uploaded with admin approval workflow
 3. **Bidding System**: Buyers bid → Sellers review → Admin has full oversight
-4. **Quote System**: Request a Quote for bulk orders, admin/seller responds with pricing
-5. **Media Upload**: Up to 4 images/videos per product via object storage
-6. **PWA**: Installable app with push notifications for bid/quote status updates
-7. **Admin Dashboard**: User management, product approvals, bid/quote management
-8. **Seller Dashboard**: My products, bids received, product upload
-9. **Buyer Dashboard**: My bids, my quotes
+4. **Media Upload**: Up to 4 images/videos per product via object storage
+5. **PWA**: Installable app with push notifications for bid status updates
+6. **Admin Dashboard**: User management, product approvals, bid management
+7. **Seller Dashboard**: My products, bids received, product upload
+8. **Buyer Dashboard**: My bids
 
 ## Tech Stack
 - **Frontend**: React, Tailwind CSS, Shadcn UI, Framer Motion
@@ -77,8 +76,9 @@ Build a full-featured B2B e-commerce marketplace for cardamom trading with a **3
 - [x] **Product Approval Workflow**: Seller creates (pending) → Admin approves → Public listing
 - [x] **Bid Flow**: Buyer places bid → Seller reviews → Admin can override
 - [x] **Seller Dashboard** (/seller): My Products (with status), Bids Received, product upload
-- [x] **Buyer Dashboard** (/dashboard): My Bids, My Quotes
-- [x] **Admin Dashboard**: Users (with role badges), Pending Products (approve/reject), Quotes, Bids, All Products
+- [x] **Buyer Dashboard** (/dashboard): My Bids
+- [x] **Admin Dashboard**: Users (with role badges), Pending Products (approve/reject), Bids, All Products
+- [x] **Quotation feature removed** (Apr 20, 2026) — quote models, endpoints, and all frontend UI fully stripped
 - [x] **Role-based Routing**: Navbar, LoginModal, Login page route to correct dashboard
 - [x] **ProtectedRoute**: Updated for seller/buyer/both/admin role checking
 - [x] **Data Migration**: Auto-migrate old "customer" users → "buyer", old bids customer_* → buyer_*
