@@ -79,6 +79,8 @@ Build a full-featured B2B e-commerce marketplace for cardamom trading with a **3
 - [x] **Buyer Dashboard** (/dashboard): My Bids
 - [x] **Admin Dashboard**: Users (with role badges), Pending Products (approve/reject), Bids, All Products
 - [x] **Quotation feature removed** (Apr 20, 2026) — quote models, endpoints, and all frontend UI fully stripped
+- [x] **Product search & grade filtering** (Apr 20, 2026) — search by name/description/size/seller + grade filter pills on Products page
+- [x] **"Both" role UX** (Apr 20, 2026) — role-switch banner on Seller/Buyer dashboards for seamless switching
 - [x] **Role-based Routing**: Navbar, LoginModal, Login page route to correct dashboard
 - [x] **ProtectedRoute**: Updated for seller/buyer/both/admin role checking
 - [x] **Data Migration**: Auto-migrate old "customer" users → "buyer", old bids customer_* → buyer_*
@@ -103,6 +105,6 @@ Build a full-featured B2B e-commerce marketplace for cardamom trading with a **3
 
 ## Testing
 - Backend: 22/22 API tests passed (iteration 6) - full 3-role system
-- Frontend: All targeted flows verified (iteration 6)
-- Test reports: /app/test_reports/iteration_6.json
-- Test files: /app/backend/tests/test_three_role_system.py
+- Frontend: All targeted flows verified (iteration 6 + iteration 7)
+- Iteration 7: 19/19 tests passed — product search/filter + both-role switching
+- Test reports: /app/test_reports/iteration_7.json
