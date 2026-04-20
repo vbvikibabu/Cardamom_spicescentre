@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film } from 'lucide-react';
+import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -237,6 +237,25 @@ const SellerDashboard = () => {
           <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-2">Seller Dashboard</h1>
           <p className="text-muted-foreground">Welcome, {user?.full_name}</p>
         </div>
+
+        {/* Role Switch for "both" users */}
+        {user?.role === 'both' && (
+          <div data-testid="role-switch-banner" className="mb-6 bg-white border border-border rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Package size={16} className="text-primary" />
+              </div>
+              <span className="text-sm text-foreground font-medium">You're viewing as <span className="text-primary font-bold">Seller</span></span>
+            </div>
+            <Link
+              to="/dashboard"
+              data-testid="switch-to-buyer-btn"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-foreground text-white rounded-lg text-xs font-semibold hover:bg-foreground/90 transition-colors"
+            >
+              <ShoppingCart size={14} /> Switch to Buyer View
+            </Link>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -21,7 +21,7 @@ const isVideoPath = (path) => {
 const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
   const [current, setCurrent] = useState(0);
   const paths = mediaPaths && mediaPaths.length > 0 ? mediaPaths : (imageUrl ? [imageUrl] : []);
-  
+
   if (paths.length === 0) return <div className="w-full h-80 bg-gray-100 flex items-center justify-center text-muted-foreground">No media</div>;
 
   const src = getMediaUrl(paths[current]);
@@ -36,15 +36,15 @@ const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
       )}
       {paths.length > 1 && (
         <>
-          <button onClick={() => setCurrent((current - 1 + paths.length) % paths.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={(e) => { e.preventDefault(); setCurrent((current - 1 + paths.length) % paths.length); }} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <ChevronLeft size={18} />
           </button>
-          <button onClick={() => setCurrent((current + 1) % paths.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={(e) => { e.preventDefault(); setCurrent((current + 1) % paths.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <ChevronRight size={18} />
           </button>
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
             {paths.map((_, i) => (
-              <button key={i} onClick={() => setCurrent(i)} className={`w-2 h-2 rounded-full transition-colors ${i === current ? 'bg-white' : 'bg-white/50'}`} />
+              <button key={i} onClick={(e) => { e.preventDefault(); setCurrent(i); }} className={`w-2 h-2 rounded-full transition-colors ${i === current ? 'bg-white' : 'bg-white/50'}`} />
             ))}
           </div>
         </>
@@ -56,6 +56,8 @@ const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
 const Products = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeGrade, setActiveGrade] = useState('all');
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -70,6 +72,30 @@ const Products = () => {
     };
     fetchProducts();
   }, []);
+
+  // Extract unique grades from products
+  const grades = useMemo(() => {
+    const uniqueGrades = [...new Set(products.map(p => p.size))];
+    return uniqueGrades.sort();
+  }, [products]);
+
+  // Filter products
+  const filteredProducts = useMemo(() => {
+    let result = products;
+    if (activeGrade !== 'all') {
+      result = result.filter(p => p.size === activeGrade);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        p.size.toLowerCase().includes(q) ||
+        (p.seller_name && p.seller_name.toLowerCase().includes(q))
+      );
+    }
+    return result;
+  }, [products, activeGrade, searchQuery]);
 
   if (loading) {
     return (
@@ -99,39 +125,132 @@ const Products = () => {
         </div>
       </section>
 
+      {/* Search & Filter Bar */}
+      <section className="py-8 border-b border-border" data-testid="products-filter-section">
+        <div className="max-w-7xl mx-auto px-6 md:px-12">
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            {/* Search */}
+            <div className="relative w-full md:w-80">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                data-testid="products-search-input"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search by name, grade, or seller..."
+                className="w-full pl-10 pr-9 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  data-testid="products-search-clear"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Grade Filter Pills */}
+            <div className="flex flex-wrap gap-2" data-testid="products-grade-filters">
+              <button
+                data-testid="grade-filter-all"
+                onClick={() => setActiveGrade('all')}
+                className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
+                  activeGrade === 'all'
+                    ? 'bg-primary text-white'
+                    : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                }`}
+              >
+                All Grades ({products.length})
+              </button>
+              {grades.map(grade => (
+                <button
+                  key={grade}
+                  data-testid={`grade-filter-${grade}`}
+                  onClick={() => setActiveGrade(grade)}
+                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
+                    activeGrade === grade
+                      ? 'bg-primary text-white'
+                      : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {grade} ({products.filter(p => p.size === grade).length})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Active filter summary */}
+          {(activeGrade !== 'all' || searchQuery) && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground" data-testid="products-filter-summary">
+              <span>Showing {filteredProducts.length} of {products.length} products</span>
+              {(activeGrade !== 'all' || searchQuery) && (
+                <button
+                  onClick={() => { setActiveGrade('all'); setSearchQuery(''); }}
+                  data-testid="products-clear-all-filters"
+                  className="text-primary text-xs font-semibold hover:underline ml-2"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Products Grid */}
       <section className="py-24" data-testid="products-grid">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-            {products.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                data-testid={`product-card-${index}`}
-                className="product-card bg-white rounded-lg overflow-hidden border border-primary/10"
+          {filteredProducts.length === 0 ? (
+            <div className="text-center py-16" data-testid="products-no-results">
+              <Package className="mx-auto text-muted-foreground mb-4" size={48} />
+              <p className="text-lg text-muted-foreground mb-2">No products found</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {searchQuery ? `No results for "${searchQuery}"` : 'No products match the selected grade.'}
+              </p>
+              <button
+                onClick={() => { setActiveGrade('all'); setSearchQuery(''); }}
+                className="text-primary font-semibold text-sm hover:underline"
               >
-                <Link to={`/products/${product.id}`} className="block cursor-pointer">
-                  <MediaGallery mediaPaths={product.media_paths} imageUrl={product.image_url} name={product.name} />
-                  <div className="p-8">
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full">
-                        {product.size}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <Leaf size={14} /> Elettaria cardamomum
-                      </span>
+                Clear filters
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+              {filteredProducts.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  viewport={{ once: true }}
+                  data-testid={`product-card-${index}`}
+                  className="product-card bg-white rounded-lg overflow-hidden border border-primary/10"
+                >
+                  <Link to={`/products/${product.id}`} className="block cursor-pointer">
+                    <MediaGallery mediaPaths={product.media_paths} imageUrl={product.image_url} name={product.name} />
+                    <div className="p-8">
+                      <div className="flex items-center gap-2 mb-4 flex-wrap">
+                        <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full">
+                          {product.size}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Leaf size={14} /> Elettaria cardamomum
+                        </span>
+                      </div>
+                      <h3 className="font-serif text-2xl md:text-3xl font-semibold mb-3 text-foreground">{product.name}</h3>
+                      {product.seller_name && (
+                        <p className="text-xs text-muted-foreground mb-3">by {product.seller_name}</p>
+                      )}
+                      <p className="text-muted-foreground leading-relaxed mb-4 line-clamp-3">{product.description}</p>
+                      <span className="text-primary text-sm font-semibold hover:underline">View Details & Place Bid</span>
                     </div>
-                    <h3 className="font-serif text-2xl md:text-3xl font-semibold mb-4 text-foreground">{product.name}</h3>
-                    <p className="text-muted-foreground leading-relaxed mb-4 line-clamp-3">{product.description}</p>
-                    <span className="text-primary text-sm font-semibold hover:underline">View Details & Place Bid</span>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
