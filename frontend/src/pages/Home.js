@@ -14,6 +14,21 @@ const getMediaUrl = (path) => {
   return `${API}/files/${path}`;
 };
 
+// Returns the resolved URL of the first *image* in a product's media, falling
+// back to image_url, then null (so callers can show a placeholder).
+const getProductImage = (product) => {
+  if (product.media_paths?.length > 0) {
+    const found = product.media_paths.find(
+      (url) =>
+        /\.(jpg|jpeg|png|webp)(\?|$)/i.test(url) ||
+        url.includes('/image/upload/')
+    );
+    if (found) return getMediaUrl(found);
+  }
+  if (product.image_url) return getMediaUrl(product.image_url);
+  return null;
+};
+
 // ─── Mini countdown chip for product cards ───────────────────────────────────
 const CountdownChip = ({ endTime, status }) => {
   const calc = () => {
@@ -205,8 +220,7 @@ const Home = () => {
           {!productsLoading && products.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {products.map((product, idx) => {
-                const imgPath = product.media_paths?.[0] || product.image_url || '';
-                const imgSrc = getMediaUrl(imgPath);
+                const imgSrc = getProductImage(product);
                 return (
                   <motion.div
                     key={product.id}
@@ -218,7 +232,7 @@ const Home = () => {
                     className="product-card bg-white rounded-xl overflow-hidden border border-primary/10 hover:border-primary/30 transition-colors"
                   >
                     <Link to={`/products/${product.id}`} className="block">
-                      {/* Image */}
+                      {/* Image — smart selection: first image in media_paths, then image_url, then placeholder */}
                       <div className="relative overflow-hidden">
                         {imgSrc ? (
                           <img
@@ -227,8 +241,9 @@ const Home = () => {
                             className="w-full h-52 object-cover hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
-                          <div className="w-full h-52 bg-gray-100 flex items-center justify-center">
-                            <Package size={32} className="text-muted-foreground" />
+                          <div className="w-full h-52 bg-primary/10 flex flex-col items-center justify-center gap-2">
+                            <span className="text-4xl select-none">🌿</span>
+                            <span className="text-xs font-medium text-primary/60 uppercase tracking-wide">Cardamom</span>
                           </div>
                         )}
                         {/* Live countdown chip */}

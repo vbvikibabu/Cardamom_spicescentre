@@ -64,10 +64,21 @@ const CountdownTimer = ({ endTime, status }) => {
 };
 
 const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
-  const [current, setCurrent] = useState(0);
   const paths = mediaPaths && mediaPaths.length > 0 ? mediaPaths : (imageUrl ? [imageUrl] : []);
 
-  if (paths.length === 0) return <div className="w-full h-80 bg-gray-100 flex items-center justify-center text-muted-foreground">No media</div>;
+  // Always start on the first image, not necessarily index 0 (which could be a video)
+  const firstImageIdx = paths.findIndex((p) => !isVideoPath(p));
+  const [current, setCurrent] = useState(firstImageIdx >= 0 ? firstImageIdx : 0);
+
+  // No media at all, or everything is a video → show placeholder
+  if (paths.length === 0 || firstImageIdx < 0) {
+    return (
+      <div className="w-full h-80 bg-primary/10 flex flex-col items-center justify-center gap-2">
+        <span className="text-5xl select-none">🌿</span>
+        <span className="text-xs font-medium text-primary/60 uppercase tracking-wide">Cardamom</span>
+      </div>
+    );
+  }
 
   const src = getMediaUrl(paths[current]);
   const video = isVideoPath(paths[current]);
