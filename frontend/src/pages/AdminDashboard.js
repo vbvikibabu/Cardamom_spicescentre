@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, Film, Gavel } from 'lucide-react';
+import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, Film, Gavel, ChevronDown, ChevronUp, Eye, Tag, Scale, Clock } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -28,6 +28,10 @@ const AdminDashboard = () => {
   const [existingMedia, setExistingMedia] = useState([]); // paths from existing product
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Pending product review panel state
+  const [expandedProductId, setExpandedProductId] = useState(null);
+  const [reviewImageIdxs, setReviewImageIdxs] = useState({});
 
   // Bid response state
   const [bidNotes, setBidNotes] = useState({});
@@ -354,48 +358,219 @@ const AdminDashboard = () => {
 
             {/* ═══ PENDING PRODUCTS TAB ═══ */}
             {activeTab === 'pending-products' && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {products.filter(p => p.approval_status === 'pending').length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">No products pending approval</p>
-                )}
-                {products.filter(p => p.approval_status === 'pending').map(p => (
-                  <div key={p.id} data-testid={`pending-product-${p.id}`} className="border border-yellow-200 bg-yellow-50/50 rounded-lg p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-4">
-                        <div className="flex gap-1 flex-shrink-0">
-                          {(p.media_paths && p.media_paths.length > 0 ? p.media_paths.slice(0, 2) : [p.image_url]).map((path, idx) => (
-                            path && (
-                              isVideo(path) ? (
-                                <div key={idx} className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center"><Film size={18} className="text-muted-foreground" /></div>
-                              ) : (
-                                <img key={idx} src={getMediaUrl(path)} alt={p.name} className="w-14 h-14 rounded-lg object-cover" />
-                              )
-                            )
-                          ))}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-foreground">{p.name}</h3>
-                          <p className="text-sm text-muted-foreground">{p.size}</p>
-                          <p className="text-xs text-muted-foreground mt-1">By: {p.seller_name || 'Unknown'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button data-testid={`approve-product-${p.id}`} onClick={() => approveProduct(p.id, 'approved')} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors inline-flex items-center gap-1">
-                          <CheckCircle size={14} /> Approve
-                        </button>
-                        <button data-testid={`reject-product-${p.id}`} onClick={() => approveProduct(p.id, 'rejected')} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors inline-flex items-center gap-1">
-                          <XCircle size={14} /> Reject
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">{p.description}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {p.features?.map((f, i) => (
-                        <span key={i} className="px-2 py-1 bg-white rounded text-xs text-foreground border border-border">{f}</span>
-                      ))}
-                    </div>
+                  <div className="text-center py-12">
+                    <CheckCircle className="mx-auto text-green-400 mb-3" size={40} />
+                    <p className="text-muted-foreground">No products pending approval</p>
                   </div>
-                ))}
+                )}
+                {products.filter(p => p.approval_status === 'pending').map(p => {
+                  const isExpanded = expandedProductId === p.id;
+                  const mediaPaths = p.media_paths?.length > 0 ? p.media_paths : (p.image_url ? [p.image_url] : []);
+                  const activeImg = reviewImageIdxs[p.id] ?? 0;
+                  const mainImgPath = mediaPaths[activeImg] || mediaPaths[0];
+                  const mainImgSrc = mainImgPath ? getMediaUrl(mainImgPath) : null;
+                  const submittedDate = p.created_at ? new Date(p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+                  return (
+                    <div key={p.id} data-testid={`pending-product-${p.id}`} className="border border-yellow-200 bg-yellow-50/30 rounded-xl overflow-hidden">
+                      {/* ── Collapsed row ── */}
+                      <div className="flex items-center gap-4 p-4">
+                        {/* Thumb */}
+                        <div className="flex-shrink-0">
+                          {mainImgSrc && !isVideo(mainImgSrc) ? (
+                            <img src={mainImgSrc} alt={p.name} className="w-14 h-14 rounded-lg object-cover border border-border" />
+                          ) : (
+                            <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center">
+                              <Film size={18} className="text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <h3 className="font-semibold text-foreground truncate">{p.name}</h3>
+                            <span className="flex-shrink-0 px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full uppercase tracking-wide">{p.size}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">{p.seller_name || 'Unknown Seller'}</span>
+                            {p.seller_company ? ` · ${p.seller_company}` : ''}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <Clock size={10} /> Submitted {submittedDate}
+                          </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            data-testid={`approve-product-${p.id}`}
+                            onClick={() => approveProduct(p.id, 'approved')}
+                            className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors inline-flex items-center gap-1"
+                          >
+                            <CheckCircle size={13} /> Approve
+                          </button>
+                          <button
+                            data-testid={`reject-product-${p.id}`}
+                            onClick={() => approveProduct(p.id, 'rejected')}
+                            className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors inline-flex items-center gap-1"
+                          >
+                            <XCircle size={13} /> Reject
+                          </button>
+                          <button
+                            data-testid={`review-product-${p.id}`}
+                            onClick={() => setExpandedProductId(isExpanded ? null : p.id)}
+                            className="px-3 py-1.5 bg-white border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-colors inline-flex items-center gap-1"
+                          >
+                            <Eye size={13} /> Review
+                            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* ── Expanded review panel ── */}
+                      {isExpanded && (
+                        <div className="border-t border-yellow-200 bg-white p-5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                            {/* Left: Image gallery */}
+                            <div>
+                              {/* Main image */}
+                              <div className="w-full h-64 rounded-xl overflow-hidden bg-gray-100 mb-3 border border-border">
+                                {mainImgSrc ? (
+                                  isVideo(mainImgSrc) ? (
+                                    <video src={mainImgSrc} controls className="w-full h-full object-cover bg-black" />
+                                  ) : (
+                                    <img src={mainImgSrc} alt={p.name} className="w-full h-full object-cover" />
+                                  )
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                    <Package size={32} />
+                                  </div>
+                                )}
+                              </div>
+                              {/* Thumbnail strip */}
+                              {mediaPaths.length > 1 && (
+                                <div className="flex gap-2 flex-wrap">
+                                  {mediaPaths.map((path, tIdx) => {
+                                    const src = getMediaUrl(path);
+                                    const isActive = (reviewImageIdxs[p.id] ?? 0) === tIdx;
+                                    return (
+                                      <button
+                                        key={tIdx}
+                                        onClick={() => setReviewImageIdxs(prev => ({ ...prev, [p.id]: tIdx }))}
+                                        className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${isActive ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}
+                                      >
+                                        {isVideo(path) ? (
+                                          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                            <Film size={16} className="text-muted-foreground" />
+                                          </div>
+                                        ) : (
+                                          <img src={src} alt="" className="w-full h-full object-cover" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Right: Product details */}
+                            <div className="space-y-4">
+                              {/* Name + size */}
+                              <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold mb-1">Product</p>
+                                <h4 className="font-serif text-xl font-bold text-foreground">{p.name}</h4>
+                                <span className="inline-block mt-1 px-2.5 py-0.5 bg-primary/10 text-primary text-xs font-semibold rounded-full">{p.size}</span>
+                              </div>
+
+                              {/* Description */}
+                              <div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold mb-1">Description</p>
+                                <p className="text-sm text-foreground leading-relaxed">{p.description}</p>
+                              </div>
+
+                              {/* Features */}
+                              {p.features?.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold mb-1.5">Features</p>
+                                  <ul className="space-y-1">
+                                    {p.features.map((f, i) => (
+                                      <li key={i} className="flex items-center gap-2 text-xs text-foreground">
+                                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                                          <CheckCircle size={10} className="text-green-600" />
+                                        </span>
+                                        {f}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Pricing */}
+                              <div className="grid grid-cols-2 gap-3">
+                                {p.base_price && (
+                                  <div className="p-3 bg-muted rounded-lg">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1"><Tag size={9} /> Base Price</p>
+                                    <p className="text-sm font-bold text-foreground">
+                                      {p.base_price_currency === 'USD' ? '$' : '₹'}{p.base_price?.toLocaleString('en-IN')}/kg
+                                    </p>
+                                  </div>
+                                )}
+                                {p.minimum_quantity_kg && (
+                                  <div className="p-3 bg-muted rounded-lg">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1"><Scale size={9} /> Min Order</p>
+                                    <p className="text-sm font-bold text-foreground">{p.minimum_quantity_kg} kg</p>
+                                  </div>
+                                )}
+                                {p.total_quantity_kg && (
+                                  <div className="p-3 bg-muted rounded-lg">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1"><Package size={9} /> Total Stock</p>
+                                    <p className="text-sm font-bold text-foreground">{p.total_quantity_kg} kg</p>
+                                  </div>
+                                )}
+                                {p.bid_duration_hours && (
+                                  <div className="p-3 bg-muted rounded-lg">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1"><Clock size={9} /> Bid Duration</p>
+                                    <p className="text-sm font-bold text-foreground">{p.bid_duration_hours}h</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Seller info */}
+                              <div className="p-3 bg-green-50 border border-green-100 rounded-lg">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold mb-2">Seller</p>
+                                <p className="text-sm font-semibold text-foreground">{p.seller_name || '—'}</p>
+                                {p.seller_company && <p className="text-xs text-muted-foreground">{p.seller_company}</p>}
+                              </div>
+
+                              {/* Quick action buttons */}
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  data-testid={`review-approve-product-${p.id}`}
+                                  onClick={() => { approveProduct(p.id, 'approved'); setExpandedProductId(null); }}
+                                  className="flex-1 py-2.5 bg-green-500 text-white rounded-lg text-sm font-semibold hover:bg-green-600 transition-colors inline-flex items-center justify-center gap-2"
+                                >
+                                  <CheckCircle size={15} /> Approve & Start Timer
+                                </button>
+                                <button
+                                  data-testid={`review-reject-product-${p.id}`}
+                                  onClick={() => { approveProduct(p.id, 'rejected'); setExpandedProductId(null); }}
+                                  className="flex-1 py-2.5 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors inline-flex items-center justify-center gap-2"
+                                >
+                                  <XCircle size={15} /> Reject
+                                </button>
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

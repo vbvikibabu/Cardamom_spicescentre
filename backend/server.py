@@ -637,7 +637,7 @@ class Product(BaseModel):
     bid_start_time: Optional[datetime] = None
     bid_duration_hours: int = 4
     bid_end_time: Optional[datetime] = None
-    listing_status: Literal["active", "expired", "sold", "archived"] = "active"
+    listing_status: Literal["active", "expired", "sold", "archived", "pending_approval", "rejected"] = "active"
     sold_at: Optional[datetime] = None
     sold_to_buyer_id: Optional[str] = None
     sold_to_buyer_name: Optional[str] = None
@@ -681,7 +681,7 @@ class ProductPublic(BaseModel):
     bid_start_time: Optional[datetime] = None
     bid_duration_hours: int = 4
     bid_end_time: Optional[datetime] = None
-    listing_status: Literal["active", "expired", "sold", "archived"] = "active"
+    listing_status: Literal["active", "expired", "sold", "archived", "pending_approval", "rejected"] = "active"
     total_bids_received: int = 0
 
 # ==================== USER MODELS ====================
@@ -987,7 +987,7 @@ async def get_all_products_admin(
     current_admin: User = Depends(get_current_admin)
 ):
     query: dict = {}
-    if listing_status and listing_status in ("active", "expired", "sold", "archived"):
+    if listing_status and listing_status in ("active", "expired", "sold", "archived", "pending_approval", "rejected"):
         query["listing_status"] = listing_status
     if approval_status and approval_status in ("pending", "approved", "rejected"):
         query["approval_status"] = approval_status
@@ -1063,10 +1063,26 @@ async def update_product_status(
     approval_status: Literal["approved", "rejected"] = Query(...),
     current_admin: User = Depends(get_current_admin)
 ):
-    result = await db.products.update_one(
-        {"id": product_id},
-        {"$set": {"approval_status": approval_status}}
-    )
+    product_before = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product_before:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    if approval_status == "approved":
+        now = datetime.now(timezone.utc)
+        duration_hrs = product_before.get("bid_duration_hours", 4)
+        update_fields = {
+            "approval_status": "approved",
+            "listing_status": "active",
+            "bid_start_time": now.isoformat(),
+            "bid_end_time": (now + timedelta(hours=duration_hrs)).isoformat(),
+        }
+    else:
+        update_fields = {
+            "approval_status": "rejected",
+            "listing_status": "rejected",
+        }
+
+    result = await db.products.update_one({"id": product_id}, {"$set": update_fields})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Product not found")
 
@@ -1074,13 +1090,13 @@ async def update_product_status(
 
     # Notify seller
     try:
-        seller_id = product.get("seller_id")
+        seller_id = product_before.get("seller_id")
         if seller_id:
             status_msg = "approved and is now live" if approval_status == "approved" else "rejected"
             await send_push_to_user(
                 seller_id,
                 f"Product {approval_status.title()}",
-                f"Your product '{product.get('name', '')}' has been {status_msg}.",
+                f"Your product '{product_before.get('name', '')}' has been {status_msg}.",
                 "/seller"
             )
     except Exception as e:
@@ -1162,8 +1178,8 @@ async def get_seller_products(
     listing_status: Optional[str] = Query(None),
     current_user: User = Depends(get_current_approved_seller)
 ):
-    query: dict = {"seller_id": current_user.id, "listing_status": {"$ne": "archived"}}
-    if listing_status and listing_status in ("active", "expired", "sold", "archived"):
+    query: dict = {"seller_id": current_user.id, "listing_status": {"$nin": ["archived"]}}
+    if listing_status and listing_status in ("active", "expired", "sold", "archived", "pending_approval", "rejected"):
         query["listing_status"] = listing_status
     products = await db.products.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     for p in products:
@@ -1179,7 +1195,6 @@ async def create_product_seller(
     raw = product_data.model_dump()
     duration_hrs = raw.pop("bid_duration_hours", 4)
     total_qty = raw.get("total_quantity_kg")
-    now = datetime.now(timezone.utc)
     product = Product(
         **raw,
         seller_id=current_user.id,
@@ -1187,15 +1202,15 @@ async def create_product_seller(
         seller_company=current_user.company_name,
         approval_status="pending",
         bid_duration_hours=duration_hrs,
-        bid_start_time=now,
-        bid_end_time=now + timedelta(hours=duration_hrs),
-        listing_status="active",
+        bid_start_time=None,
+        bid_end_time=None,
+        listing_status="pending_approval",
         remaining_quantity_kg=total_qty,
     )
     product_dict = product.model_dump()
     product_dict['created_at'] = product_dict['created_at'].isoformat()
-    product_dict['bid_start_time'] = product_dict['bid_start_time'].isoformat() if product_dict['bid_start_time'] else None
-    product_dict['bid_end_time'] = product_dict['bid_end_time'].isoformat() if product_dict['bid_end_time'] else None
+    product_dict['bid_start_time'] = None
+    product_dict['bid_end_time'] = None
     await db.products.insert_one(product_dict)
     logger.info(f"Seller {current_user.email} created product: {product.name} (pending approval, {duration_hrs}h timer)")
 

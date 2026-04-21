@@ -22,10 +22,12 @@ const statusBadge = (status) => {
 
 const listingBadge = (s) => {
   const map = {
-    active:   'bg-green-100 text-green-700',
-    expired:  'bg-orange-100 text-orange-700',
-    sold:     'bg-blue-100 text-blue-700',
-    archived: 'bg-gray-100 text-gray-500',
+    active:           'bg-green-100 text-green-700',
+    expired:          'bg-orange-100 text-orange-700',
+    sold:             'bg-blue-100 text-blue-700',
+    archived:         'bg-gray-100 text-gray-500',
+    pending_approval: 'bg-yellow-100 text-yellow-700',
+    rejected:         'bg-red-100 text-red-700',
   };
   return map[s] || 'bg-gray-100 text-gray-700';
 };
@@ -609,13 +611,20 @@ const SellerDashboard = () => {
 
                 {/* Product list filter tabs */}
                 <div className="flex gap-2 mb-4 flex-wrap">
-                  {['active','expired','sold','archived'].map(f => {
-                    const count = products.filter(p => p.listing_status === f).length;
-                    const colors = { active:'bg-green-500', expired:'bg-orange-500', sold:'bg-blue-500', archived:'bg-gray-400' };
+                  {[
+                    { key: 'pending_approval', label: 'Under Review', color: 'bg-yellow-500' },
+                    { key: 'active',           label: 'Active',       color: 'bg-green-500'  },
+                    { key: 'expired',          label: 'Expired',      color: 'bg-orange-500' },
+                    { key: 'sold',             label: 'Sold',         color: 'bg-blue-500'   },
+                    { key: 'archived',         label: 'Archived',     color: 'bg-gray-400'   },
+                    { key: 'rejected',         label: 'Rejected',     color: 'bg-red-500'    },
+                  ].map(({ key, label, color }) => {
+                    const count = products.filter(p => p.listing_status === key).length;
                     return (
-                      <button key={f} onClick={() => setProductListFilter(f)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors capitalize flex items-center gap-1.5 ${productListFilter === f ? `${colors[f]} text-white` : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
-                        {f} <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${productListFilter === f ? 'bg-white/30' : 'bg-muted-foreground/20'}`}>{count}</span>
+                      <button key={key} onClick={() => setProductListFilter(key)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 ${productListFilter === key ? `${color} text-white` : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+                        {label}
+                        <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${productListFilter === key ? 'bg-white/30' : 'bg-muted-foreground/20'}`}>{count}</span>
                       </button>
                     );
                   })}
@@ -627,9 +636,11 @@ const SellerDashboard = () => {
                     <div className="text-center py-12">
                       <Package className="mx-auto text-muted-foreground mb-4" size={48} />
                       <p className="text-muted-foreground mb-4">
-                        {productListFilter === 'active' ? 'No active products. Add your first listing!' :
+                        {productListFilter === 'pending_approval' ? 'No products under review.' :
+                         productListFilter === 'active' ? 'No active products. Add your first listing!' :
                          productListFilter === 'expired' ? 'No expired listings.' :
                          productListFilter === 'sold' ? 'No products sold yet.' :
+                         productListFilter === 'rejected' ? 'No rejected products.' :
                          'No archived products.'}
                       </p>
                     </div>
