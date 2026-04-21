@@ -14,6 +14,18 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "start_url": "/",
@@ -22,5 +34,9 @@
   "background_color": "#FAFAF5",
   "orientation": "portrait-primary",
   "scope": "/",
-  "categories": ["business", "shopping"]
+  "categories": ["business", "shopping"],
+  "apple-mobile-web-app-capable": "yes",
+  "apple-mobile-web-app-status-bar-style": "black-translucent",
+  "apple-mobile-web-app-title": "Cardamom SC",
+  "apple-touch-startup-image": "/icon-512.png"
 }
