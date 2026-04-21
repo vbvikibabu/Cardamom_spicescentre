@@ -17,7 +17,7 @@ import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import jwt
-from passlib.context import CryptContext
+import bcrypt as bcrypt_lib
 from io import BytesIO
 import cloudinary
 import cloudinary.uploader
@@ -50,7 +50,6 @@ SOLD_DISPLAY_MINUTES = int(os.environ.get("SOLD_DISPLAY_MINUTES", "30"))
 BID_TIMER_EXTENSION_HOURS = int(os.environ.get("BID_TIMER_EXTENSION_HOURS", "2"))
 MAX_TIMER_EXTENSIONS = int(os.environ.get("MAX_TIMER_EXTENSIONS", "2"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
 
 # ==================== CLOUDINARY STORAGE ====================
@@ -813,10 +812,16 @@ def _coerce_product_datetimes(p: dict):
 
 # ==================== AUTH UTILITIES ====================
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt_lib.checkpw(
+        plain_password.encode('utf-8'),
+        hashed_password.encode('utf-8')
+    )
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt_lib.hashpw(
+        password.encode('utf-8'),
+        bcrypt_lib.gensalt()
+    ).decode('utf-8')
 
 def create_access_token(data: dict):
     to_encode = data.copy()
