@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart } from 'lucide-react';
+import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart, Timer, Archive, RotateCcw, AlertCircle, Loader2 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -20,6 +20,40 @@ const statusBadge = (status) => {
   return map[status] || 'bg-gray-100 text-gray-700';
 };
 
+const listingBadge = (s) => {
+  const map = {
+    active:   'bg-green-100 text-green-700',
+    expired:  'bg-orange-100 text-orange-700',
+    sold:     'bg-blue-100 text-blue-700',
+    archived: 'bg-gray-100 text-gray-500',
+  };
+  return map[s] || 'bg-gray-100 text-gray-700';
+};
+
+// Small inline countdown for active products
+const MiniCountdown = ({ endTime }) => {
+  const calc = () => {
+    const diff = new Date(endTime) - Date.now();
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return { h, m, s, diff };
+  };
+  const [time, setTime] = useState(calc);
+  useEffect(() => {
+    const id = setInterval(() => setTime(calc()), 1000);
+    return () => clearInterval(id);
+  });
+  if (!time) return <span className="text-xs text-orange-600 font-semibold">Bidding closed</span>;
+  const urgent = time.diff < 30 * 60 * 1000;
+  return (
+    <span className={`text-xs font-mono font-semibold ${urgent ? 'text-red-600 animate-pulse' : 'text-green-700'}`}>
+      {String(time.h).padStart(2,'0')}:{String(time.m).padStart(2,'0')}:{String(time.s).padStart(2,'0')}
+    </span>
+  );
+};
+
 const SellerDashboard = () => {
   const { user, token, isApproved } = useAuth();
   const navigate = useNavigate();
@@ -29,14 +63,16 @@ const SellerDashboard = () => {
   const [bidsFilter, setBidsFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('products');
+  const [productListFilter, setProductListFilter] = useState('active');
 
   // Product form state
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '' });
+  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '', bid_duration_hours: 4, base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
   const [mediaFiles, setMediaFiles] = useState([]);
   const [existingMedia, setExistingMedia] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [productFormErrors, setProductFormErrors] = useState({});
   const fileInputRef = useRef(null);
 
   // Bid notes
@@ -74,15 +110,21 @@ const SellerDashboard = () => {
         name: product.name,
         size: product.size,
         description: product.description,
-        features: product.features.join(', ')
+        features: product.features.join(', '),
+        bid_duration_hours: product.bid_duration_hours || 4,
+        base_price: product.base_price ?? '',
+        base_price_currency: product.base_price_currency || 'INR',
+        minimum_quantity_kg: product.minimum_quantity_kg ?? '',
+        total_quantity_kg: product.total_quantity_kg ?? '',
       });
       setExistingMedia(product.media_paths?.length > 0 ? product.media_paths : (product.image_url ? [product.image_url] : []));
     } else {
       setEditingProduct(null);
-      setProductForm({ name: '', size: '', description: '', features: '' });
+      setProductForm({ name: '', size: '', description: '', features: '', bid_duration_hours: 4, base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
       setExistingMedia([]);
     }
     setMediaFiles([]);
+    setProductFormErrors({});
     setShowProductForm(true);
   };
 
@@ -133,9 +175,44 @@ const SellerDashboard = () => {
 
   const saveProduct = async (e) => {
     e.preventDefault();
+
+    // Client-side validation
+    const errs = {};
+    const trimName = productForm.name.trim();
+    if (trimName.length < 3) errs.name = 'Product name must be at least 3 characters';
+    else if (trimName.length > 100) errs.name = 'Product name must be under 100 characters';
+
+    const trimSize = productForm.size.trim();
+    if (trimSize.length < 2) errs.size = 'Size/Grade must be at least 2 characters';
+
+    const trimDesc = productForm.description.trim();
+    if (trimDesc.length < 20) errs.description = 'Description must be at least 20 characters';
+    else if (trimDesc.length > 500) errs.description = 'Description must be under 500 characters';
+
+    const featuresList = productForm.features.split(',').map(f => f.trim()).filter(Boolean);
+    if (featuresList.length < 2) errs.features = 'Please enter at least 2 comma-separated features';
+
+    const bpVal = parseFloat(productForm.base_price);
+    if (!productForm.base_price || isNaN(bpVal) || bpVal <= 0) errs.base_price = 'Base price must be a positive number';
+    else if (bpVal > 999999) errs.base_price = 'Base price seems too high — max 6 digits';
+
+    const totalQty = parseFloat(productForm.total_quantity_kg);
+    const minQty = parseFloat(productForm.minimum_quantity_kg);
+    if (!productForm.total_quantity_kg || isNaN(totalQty) || totalQty <= 0) errs.total_quantity_kg = 'Total stock must be a positive number';
+    if (!productForm.minimum_quantity_kg || isNaN(minQty) || minQty <= 0) errs.minimum_quantity_kg = 'Minimum order must be a positive number';
+    if (!errs.total_quantity_kg && !errs.minimum_quantity_kg && minQty >= totalQty) {
+      errs.minimum_quantity_kg = 'Minimum order must be less than total stock';
+    }
+
     const totalMedia = existingMedia.length + mediaFiles.length;
-    if (totalMedia < 1) { toast.error('Please add at least 1 image or video.'); return; }
-    if (totalMedia > 4) { toast.error('Maximum 4 files allowed.'); return; }
+    if (totalMedia < 1) errs.media = 'Please add at least 1 image or video';
+    if (totalMedia > 4) errs.media = 'Maximum 4 files allowed';
+
+    if (Object.keys(errs).length > 0) {
+      setProductFormErrors(errs);
+      return;
+    }
+    setProductFormErrors({});
 
     setSaving(true);
     try {
@@ -156,7 +233,12 @@ const SellerDashboard = () => {
         description: productForm.description,
         features: productForm.features.split(',').map(f => f.trim()).filter(Boolean),
         image_url: imageUrl,
-        media_paths: allMediaPaths
+        media_paths: allMediaPaths,
+        bid_duration_hours: Number(productForm.bid_duration_hours) || 4,
+        base_price: Number(productForm.base_price),
+        base_price_currency: productForm.base_price_currency,
+        minimum_quantity_kg: Number(productForm.minimum_quantity_kg),
+        total_quantity_kg: Number(productForm.total_quantity_kg),
       };
 
       if (editingProduct) {
@@ -182,6 +264,16 @@ const SellerDashboard = () => {
       toast.success('Product deleted!');
       fetchData();
     } catch { toast.error('Failed to delete product'); }
+  };
+
+  const extendTimer = async (id) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/seller/products/${id}/extend-timer`, {}, authHeaders);
+      toast.success(res.data.message);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to extend timer');
+    }
   };
 
   // ─── Bid Actions ───
@@ -311,21 +403,146 @@ const SellerDashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-foreground mb-1">Product Name *</label>
-                        <input type="text" required data-testid="seller-product-name" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="Green Cardamom - 6 mm to 7 mm" />
+                        <input
+                          type="text" data-testid="seller-product-name"
+                          value={productForm.name}
+                          onChange={e => { setProductForm({...productForm, name: e.target.value}); if (productFormErrors.name) setProductFormErrors(prev => ({...prev, name: undefined})); }}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white ${productFormErrors.name ? 'border-red-400' : 'border-border'}`}
+                          placeholder="Green Cardamom - 6 mm to 7 mm"
+                        />
+                        {productFormErrors.name && <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.name}</p>}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-foreground mb-1">Size / Grade *</label>
-                        <input type="text" required data-testid="seller-product-size" value={productForm.size} onChange={e => setProductForm({...productForm, size: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="6 mm to 7 mm" />
+                        <input
+                          type="text" data-testid="seller-product-size"
+                          value={productForm.size}
+                          onChange={e => { setProductForm({...productForm, size: e.target.value}); if (productFormErrors.size) setProductFormErrors(prev => ({...prev, size: undefined})); }}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white ${productFormErrors.size ? 'border-red-400' : 'border-border'}`}
+                          placeholder="6 mm to 7 mm"
+                        />
+                        {productFormErrors.size && <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.size}</p>}
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">Description *</label>
-                      <textarea required data-testid="seller-product-desc" value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} rows={2} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none bg-white" />
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-medium text-foreground">Description *</label>
+                        <span className={`text-[10px] font-mono ${productForm.description.length > 480 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                          {productForm.description.length}/500
+                        </span>
+                      </div>
+                      <textarea
+                        data-testid="seller-product-desc"
+                        value={productForm.description}
+                        onChange={e => { setProductForm({...productForm, description: e.target.value}); if (productFormErrors.description) setProductFormErrors(prev => ({...prev, description: undefined})); }}
+                        rows={2}
+                        maxLength={500}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none bg-white ${productFormErrors.description ? 'border-red-400' : 'border-border'}`}
+                        placeholder="Describe your product quality, origin, and characteristics (20-500 chars)"
+                      />
+                      {productFormErrors.description && <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.description}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground mb-1">Features (comma-separated) *</label>
-                      <input type="text" required data-testid="seller-product-features" value={productForm.features} onChange={e => setProductForm({...productForm, features: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="Clean pods, Good aroma, Export quality" />
+                      <input
+                        type="text" data-testid="seller-product-features"
+                        value={productForm.features}
+                        onChange={e => { setProductForm({...productForm, features: e.target.value}); if (productFormErrors.features) setProductFormErrors(prev => ({...prev, features: undefined})); }}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white ${productFormErrors.features ? 'border-red-400' : 'border-border'}`}
+                        placeholder="Clean pods, Good aroma, Export quality"
+                      />
+                      {productFormErrors.features && <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.features}</p>}
+                      <p className="text-[10px] text-muted-foreground mt-1">Enter at least 2 features, separated by commas</p>
                     </div>
+
+                    {/* Pricing & Quantity */}
+                    <div className="p-4 border border-primary/20 rounded-xl bg-primary/3 space-y-3">
+                      <p className="text-xs font-bold text-foreground uppercase tracking-wide">Pricing & Quantity</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground mb-1">Base Price * <span className="text-muted-foreground font-normal">(per kg)</span></label>
+                          <input
+                            type="number" min="0" step="0.01"
+                            data-testid="seller-base-price"
+                            value={productForm.base_price}
+                            onChange={e => { setProductForm({...productForm, base_price: e.target.value}); if (productFormErrors.base_price) setProductFormErrors(prev => ({...prev, base_price: undefined})); }}
+                            className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white ${productFormErrors.base_price ? 'border-red-400' : 'border-border'}`}
+                            placeholder="e.g. 2400"
+                          />
+                          {productFormErrors.base_price && <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.base_price}</p>}
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground mb-1">Currency *</label>
+                          <div className="flex rounded-lg overflow-hidden border border-border">
+                            {['INR','USD'].map(c => (
+                              <button
+                                key={c} type="button"
+                                onClick={() => setProductForm({...productForm, base_price_currency: c})}
+                                className={`flex-1 py-2 text-sm font-semibold transition-colors ${productForm.base_price_currency === c ? 'bg-primary text-white' : 'bg-white text-muted-foreground hover:bg-muted'}`}
+                              >{c}</button>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Bid duration stays here only when adding */}
+                        <div className="md:col-span-1" />
+                      </div>
+                      {/* Total qty + Min qty side by side */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground mb-1">Total Stock (kg) *</label>
+                          <input
+                            type="number" min="1" step="0.1"
+                            data-testid="seller-total-qty"
+                            value={productForm.total_quantity_kg}
+                            onChange={e => { setProductForm({...productForm, total_quantity_kg: e.target.value}); if (productFormErrors.total_quantity_kg) setProductFormErrors(prev => ({...prev, total_quantity_kg: undefined, minimum_quantity_kg: undefined})); }}
+                            className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white ${productFormErrors.total_quantity_kg ? 'border-red-400' : 'border-border'}`}
+                            placeholder="e.g. 1000"
+                          />
+                          {productFormErrors.total_quantity_kg
+                            ? <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.total_quantity_kg}</p>
+                            : <p className="text-[10px] text-muted-foreground mt-1">Total stock available for this listing</p>
+                          }
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground mb-1">Min. Order (kg) *</label>
+                          <input
+                            type="number" min="1" step="0.1"
+                            data-testid="seller-min-qty"
+                            value={productForm.minimum_quantity_kg}
+                            onChange={e => { setProductForm({...productForm, minimum_quantity_kg: e.target.value}); if (productFormErrors.minimum_quantity_kg) setProductFormErrors(prev => ({...prev, minimum_quantity_kg: undefined})); }}
+                            className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white ${productFormErrors.minimum_quantity_kg ? 'border-red-400' : 'border-border'}`}
+                            placeholder="e.g. 100"
+                          />
+                          {productFormErrors.minimum_quantity_kg
+                            ? <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.minimum_quantity_kg}</p>
+                            : <p className="text-[10px] text-muted-foreground mt-1">Minimum quantity per bid</p>
+                          }
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bid Duration */}
+                    {!editingProduct && (
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">
+                          <Timer size={12} className="inline mr-1" />Bidding Window *
+                        </label>
+                        <select
+                          value={productForm.bid_duration_hours}
+                          onChange={e => setProductForm({...productForm, bid_duration_hours: Number(e.target.value)})}
+                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                          data-testid="seller-bid-duration"
+                        >
+                          {[1,2,3,4,5,6,7,8].map(h => (
+                            <option key={h} value={h}>{h} hour{h > 1 ? 's' : ''}</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Bidding closes {productForm.bid_duration_hours} hour{productForm.bid_duration_hours > 1 ? 's' : ''} after submission.
+                          You can extend up to 2 times after expiry.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Media Upload */}
                     <div>
@@ -372,10 +589,11 @@ const SellerDashboard = () => {
                       )}
 
                       {(existingMedia.length + mediaFiles.length) < 4 && (
-                        <button type="button" data-testid="seller-media-upload-btn" onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-primary/40 rounded-lg text-sm text-primary font-medium hover:bg-primary/5 transition-colors">
-                          <Upload size={16} /> Add {existingMedia.length + mediaFiles.length === 0 ? 'Photos/Videos' : 'More'} <span className="text-muted-foreground font-normal">({existingMedia.length + mediaFiles.length}/4)</span>
+                        <button type="button" data-testid="seller-media-upload-btn" onClick={() => fileInputRef.current?.click()} className={`inline-flex items-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-lg text-sm font-medium hover:bg-primary/5 transition-colors ${productFormErrors.media ? 'border-red-400 text-red-600' : 'border-primary/40 text-primary'}`}>
+                          <Upload size={16} /> Add {existingMedia.length + mediaFiles.length === 0 ? 'Photos/Videos' : 'More'} <span className="font-normal opacity-70">({existingMedia.length + mediaFiles.length}/4)</span>
                         </button>
                       )}
+                      {productFormErrors.media && <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.media}</p>}
                       <input ref={fileInputRef} type="file" accept={ACCEPT_STRING} multiple onChange={handleFileSelect} className="hidden" data-testid="seller-media-file-input" />
                     </div>
 
@@ -384,40 +602,131 @@ const SellerDashboard = () => {
                     </div>
 
                     <button type="submit" disabled={saving} data-testid="seller-product-save-btn" className="bg-primary text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2">
-                      {saving ? (<><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> Saving...</>) : (editingProduct ? 'Update Product' : 'Submit Product')}
+                      {saving ? (<><Loader2 size={16} className="animate-spin" /> Saving...</>) : (editingProduct ? 'Update Product' : 'Submit Product')}
                     </button>
                   </form>
                 )}
 
+                {/* Product list filter tabs */}
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  {['active','expired','sold','archived'].map(f => {
+                    const count = products.filter(p => p.listing_status === f).length;
+                    const colors = { active:'bg-green-500', expired:'bg-orange-500', sold:'bg-blue-500', archived:'bg-gray-400' };
+                    return (
+                      <button key={f} onClick={() => setProductListFilter(f)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors capitalize flex items-center gap-1.5 ${productListFilter === f ? `${colors[f]} text-white` : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+                        {f} <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${productListFilter === f ? 'bg-white/30' : 'bg-muted-foreground/20'}`}>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* Product list */}
                 <div className="space-y-3">
-                  {products.length === 0 && !showProductForm && (
+                  {products.filter(p => p.listing_status === productListFilter).length === 0 && !showProductForm && (
                     <div className="text-center py-12">
                       <Package className="mx-auto text-muted-foreground mb-4" size={48} />
-                      <p className="text-muted-foreground mb-4">No products yet. Start by adding your first product!</p>
+                      <p className="text-muted-foreground mb-4">
+                        {productListFilter === 'active' ? 'No active products. Add your first listing!' :
+                         productListFilter === 'expired' ? 'No expired listings.' :
+                         productListFilter === 'sold' ? 'No products sold yet.' :
+                         'No archived products.'}
+                      </p>
                     </div>
                   )}
-                  {products.map(p => (
-                    <div key={p.id} data-testid={`seller-product-${p.id}`} className="border border-border rounded-lg p-4 hover:border-primary transition-colors">
-                      <div className="flex items-center gap-4">
+                  {products.filter(p => p.listing_status === productListFilter).map(p => (
+                    <div key={p.id} data-testid={`seller-product-${p.id}`} className="border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
+                      <div className="flex items-start gap-4">
+                        {/* Thumbnail */}
                         <div className="flex gap-1 flex-shrink-0">
-                          {(p.media_paths && p.media_paths.length > 0 ? p.media_paths.slice(0, 2) : [p.image_url]).map((path, idx) => (
-                            path && (
-                              isVideo(path) ? (
-                                <div key={idx} className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center"><Film size={18} className="text-muted-foreground" /></div>
-                              ) : (
-                                <img key={idx} src={getMediaUrl(path)} alt={p.name} className="w-14 h-14 rounded-lg object-cover" />
-                              )
-                            )
+                          {(p.media_paths && p.media_paths.length > 0 ? p.media_paths.slice(0,2) : [p.image_url]).map((path, idx) => (
+                            path && (isVideo(path) ? (
+                              <div key={idx} className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center"><Film size={18} className="text-muted-foreground" /></div>
+                            ) : (
+                              <img key={idx} src={getMediaUrl(path)} alt={p.name} className="w-14 h-14 rounded-lg object-cover" />
+                            ))
                           ))}
                         </div>
+
+                        {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-foreground truncate">{p.name}</h3>
-                          <p className="text-sm text-muted-foreground">{p.size}</p>
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-foreground truncate">{p.name}</h3>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${listingBadge(p.listing_status)}`}>{p.listing_status}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(p.approval_status)}`}>{p.approval_status}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-1">{p.size}</p>
+                          {p.base_price && (
+                            <p className="text-xs text-foreground font-medium">
+                              {p.base_price_currency === 'USD' ? '$' : '₹'}{p.base_price.toLocaleString('en-IN')}/kg
+                              {p.minimum_quantity_kg ? ` · Min ${p.minimum_quantity_kg} kg` : ''}
+                            </p>
+                          )}
+                          {/* Inventory bar */}
+                          {p.total_quantity_kg > 0 && (
+                            <div className="mt-1.5">
+                              <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                                <span>Remaining: <strong className="text-foreground">{(p.remaining_quantity_kg ?? p.total_quantity_kg).toLocaleString('en-IN')} / {p.total_quantity_kg.toLocaleString('en-IN')} kg</strong></span>
+                              </div>
+                              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden w-full">
+                                {(() => {
+                                  const pct = Math.round(((p.remaining_quantity_kg ?? p.total_quantity_kg) / p.total_quantity_kg) * 100);
+                                  const color = pct > 50 ? 'bg-green-500' : pct > 20 ? 'bg-amber-500' : 'bg-red-500';
+                                  return <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />;
+                                })()}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Timer for active */}
+                          {p.listing_status === 'active' && p.bid_end_time && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Timer size={12} className="text-green-600" />
+                              <span>Closes in:</span>
+                              <MiniCountdown endTime={p.bid_end_time} />
+                              <span className="text-muted-foreground">• {p.total_bids_received || 0} bids</span>
+                            </div>
+                          )}
+
+                          {/* Expired info */}
+                          {p.listing_status === 'expired' && (
+                            <div className="flex items-center gap-1.5 text-xs text-orange-600">
+                              <AlertCircle size={12} />
+                              <span>Bidding ended • {p.total_bids_received || 0} bids received
+                                {p.extension_count > 0 ? ` • ${p.extension_count} extension${p.extension_count > 1 ? 's' : ''} used` : ''}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Sold info */}
+                          {(p.listing_status === 'sold' || p.listing_status === 'archived') && p.sold_to_buyer_name && (
+                            <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                              <CheckCircle size={12} />
+                              <span>
+                                Sold to <strong>{p.sold_to_buyer_name}</strong>
+                                {p.sold_price ? ` @ ${p.sold_price_currency || 'INR'} ${p.sold_price}` : ''}
+                                {p.sold_at ? ` on ${new Date(p.sold_at).toLocaleDateString('en-IN')}` : ''}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(p.approval_status)}`}>{p.approval_status}</span>
+
+                        {/* Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <button data-testid={`seller-edit-product-${p.id}`} onClick={() => openProductForm(p)} className="p-2 border border-border rounded-lg hover:bg-muted transition-colors" title="Edit"><Pencil size={16} className="text-foreground" /></button>
+                          {/* Extend timer for expired */}
+                          {p.listing_status === 'expired' && (
+                            <button
+                              onClick={() => extendTimer(p.id)}
+                              disabled={(p.extension_count || 0) >= 2}
+                              title={(p.extension_count || 0) >= 2 ? 'Max extensions reached' : 'Extend timer by 2h'}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-semibold hover:bg-orange-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <RotateCcw size={12} /> Extend{(p.extension_count || 0) > 0 ? ` (${2 - (p.extension_count||0)} left)` : ''}
+                            </button>
+                          )}
+                          {p.listing_status === 'active' && (
+                            <button data-testid={`seller-edit-product-${p.id}`} onClick={() => openProductForm(p)} className="p-2 border border-border rounded-lg hover:bg-muted transition-colors" title="Edit"><Pencil size={16} className="text-foreground" /></button>
+                          )}
                           <button data-testid={`seller-delete-product-${p.id}`} onClick={() => deleteProduct(p.id)} className="p-2 border border-red-200 rounded-lg hover:bg-red-50 transition-colors" title="Delete"><Trash2 size={16} className="text-red-500" /></button>
                         </div>
                       </div>

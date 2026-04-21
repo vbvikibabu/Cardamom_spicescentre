@@ -1,6 +1,21 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+// Which roles satisfy each requiredRole guard
+const ROLE_ACCESS = {
+  admin:  ['admin'],
+  seller: ['seller', 'both', 'admin'],
+  buyer:  ['buyer',  'both', 'admin'],
+};
+
+// Where to redirect a logged-in user who fails the role check
+function roleHome(role) {
+  if (role === 'admin')  return '/admin';
+  if (role === 'seller') return '/seller';
+  if (role === 'buyer' || role === 'both') return '/dashboard';
+  return '/';
+}
+
 export const ProtectedRoute = ({ children, requiredRole }) => {
   const { user, loading, isAuthenticated } = useAuth();
 
@@ -16,18 +31,15 @@ export const ProtectedRoute = ({ children, requiredRole }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole === 'admin' && user?.role !== 'admin') {
-    return <Navigate to="/" replace />;
+  // Non-admin users who are not yet approved get the holding page
+  if (user?.role !== 'admin' && user?.status !== 'approved') {
+    return <Navigate to="/pending-approval" replace />;
   }
 
-  if (requiredRole === 'seller' && !['seller', 'both'].includes(user?.role)) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (requiredRole === 'buyer' && !['buyer', 'both'].includes(user?.role)) {
-    if (user?.role === 'admin') return <Navigate to="/admin" replace />;
-    if (user?.role === 'seller') return <Navigate to="/seller" replace />;
-    return <Navigate to="/" replace />;
+  // Check role permission
+  const allowed = ROLE_ACCESS[requiredRole] ?? [];
+  if (!allowed.includes(user?.role)) {
+    return <Navigate to={roleHome(user?.role)} replace />;
   }
 
   return children;

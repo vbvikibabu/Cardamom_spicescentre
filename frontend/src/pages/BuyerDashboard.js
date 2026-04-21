@@ -29,7 +29,7 @@ const BuyerDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/bids/my`, {
+      const res = await axios.get(`${API_URL}/api/buyer/bids`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setBids(res.data);

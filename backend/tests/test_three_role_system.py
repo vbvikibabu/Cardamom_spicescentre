@@ -202,7 +202,7 @@ class TestBidFlow:
         buyer_ctx["bid_id"] = bid["id"]
 
     def test_buyer_sees_own_bids(self, buyer_ctx):
-        r = _get("/api/bids/my", headers=buyer_ctx["headers"])
+        r = _get("/api/buyer/bids", headers=buyer_ctx["headers"])
         assert r.status_code == 200
         ids = [b["id"] for b in r.json()]
         assert buyer_ctx["bid_id"] in ids

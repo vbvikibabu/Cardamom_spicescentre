@@ -16,6 +16,7 @@ const AdminDashboard = () => {
   const [bids, setBids] = useState([]);
   const [bidsSummary, setBidsSummary] = useState({ total: 0, today: 0, pending: 0, accepted: 0, rejected: 0 });
   const [bidsFilter, setBidsFilter] = useState('all');
+  const [productListFilter, setProductListFilter] = useState('active');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('users');
 
@@ -41,7 +42,7 @@ const AdminDashboard = () => {
         axios.get(`${API_URL}/api/admin/users`, authHeaders),
         axios.get(`${API_URL}/api/admin/products`, authHeaders),
         axios.get(`${API_URL}/api/bids`, authHeaders),
-        axios.get(`${API_URL}/api/bids/summary`, authHeaders)
+        axios.get(`${API_URL}/api/admin/bids/summary`, authHeaders)
       ]);
       setUsers(usersRes.data);
       setProducts(productsRes.data);
@@ -634,9 +635,26 @@ const AdminDashboard = () => {
                   </form>
                 )}
 
+                {/* Listing status filter tabs */}
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  {['active','expired','sold','archived'].map(f => {
+                    const count = products.filter(p => p.listing_status === f).length;
+                    const colors = { active:'bg-green-500', expired:'bg-orange-500', sold:'bg-blue-500', archived:'bg-gray-400' };
+                    return (
+                      <button key={f} onClick={() => setProductListFilter(f)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors capitalize flex items-center gap-1.5 ${productListFilter === f ? `${colors[f]} text-white` : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+                        {f} <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${productListFilter === f ? 'bg-white/30' : 'bg-muted-foreground/20'}`}>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* Product list */}
                 <div className="space-y-3">
-                  {products.map(p => (
+                  {products.filter(p => p.listing_status === productListFilter).length === 0 && !showProductForm && (
+                    <p className="text-center text-muted-foreground py-8">No {productListFilter} products</p>
+                  )}
+                  {products.filter(p => p.listing_status === productListFilter).map(p => (
                     <div key={p.id} data-testid={`product-row-${p.id}`} className="border border-border rounded-lg p-4 hover:border-primary transition-colors">
                       <div className="flex items-center gap-4">
                         <div className="flex gap-1 flex-shrink-0">
@@ -660,10 +678,27 @@ const AdminDashboard = () => {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground truncate">{p.name}</h3>
                           <p className="text-sm text-muted-foreground">{p.size} — {p.seller_name || 'Admin'}</p>
+                          {(p.listing_status === 'sold' || p.listing_status === 'archived') && p.sold_to_buyer_name && (
+                            <p className="text-xs text-blue-600 mt-0.5">
+                              Sold to {p.sold_to_buyer_name}{p.sold_price ? ` @ ${p.sold_price_currency || 'INR'} ${p.sold_price}` : ''}
+                              {p.sold_at ? ` · ${new Date(p.sold_at).toLocaleDateString('en-IN')}` : ''}
+                            </p>
+                          )}
+                          {p.listing_status === 'expired' && (
+                            <p className="text-xs text-orange-600 mt-0.5">Bidding closed · {p.total_bids_received || 0} bids</p>
+                          )}
                         </div>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                          p.approval_status === 'approved' ? 'bg-green-100 text-green-700' : p.approval_status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                        }`}>{p.approval_status || 'approved'}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            p.listing_status === 'active' ? 'bg-green-100 text-green-700' :
+                            p.listing_status === 'expired' ? 'bg-orange-100 text-orange-700' :
+                            p.listing_status === 'sold' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-500'
+                          }`}>{p.listing_status}</span>
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            p.approval_status === 'approved' ? 'bg-green-100 text-green-700' : p.approval_status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                          }`}>{p.approval_status || 'approved'}</span>
+                        </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button data-testid={`edit-product-${p.id}`} onClick={() => openProductForm(p)} className="p-2 border border-border rounded-lg hover:bg-muted transition-colors" title="Edit">
                             <Pencil size={16} className="text-foreground" />

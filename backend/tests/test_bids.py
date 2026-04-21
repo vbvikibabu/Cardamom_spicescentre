@@ -1,6 +1,6 @@
 """
 Test suite for Bidding System - B2B Cardamom Trading App
-Tests: POST /api/bids, GET /api/bids/my, GET /api/bids, GET /api/bids/summary, PUT /api/bids/{id}
+Tests: POST /api/bids, GET /api/buyer/bids, GET /api/bids, GET /api/admin/bids/summary, PUT /api/bids/{id}
 """
 import pytest
 import requests
@@ -218,33 +218,33 @@ class TestBidsBackend:
         print(f"✓ Bid created with both kg and lot: {bid['id']}")
     
     # ═══════════════════════════════════════════════════════════════
-    # GET /api/bids/my - Customer gets their own bids
+    # GET /api/buyer/bids - Buyer gets their own bids
     # ═══════════════════════════════════════════════════════════════
-    
+
     def test_09_get_my_bids_requires_auth(self):
-        """GET /api/bids/my returns 401 without authentication"""
-        resp = requests.get(f"{BASE_URL}/api/bids/my")
+        """GET /api/buyer/bids returns 401 without authentication"""
+        resp = requests.get(f"{BASE_URL}/api/buyer/bids")
         assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
-        print("✓ GET /api/bids/my requires authentication")
-    
+        print("✓ GET /api/buyer/bids requires authentication")
+
     def test_10_get_my_bids_returns_customer_bids(self):
-        """GET /api/bids/my returns only current customer's bids"""
-        resp = requests.get(f"{BASE_URL}/api/bids/my", 
+        """GET /api/buyer/bids returns only current buyer's bids"""
+        resp = requests.get(f"{BASE_URL}/api/buyer/bids",
                           headers={"Authorization": f"Bearer {self.customer_token}"})
         assert resp.status_code == 200, f"Failed to get my bids: {resp.text}"
-        
+
         bids = resp.json()
         assert isinstance(bids, list)
         assert len(bids) >= 3, f"Expected at least 3 bids, got {len(bids)}"
-        
-        # Verify all bids belong to this customer
+
+        # Verify all bids belong to this buyer
         for bid in bids:
-            assert bid["customer_id"] == self.customer_id, "Bid doesn't belong to current customer"
+            assert bid["buyer_id"] == self.customer_id, "Bid doesn't belong to current buyer"
             assert "product_name" in bid
             assert "status" in bid
             assert "bid_date" in bid
-        
-        print(f"✓ GET /api/bids/my returns {len(bids)} bids for customer")
+
+        print(f"✓ GET /api/buyer/bids returns {len(bids)} bids for buyer")
     
     # ═══════════════════════════════════════════════════════════════
     # GET /api/bids - Admin gets all bids
@@ -290,33 +290,33 @@ class TestBidsBackend:
         print(f"✓ GET /api/bids?status=pending returns {len(bids)} pending bids")
     
     # ═══════════════════════════════════════════════════════════════
-    # GET /api/bids/summary - Admin gets bid counts
+    # GET /api/admin/bids/summary - Admin gets bid counts
     # ═══════════════════════════════════════════════════════════════
-    
+
     def test_14_get_bids_summary_requires_admin(self):
-        """GET /api/bids/summary returns 403 for non-admin"""
-        resp = requests.get(f"{BASE_URL}/api/bids/summary",
+        """GET /api/admin/bids/summary returns 403 for non-admin"""
+        resp = requests.get(f"{BASE_URL}/api/admin/bids/summary",
                           headers={"Authorization": f"Bearer {self.customer_token}"})
         assert resp.status_code == 403, f"Expected 403 for customer, got {resp.status_code}"
-        print("✓ GET /api/bids/summary requires admin role")
-    
+        print("✓ GET /api/admin/bids/summary requires admin role")
+
     def test_15_get_bids_summary_admin(self):
-        """GET /api/bids/summary returns bid counts for admin"""
-        resp = requests.get(f"{BASE_URL}/api/bids/summary",
+        """GET /api/admin/bids/summary returns bid counts for admin"""
+        resp = requests.get(f"{BASE_URL}/api/admin/bids/summary",
                           headers={"Authorization": f"Bearer {self.admin_token}"})
         assert resp.status_code == 200, f"Failed to get summary: {resp.text}"
-        
+
         summary = resp.json()
         assert "total" in summary
         assert "today" in summary
         assert "pending" in summary
         assert "accepted" in summary
         assert "rejected" in summary
-        
+
         assert summary["total"] >= 3, f"Expected at least 3 total bids"
         assert summary["pending"] >= 3, f"Expected at least 3 pending bids"
-        
-        print(f"✓ GET /api/bids/summary: total={summary['total']}, pending={summary['pending']}, today={summary['today']}")
+
+        print(f"✓ GET /api/admin/bids/summary: total={summary['total']}, pending={summary['pending']}, today={summary['today']}")
     
     # ═══════════════════════════════════════════════════════════════
     # PUT /api/bids/{id} - Admin accepts/rejects bid
@@ -406,7 +406,7 @@ class TestBidsBackend:
     
     def test_22_verify_bid_summary_after_updates(self):
         """Verify bid summary counts after accept/reject operations"""
-        resp = requests.get(f"{BASE_URL}/api/bids/summary",
+        resp = requests.get(f"{BASE_URL}/api/admin/bids/summary",
                           headers={"Authorization": f"Bearer {self.admin_token}"})
         assert resp.status_code == 200
         

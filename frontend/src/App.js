@@ -1,5 +1,5 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -16,6 +16,24 @@ import BuyerDashboard from "@/pages/BuyerDashboard";
 import SellerDashboard from "@/pages/SellerDashboard";
 import PendingApproval from "@/pages/PendingApproval";
 import Footer from "@/components/Footer";
+
+function NotFound() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center text-center px-4 pt-20">
+      <h1 className="text-7xl font-bold text-primary mb-4">404</h1>
+      <h2 className="text-2xl font-semibold mb-2">Page Not Found</h2>
+      <p className="text-muted-foreground mb-8">
+        The page you're looking for doesn't exist or has been moved.
+      </p>
+      <Link
+        to="/"
+        className="inline-flex items-center px-6 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+      >
+        Back to Home
+      </Link>
+    </div>
+  );
+}
 
 function App() {
   return (
@@ -49,6 +67,7 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="/pending-approval" element={<PendingApproval />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
           <Footer />
         </BrowserRouter>

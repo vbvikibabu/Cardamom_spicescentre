@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight, Search, X, Timer } from 'lucide-react';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -16,6 +16,51 @@ const getMediaUrl = (path) => {
 const isVideoPath = (path) => {
   const lower = (path || '').toLowerCase();
   return lower.endsWith('.mp4') || lower.endsWith('.mov');
+};
+
+// Countdown timer displayed on product cards
+const CountdownTimer = ({ endTime, status }) => {
+  const calc = () => {
+    if (!endTime || status !== 'active') return null;
+    const diff = new Date(endTime) - Date.now();
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return { h, m, s, diff };
+  };
+  const [time, setTime] = useState(calc);
+  useEffect(() => {
+    if (!endTime || status !== 'active') return;
+    const id = setInterval(() => setTime(calc()), 1000);
+    return () => clearInterval(id);
+  });
+
+  if (status === 'sold') {
+    return (
+      <div className="absolute inset-0 bg-blue-600/80 flex items-center justify-center">
+        <span className="text-white font-serif text-3xl font-bold tracking-widest">SOLD</span>
+      </div>
+    );
+  }
+  if (status === 'expired' || (status === 'active' && !time)) {
+    return (
+      <div className="absolute bottom-0 left-0 right-0 bg-orange-600/90 text-white text-center py-2 text-xs font-semibold tracking-wide">
+        BIDDING CLOSED
+      </div>
+    );
+  }
+  if (!time) return null;
+
+  const urgent = time.diff < 30 * 60 * 1000; // < 30 min
+  return (
+    <div className={`absolute bottom-0 left-0 right-0 ${urgent ? 'bg-red-600/90' : 'bg-green-700/85'} text-white py-2 px-3 flex items-center gap-2`}>
+      <Timer size={13} className={urgent ? 'animate-pulse' : ''} />
+      <span className={`text-xs font-semibold ${urgent ? 'animate-pulse' : ''}`}>
+        {String(time.h).padStart(2,'0')}:{String(time.m).padStart(2,'0')}:{String(time.s).padStart(2,'0')} remaining
+      </span>
+    </div>
+  );
 };
 
 const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
@@ -49,6 +94,30 @@ const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+// Availability bar component
+const AvailabilityBar = ({ total, remaining }) => {
+  if (!total || total <= 0) return null;
+  const rem = remaining ?? total;
+  const pct = Math.max(0, Math.min(100, Math.round((rem / total) * 100)));
+  const isLow = pct < 20;
+  const isMid = pct >= 20 && pct <= 50;
+  const barColor = isLow ? 'bg-red-500' : isMid ? 'bg-amber-500' : 'bg-green-500';
+  const textColor = isLow ? 'text-red-600' : isMid ? 'text-amber-600' : 'text-green-700';
+  return (
+    <div className="mt-2 mb-1">
+      <div className="flex items-center justify-between text-[10px] mb-1">
+        <span className="text-muted-foreground">Availability</span>
+        <span className={`font-semibold ${textColor}`}>
+          {isLow ? `Only ${rem.toLocaleString('en-IN')} kg left!` : `${rem.toLocaleString('en-IN')} / ${total.toLocaleString('en-IN')} kg`}
+        </span>
+      </div>
+      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-full ${barColor} transition-all duration-300`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 };
@@ -229,7 +298,10 @@ const Products = () => {
                   className="product-card bg-white rounded-lg overflow-hidden border border-primary/10"
                 >
                   <Link to={`/products/${product.id}`} className="block cursor-pointer">
-                    <MediaGallery mediaPaths={product.media_paths} imageUrl={product.image_url} name={product.name} />
+                    <div className="relative">
+                      <MediaGallery mediaPaths={product.media_paths} imageUrl={product.image_url} name={product.name} />
+                      <CountdownTimer endTime={product.bid_end_time} status={product.listing_status} />
+                    </div>
                     <div className="p-8">
                       <div className="flex items-center gap-2 mb-4 flex-wrap">
                         <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full">
@@ -238,13 +310,54 @@ const Products = () => {
                         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <Leaf size={14} /> Elettaria cardamomum
                         </span>
+                        {product.listing_status === 'sold' && (
+                          <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">Sold</span>
+                        )}
                       </div>
                       <h3 className="font-serif text-2xl md:text-3xl font-semibold mb-3 text-foreground">{product.name}</h3>
+
+                      {/* Seller info */}
                       {product.seller_name && (
-                        <p className="text-xs text-muted-foreground mb-3">by {product.seller_name}</p>
+                        <div className="mb-3">
+                          <p className="text-xs font-semibold text-foreground">Sold by {product.seller_name}</p>
+                          {product.seller_company && (
+                            <p className="text-xs text-muted-foreground">{product.seller_company}</p>
+                          )}
+                        </div>
                       )}
+
+                      {/* Pricing row */}
+                      {product.base_price && (
+                        <div className="flex items-center gap-4 mb-1 py-2 border-t border-border/60">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Base Price</p>
+                            <p className="text-sm font-bold text-foreground">
+                              {product.base_price_currency === 'USD' ? '$' : '₹'}{product.base_price.toLocaleString('en-IN')}/kg
+                            </p>
+                          </div>
+                          {product.minimum_quantity_kg && (
+                            <div>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Min. Qty</p>
+                              <p className="text-sm font-bold text-foreground">{product.minimum_quantity_kg} kg</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Availability bar */}
+                      {product.total_quantity_kg > 0 && product.listing_status === 'active' && (
+                        <div className="mb-3 pb-2 border-b border-border/60">
+                          <AvailabilityBar total={product.total_quantity_kg} remaining={product.remaining_quantity_kg} />
+                        </div>
+                      )}
+
                       <p className="text-muted-foreground leading-relaxed mb-4 line-clamp-3">{product.description}</p>
-                      <span className="text-primary text-sm font-semibold hover:underline">View Details & Place Bid</span>
+                      {product.listing_status === 'sold' ? (
+                        <span className="text-blue-600 text-sm font-semibold">View Details</span>
+                      ) : product.listing_status === 'expired' ? (
+                        <span className="text-orange-600 text-sm font-semibold">Bidding Closed</span>
+                      ) : (
+                        <span className="text-primary text-sm font-semibold hover:underline">View Details & Place Bid</span>
+                      )}
                     </div>
                   </Link>
                 </motion.div>
