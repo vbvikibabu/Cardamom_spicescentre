@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight, Search, X, Timer } from 'lucide-react';
+import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight, Search, X, Timer, ArrowRight } from 'lucide-react';
 import axios from 'axios';
+import { getProductImage } from '../utils/imageHelper';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -297,82 +298,117 @@ const Products = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-              {filteredProducts.map((product, index) => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: index * 0.1 }}
-                  viewport={{ once: true }}
-                  data-testid={`product-card-${index}`}
-                  className="product-card bg-white rounded-lg overflow-hidden border border-primary/10"
-                >
-                  <Link to={`/products/${product.id}`} className="block cursor-pointer">
-                    <div className="relative">
-                      <MediaGallery mediaPaths={product.media_paths} imageUrl={product.image_url} name={product.name} />
-                      <CountdownTimer endTime={product.bid_end_time} status={product.listing_status} />
-                    </div>
-                    <div className="p-8">
-                      <div className="flex items-center gap-2 mb-4 flex-wrap">
-                        <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-sans tracking-wide uppercase font-medium rounded-full">
-                          {product.size}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          <Leaf size={14} /> Elettaria cardamomum
-                        </span>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6 lg:gap-8">
+              {filteredProducts.map((product, index) => {
+                const imgSrc = getProductImage(product);
+                return (
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: Math.min(index * 0.05, 0.3) }}
+                    viewport={{ once: true }}
+                    data-testid={`product-card-${index}`}
+                    className="product-card bg-white rounded-xl overflow-hidden border border-primary/10 hover:border-primary/30 transition-colors"
+                  >
+                    <Link to={`/products/${product.id}`} className="block cursor-pointer">
+                      {/* ── Image ── */}
+                      <div className="relative overflow-hidden">
+                        {imgSrc ? (
+                          <img
+                            src={imgSrc}
+                            alt={product.name}
+                            className="w-full h-[130px] md:h-64 object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-[130px] md:h-64 bg-primary/10 flex flex-col items-center justify-center gap-1">
+                            <span className="text-3xl md:text-5xl select-none">🌿</span>
+                            <span className="text-[10px] md:text-xs font-medium text-primary/60 uppercase tracking-wide hidden md:block">Cardamom</span>
+                          </div>
+                        )}
+
+                        {/* Countdown chip overlay */}
+                        {product.listing_status === 'active' && (
+                          <div className="absolute bottom-1 left-1 right-1 md:bottom-0 md:left-0 md:right-0">
+                            <CountdownTimer endTime={product.bid_end_time} status={product.listing_status} />
+                          </div>
+                        )}
                         {product.listing_status === 'sold' && (
-                          <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">Sold</span>
+                          <div className="absolute inset-0 bg-blue-600/80 flex items-center justify-center">
+                            <span className="text-white font-serif text-xl md:text-3xl font-bold tracking-widest">SOLD</span>
+                          </div>
+                        )}
+                        {product.listing_status === 'expired' && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-orange-600/90 text-white text-center py-1 text-[10px] md:text-xs font-semibold tracking-wide">
+                            BIDDING CLOSED
+                          </div>
                         )}
                       </div>
-                      <h3 className="font-serif text-2xl md:text-3xl font-semibold mb-3 text-foreground">{product.name}</h3>
 
-                      {/* Seller info */}
-                      {product.seller_name && (
-                        <div className="mb-3">
-                          <p className="text-xs font-semibold text-foreground">Sold by {product.seller_name}</p>
-                          {product.seller_company && (
-                            <p className="text-xs text-muted-foreground">{product.seller_company}</p>
-                          )}
-                        </div>
-                      )}
+                      {/* ── Card body ── */}
+                      <div className="p-2 md:p-6">
+                        {/* Grade badge */}
+                        <span className="inline-block px-2 py-0.5 bg-primary/10 text-primary text-[10px] md:text-xs font-semibold uppercase tracking-wide rounded-full mb-1.5 md:mb-3">
+                          {product.size}
+                        </span>
 
-                      {/* Pricing row */}
-                      {product.base_price && (
-                        <div className="flex items-center gap-4 mb-1 py-2 border-t border-border/60">
-                          <div>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Base Price</p>
-                            <p className="text-sm font-bold text-foreground">
-                              {product.base_price_currency === 'USD' ? '$' : '₹'}{product.base_price.toLocaleString('en-IN')}/kg
-                            </p>
+                        {/* Product name */}
+                        <h3 className="font-serif text-[13px] md:text-2xl font-semibold text-foreground mb-1 md:mb-2 line-clamp-2 leading-snug">
+                          {product.name}
+                        </h3>
+
+                        {/* Seller — mobile: 1 line; desktop: full */}
+                        {product.seller_name && (
+                          <p className="text-[11px] md:text-xs text-muted-foreground truncate mb-1 md:mb-3">
+                            <span className="hidden md:inline">Sold by </span>
+                            <span className="font-medium text-foreground">{product.seller_name}</span>
+                          </p>
+                        )}
+
+                        {/* Price — always visible, green on mobile */}
+                        {product.base_price && (
+                          <p className="text-[12px] md:text-sm font-bold text-green-700 md:text-foreground mb-1 md:mb-0">
+                            {product.base_price_currency === 'USD' ? '$' : '₹'}{product.base_price.toLocaleString('en-IN')}/kg
+                          </p>
+                        )}
+
+                        {/* Min qty — desktop only (show just number) */}
+                        {product.minimum_quantity_kg && (
+                          <p className="hidden md:block text-[10px] text-muted-foreground mb-2">
+                            Min: {product.minimum_quantity_kg} kg
+                          </p>
+                        )}
+
+                        {/* Availability bar — desktop only */}
+                        {product.total_quantity_kg > 0 && product.listing_status === 'active' && (
+                          <div className="hidden md:block mb-3">
+                            <AvailabilityBar total={product.total_quantity_kg} remaining={product.remaining_quantity_kg} />
                           </div>
-                          {product.minimum_quantity_kg && (
-                            <div>
-                              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Min. Qty</p>
-                              <p className="text-sm font-bold text-foreground">{product.minimum_quantity_kg} kg</p>
-                            </div>
+                        )}
+
+                        {/* Description — desktop only */}
+                        <p className="hidden md:block text-muted-foreground text-sm leading-relaxed mb-4 line-clamp-3">
+                          {product.description}
+                        </p>
+
+                        {/* CTA */}
+                        <div className="mt-1.5 md:mt-0">
+                          {product.listing_status === 'sold' ? (
+                            <span className="text-blue-600 text-[11px] md:text-sm font-semibold">View Details</span>
+                          ) : product.listing_status === 'expired' ? (
+                            <span className="text-orange-600 text-[11px] md:text-sm font-semibold">Bidding Closed</span>
+                          ) : (
+                            <span className="w-full h-8 md:h-auto bg-primary/10 md:bg-transparent text-primary text-[11px] md:text-sm font-semibold rounded-lg flex items-center justify-center md:justify-start gap-1 md:hover:underline">
+                              Bid <ArrowRight size={11} className="md:hidden" />
+                              <span className="hidden md:inline">→ View Details & Place Bid</span>
+                            </span>
                           )}
                         </div>
-                      )}
-                      {/* Availability bar */}
-                      {product.total_quantity_kg > 0 && product.listing_status === 'active' && (
-                        <div className="mb-3 pb-2 border-b border-border/60">
-                          <AvailabilityBar total={product.total_quantity_kg} remaining={product.remaining_quantity_kg} />
-                        </div>
-                      )}
-
-                      <p className="text-muted-foreground leading-relaxed mb-4 line-clamp-3">{product.description}</p>
-                      {product.listing_status === 'sold' ? (
-                        <span className="text-blue-600 text-sm font-semibold">View Details</span>
-                      ) : product.listing_status === 'expired' ? (
-                        <span className="text-orange-600 text-sm font-semibold">Bidding Closed</span>
-                      ) : (
-                        <span className="text-primary text-sm font-semibold hover:underline">View Details & Place Bid</span>
-                      )}
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
+                      </div>
+                    </Link>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, Film, Gavel, ChevronDown, ChevronUp, Eye, Tag, Scale, Clock } from 'lucide-react';
+import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, Film, Gavel, ChevronDown, ChevronUp, Tag, Scale, Clock } from 'lucide-react';
+import { getProductImage } from '../utils/imageHelper';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -375,18 +376,26 @@ const AdminDashboard = () => {
 
                   return (
                     <div key={p.id} data-testid={`pending-product-${p.id}`} className="border border-yellow-200 bg-yellow-50/30 rounded-xl overflow-hidden">
-                      {/* ── Collapsed row ── */}
-                      <div className="flex items-center gap-4 p-4">
-                        {/* Thumb */}
-                        <div className="flex-shrink-0">
-                          {mainImgSrc && !isVideo(mainImgSrc) ? (
-                            <img src={mainImgSrc} alt={p.name} className="w-14 h-14 rounded-lg object-cover border border-border" />
-                          ) : (
-                            <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center">
-                              <Film size={18} className="text-muted-foreground" />
+                      {/* ── Collapsed row (tap anywhere to expand) ── */}
+                      <div
+                        className="flex items-center gap-4 p-4 cursor-pointer"
+                        onClick={() => setExpandedProductId(isExpanded ? null : p.id)}
+                      >
+                        {/* Thumb — 80×80 using shared imageHelper */}
+                        {(() => {
+                          const thumbSrc = getProductImage(p);
+                          return (
+                            <div className="flex-shrink-0">
+                              {thumbSrc ? (
+                                <img src={thumbSrc} alt={p.name} className="w-20 h-20 rounded-xl object-cover border border-border" />
+                              ) : (
+                                <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center">
+                                  <Film size={20} className="text-muted-foreground" />
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+                          );
+                        })()}
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
@@ -403,8 +412,11 @@ const AdminDashboard = () => {
                           </p>
                         </div>
 
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Actions — stop propagation so they don't toggle expand */}
+                        <div
+                          className="flex items-center gap-2 flex-shrink-0"
+                          onClick={e => e.stopPropagation()}
+                        >
                           <button
                             data-testid={`approve-product-${p.id}`}
                             onClick={() => approveProduct(p.id, 'approved')}
@@ -419,14 +431,7 @@ const AdminDashboard = () => {
                           >
                             <XCircle size={13} /> Reject
                           </button>
-                          <button
-                            data-testid={`review-product-${p.id}`}
-                            onClick={() => setExpandedProductId(isExpanded ? null : p.id)}
-                            className="px-3 py-1.5 bg-white border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-colors inline-flex items-center gap-1"
-                          >
-                            <Eye size={13} /> Review
-                            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                          </button>
+                          {isExpanded ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
                         </div>
                       </div>
 
@@ -546,19 +551,19 @@ const AdminDashboard = () => {
                                 {p.seller_company && <p className="text-xs text-muted-foreground">{p.seller_company}</p>}
                               </div>
 
-                              {/* Quick action buttons */}
-                              <div className="flex gap-2 pt-1">
+                              {/* Quick action buttons — stacked on mobile, side-by-side on sm+ */}
+                              <div className="flex flex-col sm:flex-row gap-2 pt-1">
                                 <button
                                   data-testid={`review-approve-product-${p.id}`}
                                   onClick={() => { approveProduct(p.id, 'approved'); setExpandedProductId(null); }}
-                                  className="flex-1 py-2.5 bg-green-500 text-white rounded-lg text-sm font-semibold hover:bg-green-600 transition-colors inline-flex items-center justify-center gap-2"
+                                  className="flex-1 min-h-[44px] py-2.5 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 transition-colors inline-flex items-center justify-center gap-2"
                                 >
                                   <CheckCircle size={15} /> Approve & Start Timer
                                 </button>
                                 <button
                                   data-testid={`review-reject-product-${p.id}`}
                                   onClick={() => { approveProduct(p.id, 'rejected'); setExpandedProductId(null); }}
-                                  className="flex-1 py-2.5 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors inline-flex items-center justify-center gap-2"
+                                  className="flex-1 min-h-[44px] py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition-colors inline-flex items-center justify-center gap-2"
                                 >
                                   <XCircle size={15} /> Reject
                                 </button>

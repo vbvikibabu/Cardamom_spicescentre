@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Timer, Package } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { getProductImage } from '../utils/imageHelper';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -12,21 +13,6 @@ const getMediaUrl = (path) => {
   if (!path) return '';
   if (path.startsWith('http')) return path;
   return `${API}/files/${path}`;
-};
-
-// Returns the resolved URL of the first *image* in a product's media, falling
-// back to image_url, then null (so callers can show a placeholder).
-const getProductImage = (product) => {
-  if (product.media_paths?.length > 0) {
-    const found = product.media_paths.find(
-      (url) =>
-        /\.(jpg|jpeg|png|webp)(\?|$)/i.test(url) ||
-        url.includes('/image/upload/')
-    );
-    if (found) return getMediaUrl(found);
-  }
-  if (product.image_url) return getMediaUrl(product.image_url);
-  return null;
 };
 
 // ─── Mini countdown chip for product cards ───────────────────────────────────

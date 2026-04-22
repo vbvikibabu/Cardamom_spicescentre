@@ -45,7 +45,7 @@ const DetailCountdown = ({ endTime, status }) => {
   if (status === 'sold') return null; // handled separately
   if (status === 'expired' || (status === 'active' && !time)) {
     return (
-      <div className="flex items-center gap-2 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl mb-6">
+      <div className="flex items-center gap-2 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl mb-4">
         <AlertCircle size={18} className="text-orange-600 flex-shrink-0" />
         <div>
           <p className="text-sm font-semibold text-orange-800">Bidding has ended</p>
@@ -58,7 +58,7 @@ const DetailCountdown = ({ endTime, status }) => {
   const urgent = time.diff < 30 * 60 * 1000;
   const pad = (n) => String(n).padStart(2, '0');
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl mb-6 border ${urgent ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl mb-4 border ${urgent ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
       <Timer size={18} className={urgent ? 'text-red-600 animate-pulse' : 'text-green-700'} />
       <div>
         <p className={`text-xs font-semibold uppercase tracking-wide mb-0.5 ${urgent ? 'text-red-700' : 'text-green-800'}`}>
@@ -84,7 +84,7 @@ const AvailabilityBar = ({ total, remaining }) => {
   const textColor = isLow ? 'text-red-600' : isMid ? 'text-amber-600' : 'text-green-700';
   const bgColor = isLow ? 'bg-red-50 border-red-200' : isMid ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
   return (
-    <div className={`p-3 border rounded-xl mb-5 ${bgColor}`}>
+    <div className={`p-3 border rounded-xl mb-4 ${bgColor}`}>
       <div className="flex items-center justify-between text-xs mb-2">
         <span className="font-semibold text-foreground uppercase tracking-wide text-[10px]">Stock Availability</span>
         <span className={`font-bold ${textColor}`}>
