@@ -381,7 +381,7 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div data-testid="admin-dashboard" className="min-h-screen bg-muted pt-20">
+    <div data-testid="admin-dashboard" className="min-h-screen bg-muted pt-[108px] pb-20 md:pb-0">
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
         {/* Header */}
         <div className="mb-8">
@@ -1327,10 +1327,10 @@ const AdminDashboard = () => {
                                       <CheckCircle size={13} /> Approve
                                     </button>
                                   )}
-                                  {lot.lot_status === 'approved' && selectedEvent?.status === 'live' && (
+                                  {lot.lot_status === 'approved' && (
                                     <button onClick={() => startLot(lot.id)}
                                       className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors inline-flex items-center gap-1">
-                                      <Radio size={13} /> Start Bidding
+                                      <Radio size={13} /> ▶ Start Bidding
                                     </button>
                                   )}
                                   {lot.lot_status === 'live' && (
