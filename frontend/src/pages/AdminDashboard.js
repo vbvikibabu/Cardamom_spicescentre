@@ -436,7 +436,7 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div data-testid="admin-dashboard" className="min-h-screen bg-muted pt-[108px] pb-20 md:pb-0">
+    <div data-testid="admin-dashboard" className="min-h-screen bg-muted pt-20 pb-20 md:pb-0">
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
         {/* Header */}
         <div className="mb-8">

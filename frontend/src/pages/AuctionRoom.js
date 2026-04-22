@@ -9,6 +9,23 @@ const WS_URL = API_URL
   .replace('https://', 'wss://')
   .replace('http://', 'ws://');
 
+// FIX 3 — Extract best image URL from a lot
+const getLotImage = (lot) => {
+  if (!lot) return null;
+  if (lot.media_paths?.length > 0) {
+    const img = lot.media_paths.find(url =>
+      /\.(jpg|jpeg|png|webp)(\?|$)/i.test(url) ||
+      url.includes('/image/upload/')
+    );
+    if (img) return img;
+    const vid = lot.media_paths.find(url => url.includes('/video/upload/'));
+    if (vid) return vid
+      .replace('/video/upload/', '/video/upload/so_0,f_jpg,q_80/')
+      .replace(/\.(mp4|mov)$/, '.jpg');
+  }
+  return null;
+};
+
 export default function AuctionRoom() {
   const { eventId } = useParams();
   const { user, token } = useAuth();
@@ -36,18 +53,66 @@ export default function AuctionRoom() {
     activeLotRef.current = activeLot;
   }, [activeLot]);
 
+  // ── Fetch lot status from server (source of truth) ──
   const fetchLotStatus = useCallback(async (lotId) => {
     if (!lotId) return;
     try {
       const res = await axios.get(`${API_URL}/api/auction/lots/${lotId}/live`);
-      setCurrentLotData(res.data);
-      setTimeLeft(res.data.seconds_remaining || 0);
-      setRecentBids(res.data.recent_bids || []);
-      setViewerCount(res.data.viewer_count || 0);
+      const data = res.data;
+      setCurrentLotData(data);
+      // FIX 1 — calculate time from server's end_time, not seconds_remaining
+      if (data.end_time) {
+        const serverEnd = new Date(data.end_time);
+        const now = new Date();
+        const remaining = Math.max(0, Math.floor((serverEnd - now) / 1000));
+        setTimeLeft(remaining);
+      } else {
+        setTimeLeft(data.seconds_remaining || 0);
+      }
+      setRecentBids(data.recent_bids || []);
+      setViewerCount(data.viewer_count || 0);
     } catch (e) {
       console.error(e);
     }
   }, []);
+
+  // FIX 1 — Server timer sync every 5 seconds while lot is live
+  useEffect(() => {
+    if (!activeLot) return;
+
+    const syncTimer = setInterval(async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/auction/lots/${activeLot}/live`);
+        const data = res.data;
+
+        if (data.lot_status !== 'live') {
+          clearInterval(syncTimer);
+          setCurrentLotData(data);
+          return;
+        }
+
+        if (data.end_time) {
+          const serverEnd = new Date(data.end_time);
+          const now = new Date();
+          const remaining = Math.max(0, Math.floor((serverEnd - now) / 1000));
+          setTimeLeft(remaining);
+        }
+
+        setCurrentLotData(prev => ({
+          ...prev,
+          current_price: data.current_price,
+          current_winner: data.current_winner,
+          current_winner_company: data.current_winner_company,
+          min_next_bid: data.min_next_bid,
+          total_bids: data.total_bids,
+        }));
+      } catch (e) {
+        console.error('Timer sync error:', e);
+      }
+    }, 5000);
+
+    return () => clearInterval(syncTimer);
+  }, [activeLot]);
 
   const handleWSMessage = useCallback((msg) => {
     switch (msg.type) {
@@ -71,7 +136,8 @@ export default function AuctionRoom() {
           min_next_bid: msg.min_next_bid,
           total_bids: msg.total_bids,
         }));
-        setTimeLeft(msg.seconds_remaining || 45);
+        // Use server's seconds_remaining from the message
+        if (msg.seconds_remaining) setTimeLeft(msg.seconds_remaining);
         if (msg.viewer_count !== undefined) setViewerCount(msg.viewer_count);
         setRecentBids(prev => [{
           bidder: msg.bidder_display,
@@ -87,7 +153,7 @@ export default function AuctionRoom() {
         setShowSold(false);
         setSoldData(null);
         setBidAmount(String((msg.starting_price || 0) + (msg.bid_increment || 10)));
-        toast.info(`Auction started for ${msg.product_name}!`);
+        toast.info(`🔴 Auction started for ${msg.product_name}!`);
         break;
 
       case 'lot_sold':
@@ -110,6 +176,7 @@ export default function AuctionRoom() {
         break;
 
       case 'timer_warning':
+        // FIX 1 — always use server value
         setTimeLeft(msg.seconds_remaining);
         break;
 
@@ -139,15 +206,12 @@ export default function AuctionRoom() {
     };
 
     ws.onmessage = (e) => {
-      try {
-        handleWSMessage(JSON.parse(e.data));
-      } catch {}
+      try { handleWSMessage(JSON.parse(e.data)); } catch {}
     };
 
     ws.onclose = () => {
       setWsConnected(false);
       clearInterval(pingRef.current);
-      // Auto-reconnect after 3s
       setTimeout(() => {
         if (activeLotRef.current) connectWS(activeLotRef.current);
       }, 3000);
@@ -183,7 +247,7 @@ export default function AuctionRoom() {
     };
   }, [activeLot, connectWS, fetchLotStatus]);
 
-  // Client-side countdown (decrements every second)
+  // FIX 1 — Local countdown between server syncs (every 1s)
   useEffect(() => {
     if (timeLeft > 0 && currentLotData?.lot_status === 'live') {
       timerRef.current = setTimeout(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
@@ -191,10 +255,37 @@ export default function AuctionRoom() {
     return () => clearTimeout(timerRef.current);
   }, [timeLeft, currentLotData?.lot_status]);
 
+  // FIX 2 — Poll for lot going live when in lobby (every 8s)
+  const pollForLiveLot = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/auction/events/${eventId}`);
+      const liveLot = res.data.lots.find(l => l.lot_status === 'live');
+      if (liveLot && liveLot.id !== activeLotRef.current) {
+        setActiveLot(liveLot.id);
+        setCurrentLotData(liveLot);
+        toast.success('🔴 Auction is LIVE! Place your bids!');
+      }
+      setLots(res.data.lots);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    if (activeLot) return;
+    const interval = setInterval(pollForLiveLot, 8000);
+    return () => clearInterval(interval);
+  }, [activeLot, pollForLiveLot]);
+
   const placeBid = async () => {
     if (!user || !token) {
       sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
       navigate('/login');
+      return;
+    }
+    // FIX 1 — Hard block when timer is 0 or lot not live
+    if (timeLeft === 0 || currentLotData?.lot_status !== 'live') {
+      toast.error('Bidding is closed for this lot');
       return;
     }
     const amount = parseFloat(bidAmount);
@@ -219,7 +310,9 @@ export default function AuctionRoom() {
   };
 
   const timerColor = timeLeft <= 10 ? 'bg-red-600' : timeLeft <= 20 ? 'bg-amber-500' : 'bg-[#2d5a27]';
-  const timerText = timeLeft <= 5 ? 'Going twice...' : timeLeft <= 10 ? 'Going once...' : `${timeLeft}s`;
+  const timerText = timeLeft === 0 ? 'Bidding Closed' : timeLeft <= 5 ? 'Going twice...' : timeLeft <= 10 ? 'Going once...' : 'Time Remaining';
+  const bidWindowSeconds = currentLotData?.bid_window_seconds || 45;
+  const isLiveBidding = currentLotData?.lot_status === 'live' && timeLeft > 0;
 
   if (!event) {
     return (
@@ -232,10 +325,12 @@ export default function AuctionRoom() {
     );
   }
 
+  const lotImage = getLotImage(currentLotData);
+
   return (
     <div className="min-h-screen bg-[#1a3a1a] pb-24 md:pb-0 pt-20 relative">
 
-      {/* SOLD overlay — shows for 8s */}
+      {/* SOLD overlay — 8 seconds */}
       {showSold && soldData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75">
           <div className="bg-white rounded-2xl p-8 text-center mx-4 max-w-sm w-full animate-bounce shadow-2xl">
@@ -257,86 +352,98 @@ export default function AuctionRoom() {
         </div>
       )}
 
-      {/* Top bar */}
-      <div className="bg-[#0d2a0d] px-4 py-3 flex justify-between items-center">
-        <div>
-          <p className="text-green-300 text-xs font-semibold tracking-wider">LIVE AUCTION</p>
-          <p className="text-white font-semibold text-sm truncate max-w-48">{event.title}</p>
+      {/* FIX 7 — Top bar: tighter, no overflow */}
+      <div className="bg-[#0d2a0d] px-4 py-2.5 flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-green-300 text-[10px] font-bold tracking-wider uppercase">Live Auction</p>
+          <p className="text-white font-semibold text-sm truncate">{event.title}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <div className="text-right">
-            <p className="text-green-300 text-xs">📍 {event.location}</p>
-            <p className="text-gray-400 text-xs">👥 {viewerCount} watching</p>
+            <p className="text-green-300 text-[10px] truncate max-w-28">📍 {event.location}</p>
+            <p className="text-gray-400 text-[10px]">👥 {viewerCount} watching</p>
           </div>
-          <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
         </div>
       </div>
 
       {/* Live lot view */}
       {currentLotData?.lot_status === 'live' ? (
-        <div className="px-4 py-4 max-w-lg mx-auto space-y-4">
+        <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
 
-          {/* Lot header */}
-          <div className="bg-[#0d2a0d] rounded-xl p-4 text-center">
+          {/* FIX 7 — Lot header card */}
+          <div className="bg-[#0d2a0d] rounded-xl p-4">
             <div className="flex justify-between text-green-300 text-xs mb-2">
               <span>LOT {currentLotData.lot_number || '–'}</span>
               <span>{currentLotData.total_bids || 0} bids</span>
             </div>
-            <h2 className="text-white text-xl font-serif font-bold mb-1">{currentLotData.product_name}</h2>
-            <p className="text-green-300 text-sm">{currentLotData.grade} · {currentLotData.quantity_kg} kg</p>
+            {/* FIX 3 — Lot image */}
+            {lotImage && (
+              <img
+                src={lotImage}
+                alt={currentLotData.product_name}
+                className="w-full h-40 object-cover rounded-lg mb-3"
+              />
+            )}
+            <h2 className="text-white text-lg font-serif font-bold mb-0.5 truncate">{currentLotData.product_name}</h2>
+            <p className="text-green-300 text-xs truncate">{currentLotData.grade} · {currentLotData.quantity_kg} kg</p>
           </div>
 
-          {/* Current bid */}
-          <div className="bg-white rounded-xl p-5 text-center">
+          {/* Current bid — FIX 7 smaller price on mobile */}
+          <div className="bg-white rounded-xl p-4 text-center">
             <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Current Bid</p>
-            <p className="text-4xl font-bold text-[#2d5a27] mb-1">
+            <p className="text-3xl md:text-4xl font-bold text-[#2d5a27] mb-1">
               ₹{currentLotData.current_price?.toLocaleString('en-IN')}/kg
             </p>
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-600 text-sm truncate">
               {currentLotData.current_winner || 'No bids yet'}
               {currentLotData.current_winner_company ? ` · ${currentLotData.current_winner_company}` : ''}
             </p>
           </div>
 
-          {/* Countdown timer */}
+          {/* Countdown timer — FIX 7 text-4xl on mobile */}
           <div className={`${timerColor} rounded-xl p-4 text-center transition-colors duration-500`}>
-            <p className="text-white/70 text-xs uppercase tracking-wider mb-1">
-              {timeLeft <= 10 ? timerText : 'Time Remaining'}
-            </p>
-            <p className={`text-white font-bold text-5xl font-mono ${timeLeft <= 10 ? 'animate-pulse' : ''}`}>
+            <p className="text-white/70 text-xs uppercase tracking-wider mb-1">{timerText}</p>
+            <p className={`text-white font-bold text-4xl md:text-5xl font-mono ${timeLeft <= 10 ? 'animate-pulse' : ''}`}>
               {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
             </p>
             <div className="mt-2 bg-white/20 rounded-full h-1.5 overflow-hidden">
               <div
                 className="bg-white h-full transition-all duration-1000 rounded-full"
-                style={{ width: `${Math.min(100, (timeLeft / (currentLotData?.bid_window_seconds || 45)) * 100)}%` }}
+                style={{ width: `${Math.min(100, (timeLeft / bidWindowSeconds) * 100)}%` }}
               />
             </div>
           </div>
 
-          {/* Bid input */}
+          {/* Bid input — FIX 1 blocked when timer=0, FIX 7 mobile layout */}
           {user ? (
             <div className="bg-white rounded-xl p-4">
-              <p className="text-gray-500 text-xs mb-2 text-center">
-                Min next bid: ₹{currentLotData.min_next_bid?.toLocaleString('en-IN')}/kg
-                &nbsp;(+₹{currentLotData.bid_increment}/kg increment)
+              <p className="text-gray-500 text-[11px] mb-2 text-center">
+                Min: ₹{currentLotData.min_next_bid?.toLocaleString('en-IN')}/kg
+                {' '}(+₹{currentLotData.bid_increment} increment)
               </p>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={bidAmount}
-                  onChange={e => setBidAmount(e.target.value)}
-                  placeholder={`Min ₹${currentLotData.min_next_bid}`}
-                  className="flex-1 border-2 border-[#2d5a27] rounded-lg px-3 py-3 text-lg font-bold text-center focus:outline-none"
-                />
-                <button
-                  onClick={placeBid}
-                  disabled={bidding || timeLeft === 0}
-                  className="bg-[#2d5a27] text-white px-6 py-3 rounded-lg font-bold text-lg disabled:opacity-50 active:scale-95 transition-transform min-w-24"
-                >
-                  {bidding ? '...' : '🔨 BID'}
-                </button>
-              </div>
+              {isLiveBidding ? (
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={bidAmount}
+                    onChange={e => setBidAmount(e.target.value)}
+                    placeholder={`Min ₹${currentLotData.min_next_bid}`}
+                    className="flex-1 border-2 border-[#2d5a27] rounded-lg px-3 py-3 text-lg font-bold text-center focus:outline-none"
+                  />
+                  <button
+                    onClick={placeBid}
+                    disabled={bidding}
+                    className="bg-[#2d5a27] text-white px-4 py-3 rounded-lg font-bold text-base disabled:opacity-50 active:scale-95 transition-transform w-20"
+                  >
+                    {bidding ? '...' : '🔨 BID'}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-lg py-3 text-center">
+                  <p className="text-red-600 font-bold text-sm">⏹ Bidding Closed</p>
+                </div>
+              )}
             </div>
           ) : (
             <button
@@ -347,18 +454,18 @@ export default function AuctionRoom() {
             </button>
           )}
 
-          {/* Bid history */}
+          {/* Bid history — FIX 7 max 5 items, truncate bidder name */}
           {recentBids.length > 0 && (
             <div className="bg-[#0d2a0d] rounded-xl p-4">
               <p className="text-green-300 text-xs uppercase tracking-wider mb-3">Bid History</p>
               <div className="space-y-2">
-                {recentBids.map((bid, i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <span className="text-gray-400 text-sm">{bid.bidder}</span>
-                    <span className={`font-bold ${i === 0 ? 'text-white text-lg' : 'text-gray-400 text-sm'}`}>
+                {recentBids.slice(0, 5).map((bid, i) => (
+                  <div key={i} className="flex justify-between items-center gap-2">
+                    <span className="text-gray-400 text-xs truncate max-w-[80px]">{bid.bidder}</span>
+                    <span className={`font-bold flex-shrink-0 ${i === 0 ? 'text-white text-base' : 'text-gray-400 text-sm'}`}>
                       ₹{bid.amount?.toLocaleString('en-IN')}
                     </span>
-                    <span className="text-gray-500 text-xs">{bid.time}</span>
+                    <span className="text-gray-500 text-[10px] flex-shrink-0">{bid.time}</span>
                   </div>
                 ))}
               </div>
@@ -367,93 +474,107 @@ export default function AuctionRoom() {
         </div>
 
       ) : (
-        /* Waiting / lobby view */
-        <div className="px-4 py-8 max-w-lg mx-auto">
-          <div className="text-center mb-6">
-            <p className="text-green-300 text-sm mb-4">
-              {lots.filter(l => l.lot_status === 'approved').length} lots waiting to go live
+        /* FIX 2 — Lobby/waiting view with polling */
+        <div className="px-4 py-6 max-w-lg mx-auto">
+          <div className="text-center mb-5">
+            <p className="text-green-300 text-sm">
+              {lots.filter(l => l.lot_status === 'approved').length > 0
+                ? `⏳ ${lots.filter(l => l.lot_status === 'approved').length} lots queued — waiting for admin to start`
+                : 'Waiting for auction to begin...'}
             </p>
+            <p className="text-gray-500 text-xs mt-1">Page updates automatically every 8 seconds</p>
           </div>
           <div className="space-y-3">
-            {lots.map(lot => (
-              <div
-                key={lot.id}
-                onClick={() => {
-                  if (lot.lot_status === 'live') {
-                    setActiveLot(lot.id);
-                    setCurrentLotData(lot);
-                  }
-                }}
-                className={`rounded-xl p-4 border ${
-                  lot.lot_status === 'live'
-                    ? 'bg-white border-green-500 cursor-pointer'
-                    : lot.lot_status === 'sold'
-                    ? 'bg-gray-800 border-gray-700'
-                    : 'bg-[#0d2a0d] border-gray-700'
-                }`}
-              >
-                {lot.lot_status === 'sold' ? (
-                  /* Sold lot — prominent winner card */
-                  <div>
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-0.5">LOT {lot.lot_number}</p>
-                        <p className="font-semibold text-gray-400 text-sm">{lot.product_name}</p>
-                        <p className="text-gray-500 text-xs">{lot.grade} · {lot.quantity_kg} kg</p>
-                      </div>
-                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-900/60 text-green-300">✅ SOLD</span>
-                    </div>
-                    <div className="bg-green-900/30 rounded-lg px-3 py-2 mt-2">
-                      <p className="text-green-300 text-lg font-bold">
-                        ₹{(lot.sold_price || lot.current_price)?.toLocaleString('en-IN')}/kg
-                      </p>
-                      {lot.current_winner_name && (
-                        <>
-                          <p className="text-white text-sm font-semibold">Winner: {lot.current_winner_name}</p>
-                          {lot.current_winner_company && (
-                            <p className="text-gray-400 text-xs">{lot.current_winner_company}</p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  /* Normal lot row */
-                  <div className="flex justify-between items-center">
+            {lots.map(lot => {
+              const thumbImg = getLotImage(lot); // FIX 3 — thumbnails in lobby
+              return (
+                <div
+                  key={lot.id}
+                  onClick={() => {
+                    if (lot.lot_status === 'live') {
+                      setActiveLot(lot.id);
+                      setCurrentLotData(lot);
+                    }
+                  }}
+                  className={`rounded-xl p-4 border ${
+                    lot.lot_status === 'live'
+                      ? 'bg-white border-green-500 cursor-pointer'
+                      : lot.lot_status === 'sold'
+                      ? 'bg-gray-800 border-gray-700'
+                      : 'bg-[#0d2a0d] border-gray-700'
+                  }`}
+                >
+                  {lot.lot_status === 'sold' ? (
                     <div>
-                      <p className="text-xs text-gray-400 mb-1">LOT {lot.lot_number}</p>
-                      <p className="text-white font-semibold">{lot.product_name}</p>
-                      <p className="text-gray-400 text-sm">{lot.grade} · {lot.quantity_kg} kg</p>
-                      {lot.lot_status === 'live' && lot.current_price && (
-                        <p className="text-green-300 text-sm font-bold mt-1">
-                          Current: ₹{lot.current_price?.toLocaleString('en-IN')}/kg
+                      <div className="flex items-start gap-3 mb-2">
+                        {thumbImg && (
+                          <img src={thumbImg} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0 opacity-60" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-500 mb-0.5">LOT {lot.lot_number}</p>
+                          <p className="font-semibold text-gray-400 text-sm truncate">{lot.product_name}</p>
+                          <p className="text-gray-500 text-xs">{lot.grade} · {lot.quantity_kg} kg</p>
+                        </div>
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-900/60 text-green-300 flex-shrink-0">✅ SOLD</span>
+                      </div>
+                      <div className="bg-green-900/30 rounded-lg px-3 py-2">
+                        <p className="text-green-300 text-base font-bold">
+                          ₹{(lot.sold_price || lot.current_price)?.toLocaleString('en-IN')}/kg
                         </p>
-                      )}
+                        {lot.current_winner_name && (
+                          <>
+                            <p className="text-white text-sm font-semibold">Winner: {lot.current_winner_name}</p>
+                            {lot.current_winner_company && (
+                              <p className="text-gray-400 text-xs">{lot.current_winner_company}</p>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                      lot.lot_status === 'live'
-                        ? 'bg-red-500 text-white animate-pulse'
-                        : lot.lot_status === 'unsold'
-                        ? 'bg-gray-700 text-gray-400'
-                        : lot.lot_status === 'approved'
-                        ? 'bg-amber-500/20 text-amber-300'
-                        : 'bg-gray-700 text-gray-400'
-                    }`}>
-                      {lot.lot_status === 'live' ? '🔴 LIVE'
-                        : lot.lot_status === 'approved' ? 'NEXT UP'
-                        : lot.lot_status === 'unsold' ? '❌ NO BIDS'
-                        : lot.lot_status.toUpperCase()}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      {thumbImg && (
+                        <img src={thumbImg} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-400 mb-0.5">LOT {lot.lot_number}</p>
+                        <p className={`font-semibold text-sm truncate ${lot.lot_status === 'live' ? 'text-gray-800' : 'text-white'}`}>
+                          {lot.product_name}
+                        </p>
+                        <p className={`text-xs truncate ${lot.lot_status === 'live' ? 'text-gray-600' : 'text-gray-400'}`}>
+                          {lot.grade} · {lot.quantity_kg} kg
+                        </p>
+                        {lot.lot_status === 'live' && lot.current_price && (
+                          <p className="text-green-700 text-xs font-bold mt-0.5">
+                            Current: ₹{lot.current_price?.toLocaleString('en-IN')}/kg
+                          </p>
+                        )}
+                      </div>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 ${
+                        lot.lot_status === 'live'
+                          ? 'bg-red-500 text-white animate-pulse'
+                          : lot.lot_status === 'unsold'
+                          ? 'bg-gray-700 text-gray-400'
+                          : lot.lot_status === 'approved'
+                          ? 'bg-amber-500/20 text-amber-300'
+                          : 'bg-gray-700 text-gray-400'
+                      }`}>
+                        {lot.lot_status === 'live' ? '🔴 LIVE'
+                          : lot.lot_status === 'approved' ? 'NEXT'
+                          : lot.lot_status === 'unsold' ? '❌'
+                          : lot.lot_status.toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             {lots.length === 0 && (
               <div className="text-center py-16">
                 <p className="text-4xl mb-4">🌿</p>
                 <p className="text-green-300">No lots registered yet</p>
-                <p className="text-gray-500 text-sm mt-2">Sellers can register their lots below</p>
+                <p className="text-gray-500 text-sm mt-2">Check back soon</p>
               </div>
             )}
           </div>

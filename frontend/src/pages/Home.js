@@ -119,7 +119,7 @@ const Home = () => {
   }, []);
 
   return (
-    <div data-testid="home-page" className="pt-[108px] pb-20 md:pb-0">
+    <div data-testid="home-page" className="pt-20 pb-20 md:pb-0">
 
       {/* FIX 2 — Live / upcoming auction flash banner */}
       {liveEvent && (

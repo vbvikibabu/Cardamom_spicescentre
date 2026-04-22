@@ -2103,14 +2103,15 @@ async def place_auction_bid(lot_id: str, bid_data: AuctionBidPlace, current_user
     if not lot:
         raise HTTPException(404, "Lot not found")
     if lot["lot_status"] != "live":
-        raise HTTPException(400, "This lot is not currently live")
+        raise HTTPException(400, f"This lot is {lot['lot_status']} and not accepting bids")
     if lot.get("seller_id") == current_user.id:
         raise HTTPException(403, "Cannot bid on your own lot")
     end_time_str = lot.get("auction_end_time")
     if end_time_str:
         end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
-        if datetime.now(timezone.utc) > end_time:
-            raise HTTPException(400, "Bidding time has expired")
+        end_time_with_buffer = end_time + timedelta(seconds=2)
+        if datetime.now(timezone.utc) > end_time_with_buffer:
+            raise HTTPException(400, "Bidding has closed for this lot")
     min_bid = lot["current_price"] + lot["bid_increment"]
     if bid_data.bid_amount < min_bid:
         raise HTTPException(400, f"Bid must be at least {lot['currency']} {min_bid:.0f}/kg (increment: {lot['bid_increment']:.0f})")

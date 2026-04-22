@@ -1,18 +1,38 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Phone, Mail, MessageCircle, Instagram, LogIn, LogOut, LayoutDashboard, User } from 'lucide-react';
-
-const DARK_GREEN = '#2d5a27';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import LoginModal from './LoginModal';
+
+const DARK_GREEN = '#2d5a27';
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [liveAuctionBanner, setLiveAuctionBanner] = useState(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, isSeller, isAdmin } = useAuth();
+
+  // FIX 4 — Poll for live auction every 30s (for all users)
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/auction/events/upcoming`);
+        const live = (res.data || []).find(e => e.status === 'live');
+        setLiveAuctionBanner(live || null);
+        // Reset dismiss if event changed
+        if (live) setBannerDismissed(prev => prev);
+      } catch { /* silent */ }
+    };
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -228,37 +248,33 @@ const Navbar = () => {
         )}
       </nav>
 
-      {/* Market price ticker */}
-      <style>{`
-        @keyframes ticker-scroll {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .ticker-track { animation: ticker-scroll 25s linear infinite; }
-        .ticker-track:hover { animation-play-state: paused; }
-      `}</style>
-      <div
-        style={{ backgroundColor: '#2d5a27' }}
-        className="fixed top-20 left-0 right-0 z-[39] h-7 overflow-hidden flex items-center select-none"
-        aria-hidden="true"
-      >
-        <div className="ticker-track flex whitespace-nowrap">
-          {[0, 1].map((i) => (
-            <span key={i} style={{ color: '#f5f0e8' }} className="text-[11px] font-medium inline-flex items-center">
-              &nbsp;&nbsp;&nbsp;8mm &amp; Above&nbsp;₹2,650/kg
-              &nbsp;&nbsp;<span className="opacity-50">|</span>&nbsp;&nbsp;
-              7mm–8mm&nbsp;₹2,450/kg
-              &nbsp;&nbsp;<span className="opacity-50">|</span>&nbsp;&nbsp;
-              6mm–7mm&nbsp;₹2,200/kg
-              &nbsp;&nbsp;<span className="opacity-50">|</span>&nbsp;&nbsp;
-              📍 Bodinayakanur Market
-              &nbsp;&nbsp;<span className="opacity-50">|</span>&nbsp;&nbsp;
-              Updated: Today
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            </span>
-          ))}
+      {/* FIX 4 — Live auction notification banner */}
+      {liveAuctionBanner && !bannerDismissed && !location.pathname.startsWith('/auctions') && (
+        <div
+          style={{ backgroundColor: '#b91c1c' }}
+          className="fixed top-20 left-0 right-0 z-[39] flex items-center justify-between px-4 py-2.5 text-white text-sm font-semibold shadow-md"
+        >
+          <span className="flex items-center gap-2 truncate">
+            <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping flex-shrink-0" />
+            🔴 LIVE AUCTION: {liveAuctionBanner.title}
+            {liveAuctionBanner.location ? ` | ${liveAuctionBanner.location}` : ''}
+          </span>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+            <Link
+              to={`/auctions/${liveAuctionBanner.id}`}
+              onClick={() => setBannerDismissed(true)}
+              className="bg-white text-red-700 text-xs font-bold px-3 py-1 rounded-full hover:bg-red-50 transition-colors whitespace-nowrap"
+            >
+              Join Now →
+            </Link>
+            <button
+              onClick={() => setBannerDismissed(true)}
+              className="text-white/70 hover:text-white text-xl leading-none"
+              aria-label="Dismiss"
+            >×</button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Login Modal */}
       <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />

@@ -199,14 +199,14 @@ const Products = () => {
 
   if (loading) {
     return (
-      <div data-testid="products-loading" className="pt-[108px] flex items-center justify-center py-20">
+      <div data-testid="products-loading" className="pt-20 flex items-center justify-center py-20">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
       </div>
     );
   }
 
   return (
-    <div data-testid="products-page" className="pt-[108px] pb-20 md:pb-0">
+    <div data-testid="products-page" className="pt-20 pb-20 md:pb-0">
 
       {/* FIX 4 — Live auction banner */}
       {liveAuction && !auctionDismissed && (
