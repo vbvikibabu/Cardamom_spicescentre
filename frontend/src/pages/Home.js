@@ -67,6 +67,8 @@ const Home = () => {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [liveEvent, setLiveEvent] = useState(null);
+  const [upcomingEvent, setUpcomingEvent] = useState(null);
 
   // FIX 4 — Auto-redirect approved users to their dashboard
   useEffect(() => {
@@ -96,12 +98,64 @@ const Home = () => {
     fetchProducts();
   }, []);
 
+  // FIX 2 — Poll for live/upcoming auction events every 30s
+  useEffect(() => {
+    const checkAuction = async () => {
+      try {
+        const res = await axios.get(`${API}/auction/events/upcoming`);
+        const events = res.data || [];
+        setLiveEvent(events.find(e => e.status === 'live') || null);
+        setUpcomingEvent(
+          events.find(e => e.status === 'upcoming' || e.status === 'registration_open') || null
+        );
+      } catch {
+        setLiveEvent(null);
+        setUpcomingEvent(null);
+      }
+    };
+    checkAuction();
+    const interval = setInterval(checkAuction, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div data-testid="home-page" className="pt-20">
+    <div data-testid="home-page" className="pt-[108px] pb-20 md:pb-0">
+
+      {/* FIX 2 — Live / upcoming auction flash banner */}
+      {liveEvent && (
+        <div className="bg-red-600 text-white flex items-center justify-between px-4 py-2.5 text-sm font-semibold">
+          <span className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping flex-shrink-0" />
+            🔴 LIVE NOW: {liveEvent.title}
+          </span>
+          <Link
+            to={`/auctions/${liveEvent.id}`}
+            className="bg-white text-red-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-red-50 transition-colors flex-shrink-0 ml-3"
+          >
+            Join Now →
+          </Link>
+        </div>
+      )}
+      {!liveEvent && upcomingEvent && (
+        <div className="bg-amber-500 text-white flex items-center justify-between px-4 py-2.5 text-sm font-semibold">
+          <span className="flex items-center gap-2">
+            🔔 Upcoming Auction: {upcomingEvent.title}
+            {upcomingEvent.status === 'registration_open' && (
+              <span className="text-xs bg-white/20 rounded-full px-2 py-0.5">Registration Open</span>
+            )}
+          </span>
+          <Link
+            to="/auctions"
+            className="bg-white text-amber-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-amber-50 transition-colors flex-shrink-0 ml-3"
+          >
+            View Details →
+          </Link>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════ HERO ═══ */}
-      <section className="min-h-screen flex items-center pt-20" data-testid="hero-section">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 w-full py-12">
+      <section className="flex items-center" data-testid="hero-section">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 w-full py-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
 
             {/* Left: Copy + CTA */}
@@ -164,7 +218,7 @@ const Home = () => {
       </section>
 
       {/* ══════════════════════════════════════════════ LIVE LISTINGS ═══ */}
-      <section className="py-24 bg-muted" data-testid="live-listings-section">
+      <section className="py-10 mt-6 bg-muted" data-testid="live-listings-section">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
 
           {/* Section header */}

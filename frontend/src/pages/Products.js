@@ -139,6 +139,8 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGrade, setActiveGrade] = useState('all');
+  const [liveAuction, setLiveAuction] = useState(null);
+  const [auctionDismissed, setAuctionDismissed] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -152,6 +154,23 @@ const Products = () => {
       }
     };
     fetchProducts();
+  }, []);
+
+  // FIX 4 — Poll for live auction event
+  useEffect(() => {
+    const checkAuction = async () => {
+      try {
+        const res = await axios.get(`${API}/auction/events/upcoming`);
+        const events = res.data || [];
+        const live = events.find(e => e.status === 'live');
+        setLiveAuction(live || null);
+      } catch {
+        setLiveAuction(null);
+      }
+    };
+    checkAuction();
+    const interval = setInterval(checkAuction, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // Extract unique grades from products
@@ -180,36 +199,50 @@ const Products = () => {
 
   if (loading) {
     return (
-      <div data-testid="products-loading" className="min-h-screen flex items-center justify-center">
+      <div data-testid="products-loading" className="pt-[108px] flex items-center justify-center py-20">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
       </div>
     );
   }
 
   return (
-    <div data-testid="products-page" className="pt-20">
-      {/* Hero */}
-      <section className="py-24 bg-muted" data-testid="products-hero">
-        <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center max-w-3xl mx-auto"
-          >
-            <p className="font-sans text-xs tracking-[0.2em] uppercase font-bold text-accent mb-6">Our Collection</p>
-            <h1 className="font-serif text-5xl md:text-7xl tracking-tight leading-tight mb-6 text-foreground">Green Cardamom Varieties</h1>
-            <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-              Premium quality Green Cardamom (Elettaria cardamomum) in three different size grades to meet diverse market requirements.
-            </p>
-          </motion.div>
-        </div>
-      </section>
+    <div data-testid="products-page" className="pt-[108px] pb-20 md:pb-0">
 
-      {/* Search & Filter Bar */}
-      <section className="py-8 border-b border-border" data-testid="products-filter-section">
-        <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+      {/* FIX 4 — Live auction banner */}
+      {liveAuction && !auctionDismissed && (
+        <div className="bg-red-600 text-white flex items-center justify-between px-4 py-2 text-sm font-semibold">
+          <span className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
+            🔴 LIVE AUCTION: {liveAuction.title}
+          </span>
+          <div className="flex items-center gap-3">
+            <Link
+              to={`/auctions/${liveAuction.id}`}
+              className="bg-white text-red-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-red-50 transition-colors"
+            >
+              Join Now →
+            </Link>
+            <button
+              onClick={() => setAuctionDismissed(true)}
+              className="text-white/70 hover:text-white text-lg leading-none"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* FIX 1 — Compact 2-line header (max ~70px) */}
+      <div className="px-4 pt-3 pb-2" data-testid="products-hero">
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-600 leading-none mb-1">Our Range</p>
+        <h1 className="font-serif text-2xl font-bold text-foreground leading-tight">Products</h1>
+      </div>
+
+      {/* Search & Filter — tight, 8px gaps */}
+      <div className="px-4 pb-3 border-b border-border" data-testid="products-filter-section">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col md:flex-row gap-2 items-start md:items-center justify-between">
             {/* Search */}
             <div className="relative w-full md:w-80">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -264,24 +297,22 @@ const Products = () => {
 
           {/* Active filter summary */}
           {(activeGrade !== 'all' || searchQuery) && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground" data-testid="products-filter-summary">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="products-filter-summary">
               <span>Showing {filteredProducts.length} of {products.length} products</span>
-              {(activeGrade !== 'all' || searchQuery) && (
-                <button
-                  onClick={() => { setActiveGrade('all'); setSearchQuery(''); }}
-                  data-testid="products-clear-all-filters"
-                  className="text-primary text-xs font-semibold hover:underline ml-2"
-                >
-                  Clear all filters
-                </button>
-              )}
+              <button
+                onClick={() => { setActiveGrade('all'); setSearchQuery(''); }}
+                data-testid="products-clear-all-filters"
+                className="text-primary text-xs font-semibold hover:underline ml-1"
+              >
+                Clear all
+              </button>
             </div>
           )}
         </div>
-      </section>
+      </div>
 
       {/* Products Grid */}
-      <section className="py-24" data-testid="products-grid">
+      <section className="py-6" data-testid="products-grid">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           {filteredProducts.length === 0 ? (
             <div className="text-center py-16" data-testid="products-no-results">

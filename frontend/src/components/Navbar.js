@@ -228,6 +228,38 @@ const Navbar = () => {
         )}
       </nav>
 
+      {/* Market price ticker */}
+      <style>{`
+        @keyframes ticker-scroll {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .ticker-track { animation: ticker-scroll 25s linear infinite; }
+        .ticker-track:hover { animation-play-state: paused; }
+      `}</style>
+      <div
+        style={{ backgroundColor: '#2d5a27' }}
+        className="fixed top-20 left-0 right-0 z-[39] h-7 overflow-hidden flex items-center select-none"
+        aria-hidden="true"
+      >
+        <div className="ticker-track flex whitespace-nowrap">
+          {[0, 1].map((i) => (
+            <span key={i} style={{ color: '#f5f0e8' }} className="text-[11px] font-medium inline-flex items-center">
+              &nbsp;&nbsp;&nbsp;8mm &amp; Above&nbsp;₹2,650/kg
+              &nbsp;&nbsp;<span className="opacity-50">|</span>&nbsp;&nbsp;
+              7mm–8mm&nbsp;₹2,450/kg
+              &nbsp;&nbsp;<span className="opacity-50">|</span>&nbsp;&nbsp;
+              6mm–7mm&nbsp;₹2,200/kg
+              &nbsp;&nbsp;<span className="opacity-50">|</span>&nbsp;&nbsp;
+              📍 Bodinayakanur Market
+              &nbsp;&nbsp;<span className="opacity-50">|</span>&nbsp;&nbsp;
+              Updated: Today
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* Login Modal */}
       <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
     </>
