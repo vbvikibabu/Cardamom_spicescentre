@@ -30,6 +30,20 @@ const Login = () => {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
+  // Save the path the user was trying to reach before being redirected to login
+  useEffect(() => {
+    const ref = document.referrer;
+    const current = window.location.pathname;
+    if (current === '/login' && ref) {
+      try {
+        const refUrl = new URL(ref);
+        if (refUrl.origin === window.location.origin && refUrl.pathname !== '/login') {
+          sessionStorage.setItem('redirectAfterLogin', refUrl.pathname + refUrl.search);
+        }
+      } catch { /* ignore */ }
+    }
+  }, []);
+
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
@@ -50,6 +64,15 @@ const Login = () => {
     try {
       const userData = await login(email, password);
       toast.success(`Welcome back, ${userData.full_name}!`);
+
+      // Check for saved redirect path
+      const savedPath = sessionStorage.getItem('redirectAfterLogin');
+      if (savedPath) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(savedPath);
+        return;
+      }
+
       if (userData.role === 'admin') navigate('/admin');
       else if (userData.status === 'approved') {
         if (userData.role === 'seller' || userData.role === 'both') navigate('/seller');

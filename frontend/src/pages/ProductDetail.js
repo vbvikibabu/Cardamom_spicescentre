@@ -132,7 +132,12 @@ const ProductDetail = () => {
   }, [id]);
 
   const requireAuth = (callback) => {
-    if (!isAuthenticated) { setShowLoginModal(true); return; }
+    if (!isAuthenticated) {
+      // Save current product page so user is returned here after login
+      sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+      setShowLoginModal(true);
+      return;
+    }
     if (!isApproved) { toast.error('Your account is pending approval.'); return; }
     callback();
   };
@@ -378,12 +383,26 @@ const ProductDetail = () => {
             {/* CTA Buttons */}
             <div className="mt-auto space-y-3">
               {product.listing_status === 'active' ? (
-                <>
-                  <button data-testid="product-detail-place-bid" onClick={openBidModal} className="w-full inline-flex items-center justify-center gap-3 bg-foreground text-white py-4 rounded-xl font-semibold text-base hover:bg-foreground/90 transition-colors">
-                    <Gavel size={18} /> Place a Bid
-                  </button>
-                  <p className="text-xs text-center text-muted-foreground">Bids are reviewed by the seller. You will be notified of the outcome.</p>
-                </>
+                (() => {
+                  const isOwnProduct = isAuthenticated && user?.id === product.seller_id;
+                  const isSellerOnly = isAuthenticated && user?.role === 'seller';
+                  const cannotBid = isOwnProduct || isSellerOnly;
+                  if (cannotBid) {
+                    return (
+                      <div className="w-full py-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-semibold text-sm text-center">
+                        {isOwnProduct ? '🚫 This is your listing — you cannot bid on it.' : '🚫 Sellers cannot place bids.'}
+                      </div>
+                    );
+                  }
+                  return (
+                    <>
+                      <button data-testid="product-detail-place-bid" onClick={openBidModal} className="w-full inline-flex items-center justify-center gap-3 bg-foreground text-white py-4 rounded-xl font-semibold text-base hover:bg-foreground/90 transition-colors">
+                        <Gavel size={18} /> Place a Bid
+                      </button>
+                      <p className="text-xs text-center text-muted-foreground">Bids are reviewed by the seller. You will be notified of the outcome.</p>
+                    </>
+                  );
+                })()
               ) : product.listing_status === 'sold' ? (
                 <div className="w-full py-4 rounded-xl bg-blue-100 text-blue-700 font-semibold text-base text-center">
                   Product Sold

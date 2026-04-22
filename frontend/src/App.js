@@ -5,6 +5,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import ScrollToTop from "@/components/ScrollToTop";
 import Navbar from "@/components/Navbar";
+import BottomNav from "@/components/BottomNav";
 import Home from "@/pages/Home";
 import Products from "@/pages/Products";
 import ProductDetail from "@/pages/ProductDetail";
@@ -44,6 +45,7 @@ function App() {
         <BrowserRouter>
           <ScrollToTop />
           <Navbar />
+          <div className="pb-20 md:pb-0">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/products" element={<Products />} />
@@ -69,7 +71,9 @@ function App() {
             <Route path="/pending-approval" element={<PendingApproval />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </div>
           <Footer />
+          <BottomNav />
         </BrowserRouter>
         
         <Toaster />

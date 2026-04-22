@@ -28,6 +28,14 @@ const LoginModal = ({ open, onOpenChange }) => {
       setEmail('');
       setPassword('');
 
+      // Redirect to saved path if available
+      const savedPath = userData._redirectAfterLogin || sessionStorage.getItem('redirectAfterLogin');
+      if (savedPath) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(savedPath);
+        return;
+      }
+
       if (userData.role === 'admin') {
         navigate('/admin');
       } else if (userData.status === 'approved') {

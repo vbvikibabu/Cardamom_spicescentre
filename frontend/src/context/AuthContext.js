@@ -57,6 +57,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', access_token);
     setToken(access_token);
     setUser(userData);
+    // Store the redirect path from sessionStorage so callers can check it
+    userData._redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin') || null;
     return userData;
   };
 

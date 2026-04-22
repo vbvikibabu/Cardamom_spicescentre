@@ -3,7 +3,15 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart, Timer, Archive, RotateCcw, AlertCircle, Loader2 } from 'lucide-react';
+import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart, Timer, Archive, RotateCcw, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
+
+const getGreeting = (firstName) => {
+  const h = new Date().getHours();
+  const name = firstName || 'there';
+  if (h < 12) return `Good morning, ${name}`;
+  if (h < 17) return `Good afternoon, ${name}`;
+  return `Good evening, ${name}`;
+};
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -79,13 +87,58 @@ const SellerDashboard = () => {
 
   // Bid notes
   const [bidNotes, setBidNotes] = useState({});
+  // Real-time form validity (FIX 8)
+  const [isFormValid, setIsFormValid] = useState(false);
 
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+
+  // Real-time validation — runs whenever form fields change
+  const validateProductFormRealtime = useCallback((form, media, existingMediaArr) => {
+    const errs = {};
+    const trimName = form.name.trim();
+    if (trimName.length < 3) errs.name = 'At least 3 characters';
+    else if (trimName.length > 100) errs.name = 'Max 100 characters';
+
+    const trimSize = form.size.trim();
+    if (trimSize.length < 2) errs.size = 'At least 2 characters';
+
+    const trimDesc = form.description.trim();
+    if (trimDesc.length < 20) errs.description = 'At least 20 characters';
+    else if (trimDesc.length > 500) errs.description = 'Max 500 characters';
+
+    const featuresList = form.features.split(',').map(f => f.trim()).filter(Boolean);
+    if (featuresList.length < 2) errs.features = 'Enter at least 2 comma-separated features';
+
+    const bpVal = parseFloat(form.base_price);
+    if (!form.base_price || isNaN(bpVal) || bpVal <= 0) errs.base_price = 'Enter a positive number';
+    else if (bpVal > 999999) errs.base_price = 'Max 6 digits';
+
+    const totalQty = parseFloat(form.total_quantity_kg);
+    const minQty = parseFloat(form.minimum_quantity_kg);
+    if (!form.total_quantity_kg || isNaN(totalQty) || totalQty <= 0) errs.total_quantity_kg = 'Enter a positive number';
+    if (!form.minimum_quantity_kg || isNaN(minQty) || minQty <= 0) errs.minimum_quantity_kg = 'Enter a positive number';
+    if (!errs.total_quantity_kg && !errs.minimum_quantity_kg && minQty >= totalQty) {
+      errs.minimum_quantity_kg = 'Must be less than total stock';
+    }
+
+    const totalMedia = existingMediaArr.length + media.length;
+    if (totalMedia < 1) errs.media = 'Add at least 1 image or video';
+    if (totalMedia > 4) errs.media = 'Max 4 files';
+
+    return errs;
+  }, []);
 
   useEffect(() => {
     if (!isApproved) { navigate('/pending-approval'); return; }
     fetchData();
   }, [isApproved, navigate]);
+
+  // Re-validate form whenever any field, media, or existingMedia changes
+  useEffect(() => {
+    if (!showProductForm) return;
+    const errs = validateProductFormRealtime(productForm, mediaFiles, existingMedia);
+    setIsFormValid(Object.keys(errs).length === 0);
+  }, [productForm, mediaFiles, existingMedia, showProductForm, validateProductFormRealtime]);
 
   const fetchData = async () => {
     try {
@@ -127,6 +180,7 @@ const SellerDashboard = () => {
     }
     setMediaFiles([]);
     setProductFormErrors({});
+    setIsFormValid(false);
     setShowProductForm(true);
   };
 
@@ -248,9 +302,10 @@ const SellerDashboard = () => {
         toast.success('Product updated! It will be reviewed by admin.');
       } else {
         await axios.post(`${API_URL}/api/seller/products`, payload, authHeaders);
-        toast.success('Product submitted for admin approval!');
+        toast.success('Product submitted! It will be live once admin approves.');
       }
       setShowProductForm(false);
+      setProductListFilter('pending_approval');
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to save product');
@@ -324,12 +379,31 @@ const SellerDashboard = () => {
     { key: 'bids', label: 'Bids Received' }
   ];
 
+  const firstName = user?.full_name?.split(' ')[0];
+  const greeting = getGreeting(firstName);
+
   return (
     <div data-testid="seller-dashboard" className="min-h-screen bg-muted pt-20">
-      <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
-        <div className="mb-8">
-          <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-2">Seller Dashboard</h1>
-          <p className="text-muted-foreground">Welcome, {user?.full_name}</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 py-8 md:py-12">
+        <div className="flex items-start justify-between mb-6 gap-4">
+          <div>
+            <h1 className="font-serif text-3xl md:text-5xl font-bold text-foreground mb-1">{greeting} 👋</h1>
+            <p className="text-sm text-muted-foreground">
+              {products.filter(p => p.listing_status === 'active').length > 0
+                ? `You have ${products.filter(p => p.listing_status === 'active').length} active listing${products.filter(p => p.listing_status === 'active').length > 1 ? 's' : ''}.`
+                : 'No active listings. Add your first product to get started.'}
+            </p>
+          </div>
+          {/* Prominent Add Product CTA */}
+          <button
+            data-testid="seller-add-product-btn-header"
+            onClick={() => { setActiveTab('products'); openProductForm(); }}
+            className="flex-shrink-0 inline-flex items-center gap-2 bg-primary text-white px-4 py-2.5 md:px-6 md:py-3 rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
+          >
+            <Plus size={18} />
+            <span className="hidden sm:inline">Add Product</span>
+            <span className="sm:hidden">New</span>
+          </button>
         </div>
 
         {/* Role Switch for "both" users */}
@@ -603,8 +677,22 @@ const SellerDashboard = () => {
                       Products are submitted for admin review. Once approved, they will be visible to buyers.
                     </div>
 
-                    <button type="submit" disabled={saving} data-testid="seller-product-save-btn" className="bg-primary text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2">
-                      {saving ? (<><Loader2 size={16} className="animate-spin" /> Saving...</>) : (editingProduct ? 'Update Product' : 'Submit Product')}
+                    <button
+                      type="submit"
+                      disabled={saving || !isFormValid}
+                      data-testid="seller-product-save-btn"
+                      className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors inline-flex items-center gap-2 ${
+                        isFormValid
+                          ? 'bg-primary text-white hover:bg-primary/90'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      } disabled:opacity-70`}
+                    >
+                      {saving
+                        ? (<><Loader2 size={16} className="animate-spin" /> Saving...</>)
+                        : isFormValid
+                          ? (editingProduct ? 'Update Product' : 'Submit Product')
+                          : 'Fill all required fields'
+                      }
                     </button>
                   </form>
                 )}
@@ -646,38 +734,66 @@ const SellerDashboard = () => {
                     </div>
                   )}
                   {products.filter(p => p.listing_status === productListFilter).map(p => (
-                    <div key={p.id} data-testid={`seller-product-${p.id}`} className="border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
-                      <div className="flex items-start gap-4">
-                        {/* Thumbnail */}
-                        <div className="flex gap-1 flex-shrink-0">
-                          {(p.media_paths && p.media_paths.length > 0 ? p.media_paths.slice(0,2) : [p.image_url]).map((path, idx) => (
-                            path && (isVideo(path) ? (
-                              <div key={idx} className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center"><Film size={18} className="text-muted-foreground" /></div>
+                    <div key={p.id} data-testid={`seller-product-${p.id}`} className="border border-border rounded-xl p-4 hover:border-primary/50 transition-colors bg-white">
+                      <div className="flex items-start gap-3">
+                        {/* Thumbnail - single, consistent size */}
+                        {(() => {
+                          const firstMedia = p.media_paths?.[0] || p.image_url;
+                          return firstMedia ? (
+                            isVideo(firstMedia) ? (
+                              <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                <Film size={20} className="text-muted-foreground" />
+                              </div>
                             ) : (
-                              <img key={idx} src={getMediaUrl(path)} alt={p.name} className="w-14 h-14 rounded-lg object-cover" />
-                            ))
-                          ))}
-                        </div>
+                              <img src={getMediaUrl(firstMedia)} alt={p.name} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
+                            )
+                          ) : (
+                            <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <span className="text-2xl">🌿</span>
+                            </div>
+                          );
+                        })()}
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-foreground truncate">{p.name}</h3>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${listingBadge(p.listing_status)}`}>{p.listing_status}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(p.approval_status)}`}>{p.approval_status}</span>
+                          <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1 mb-1">
+                            <h3 className="font-semibold text-foreground text-sm leading-snug">{p.name}</h3>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {/* Actions inline on mobile */}
+                              {p.listing_status === 'expired' && (
+                                <button
+                                  onClick={() => extendTimer(p.id)}
+                                  disabled={(p.extension_count || 0) >= 2}
+                                  title={(p.extension_count || 0) >= 2 ? 'Max extensions reached' : 'Extend timer by 2h'}
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-orange-500 text-white rounded-lg text-[10px] font-semibold hover:bg-orange-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  <RotateCcw size={10} /> Extend
+                                </button>
+                              )}
+                              {p.listing_status === 'active' && (
+                                <button data-testid={`seller-edit-product-${p.id}`} onClick={() => openProductForm(p)} className="p-1.5 border border-border rounded-lg hover:bg-muted transition-colors" title="Edit"><Pencil size={14} className="text-foreground" /></button>
+                              )}
+                              <button data-testid={`seller-delete-product-${p.id}`} onClick={() => deleteProduct(p.id)} className="p-1.5 border border-red-200 rounded-lg hover:bg-red-50 transition-colors" title="Delete"><Trash2 size={14} className="text-red-500" /></button>
+                            </div>
                           </div>
-                          <p className="text-sm text-muted-foreground mb-1">{p.size}</p>
+
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${listingBadge(p.listing_status)}`}>{p.listing_status}</span>
+                            <span className="text-xs text-muted-foreground">{p.size}</span>
+                          </div>
+
                           {p.base_price && (
-                            <p className="text-xs text-foreground font-medium">
+                            <p className="text-xs text-foreground font-medium mb-1">
                               {p.base_price_currency === 'USD' ? '$' : '₹'}{p.base_price.toLocaleString('en-IN')}/kg
                               {p.minimum_quantity_kg ? ` · Min ${p.minimum_quantity_kg} kg` : ''}
                             </p>
                           )}
+
                           {/* Inventory bar */}
                           {p.total_quantity_kg > 0 && (
-                            <div className="mt-1.5">
+                            <div className="mb-1.5">
                               <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
-                                <span>Remaining: <strong className="text-foreground">{(p.remaining_quantity_kg ?? p.total_quantity_kg).toLocaleString('en-IN')} / {p.total_quantity_kg.toLocaleString('en-IN')} kg</strong></span>
+                                <span>Stock: <strong className="text-foreground">{(p.remaining_quantity_kg ?? p.total_quantity_kg).toLocaleString('en-IN')} / {p.total_quantity_kg.toLocaleString('en-IN')} kg</strong></span>
                               </div>
                               <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden w-full">
                                 {(() => {
@@ -689,56 +805,33 @@ const SellerDashboard = () => {
                             </div>
                           )}
 
-                          {/* Timer for active */}
+                          {/* Status line */}
                           {p.listing_status === 'active' && p.bid_end_time && (
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <Timer size={12} className="text-green-600" />
+                              <Timer size={11} className="text-green-600" />
                               <span>Closes in:</span>
                               <MiniCountdown endTime={p.bid_end_time} />
-                              <span className="text-muted-foreground">• {p.total_bids_received || 0} bids</span>
+                              <span>• {p.total_bids_received || 0} bids</span>
                             </div>
                           )}
-
-                          {/* Expired info */}
+                          {p.listing_status === 'pending_approval' && (
+                            <p className="text-[10px] text-yellow-700 font-medium">⏳ Awaiting admin review</p>
+                          )}
+                          {p.listing_status === 'rejected' && (
+                            <p className="text-[10px] text-red-600 font-medium">✗ Rejected by admin</p>
+                          )}
                           {p.listing_status === 'expired' && (
                             <div className="flex items-center gap-1.5 text-xs text-orange-600">
-                              <AlertCircle size={12} />
-                              <span>Bidding ended • {p.total_bids_received || 0} bids received
-                                {p.extension_count > 0 ? ` • ${p.extension_count} extension${p.extension_count > 1 ? 's' : ''} used` : ''}
-                              </span>
+                              <AlertCircle size={11} />
+                              <span>Bidding ended · {p.total_bids_received || 0} bids</span>
                             </div>
                           )}
-
-                          {/* Sold info */}
                           {(p.listing_status === 'sold' || p.listing_status === 'archived') && p.sold_to_buyer_name && (
                             <div className="flex items-center gap-1.5 text-xs text-blue-600">
-                              <CheckCircle size={12} />
-                              <span>
-                                Sold to <strong>{p.sold_to_buyer_name}</strong>
-                                {p.sold_price ? ` @ ${p.sold_price_currency || 'INR'} ${p.sold_price}` : ''}
-                                {p.sold_at ? ` on ${new Date(p.sold_at).toLocaleDateString('en-IN')}` : ''}
-                              </span>
+                              <CheckCircle size={11} />
+                              <span>Sold to <strong>{p.sold_to_buyer_name}</strong></span>
                             </div>
                           )}
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {/* Extend timer for expired */}
-                          {p.listing_status === 'expired' && (
-                            <button
-                              onClick={() => extendTimer(p.id)}
-                              disabled={(p.extension_count || 0) >= 2}
-                              title={(p.extension_count || 0) >= 2 ? 'Max extensions reached' : 'Extend timer by 2h'}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-semibold hover:bg-orange-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              <RotateCcw size={12} /> Extend{(p.extension_count || 0) > 0 ? ` (${2 - (p.extension_count||0)} left)` : ''}
-                            </button>
-                          )}
-                          {p.listing_status === 'active' && (
-                            <button data-testid={`seller-edit-product-${p.id}`} onClick={() => openProductForm(p)} className="p-2 border border-border rounded-lg hover:bg-muted transition-colors" title="Edit"><Pencil size={16} className="text-foreground" /></button>
-                          )}
-                          <button data-testid={`seller-delete-product-${p.id}`} onClick={() => deleteProduct(p.id)} className="p-2 border border-red-200 rounded-lg hover:bg-red-50 transition-colors" title="Delete"><Trash2 size={16} className="text-red-500" /></button>
                         </div>
                       </div>
                     </div>

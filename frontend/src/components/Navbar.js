@@ -154,14 +154,14 @@ const Navbar = () => {
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
           <div data-testid="mobile-menu" className="md:hidden navbar-glass border-t border-border">
-            <div className="px-6 py-4 space-y-4">
+            <div className="px-6 py-4 space-y-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
                   data-testid={`mobile-nav-link-${link.name.toLowerCase()}`}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`block font-sans text-sm tracking-wide uppercase font-medium transition-colors ${
+                  className={`block py-2.5 font-sans text-sm tracking-wide font-medium transition-colors ${
                     location.pathname === link.path
                       ? 'text-primary'
                       : 'text-muted-foreground'
@@ -171,25 +171,25 @@ const Navbar = () => {
                 </Link>
               ))}
 
-              {/* Mobile Auth Buttons */}
-              <div className="pt-4 border-t border-border space-y-2">
+              {/* Mobile Auth Links */}
+              <div className="pt-3 border-t border-border">
                 {isAuthenticated ? (
                   <>
                     <Link
                       to={isAdmin ? '/admin' : isSeller ? '/seller' : '/dashboard'}
                       data-testid="mobile-dashboard-button"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 bg-accent text-white rounded-lg"
+                      className="flex items-center gap-2 py-2.5 text-sm font-medium text-primary"
                     >
-                      <LayoutDashboard size={18} />
+                      <LayoutDashboard size={16} />
                       <span>Dashboard</span>
                     </Link>
                     <button
                       onClick={handleLogout}
                       data-testid="mobile-logout-button"
-                      className="flex items-center gap-3 px-4 py-3 bg-red-500 text-white rounded-lg w-full"
+                      className="flex items-center gap-2 py-2.5 text-sm font-medium text-red-500 w-full text-left"
                     >
-                      <LogOut size={18} />
+                      <LogOut size={16} />
                       <span>Logout</span>
                     </button>
                   </>
@@ -198,41 +198,37 @@ const Navbar = () => {
                     <button
                       onClick={openLogin}
                       data-testid="mobile-login-button"
-                      className="flex items-center gap-3 px-4 py-3 bg-accent text-white rounded-lg w-full"
+                      className="flex items-center gap-2 py-2.5 text-sm font-medium text-primary w-full text-left"
                     >
-                      <LogIn size={18} />
+                      <LogIn size={16} />
                       <span>Login</span>
                     </button>
                     <Link
                       to="/register"
                       data-testid="mobile-register-button"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg"
+                      className="flex items-center gap-2 py-2.5 text-sm font-medium text-muted-foreground"
                     >
-                      <User size={18} />
+                      <User size={16} />
                       <span>Register</span>
                     </Link>
                   </>
                 )}
               </div>
-              
-              {/* Mobile Contact Buttons */}
-              <div className="pt-2 space-y-2">
-                <a href="tel:+918838226519" className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg">
+
+              {/* Mobile Contact Links */}
+              <div className="pt-3 border-t border-border flex items-center gap-4">
+                <a href="tel:+918838226519" title="Call Us" className="text-primary hover:text-primary/80 transition-colors">
                   <Phone size={18} />
-                  <span>+91-8838226519</span>
                 </a>
-                <a href="https://wa.me/918838226519" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-3 bg-green-500 text-white rounded-lg">
+                <a href="https://wa.me/918838226519" target="_blank" rel="noopener noreferrer" title="WhatsApp" className="text-primary hover:text-primary/80 transition-colors">
                   <MessageCircle size={18} />
-                  <span>WhatsApp</span>
                 </a>
-                <a href="mailto:cardamomspicescentre@gmail.com" className="flex items-center gap-3 px-4 py-3 bg-primary text-white rounded-lg">
+                <a href="mailto:cardamomspicescentre@gmail.com" title="Email Us" className="text-primary hover:text-primary/80 transition-colors">
                   <Mail size={18} />
-                  <span>Email Us</span>
                 </a>
-                <a href="https://www.instagram.com/cardamom_spicescentre?igsh=MTFxMGI3N2ZmenB4ZA==" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-3 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 text-white rounded-lg">
+                <a href="https://www.instagram.com/cardamom_spicescentre?igsh=MTFxMGI3N2ZmenB4ZA==" target="_blank" rel="noopener noreferrer" title="Instagram" className="text-primary hover:text-primary/80 transition-colors">
                   <Instagram size={18} />
-                  <span>Instagram</span>
                 </a>
               </div>
             </div>

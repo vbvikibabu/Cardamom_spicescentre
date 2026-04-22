@@ -611,6 +611,55 @@ async def _email_timer_expired_to_seller(product: dict, seller_email: str) -> No
     )
 
 
+# --- 9. New product approved → all buyers ---
+async def _email_buyers_new_product(product: dict, buyer_emails: list) -> None:
+    """Fire-and-forget: send product notification to each buyer email in batches."""
+    if not buyer_emails:
+        return
+    name = product.get("name", "New Cardamom Listing")
+    size = product.get("size", "")
+    seller_company = product.get("seller_company") or product.get("seller_name", "Verified Seller")
+    currency_sym = "$" if product.get("base_price_currency") == "USD" else "₹"
+    base_price = product.get("base_price")
+    price_str = f"{currency_sym}{base_price:,.2f}/kg" if base_price else "On request"
+    total_qty = product.get("total_quantity_kg")
+    qty_str = f"{total_qty:,.0f} kg" if total_qty else "On request"
+    duration_hrs = product.get("bid_duration_hours", 4)
+    product_id = product.get("id", "")
+    product_link = f"https://cardamomspicescentre.com/products/{product_id}"
+
+    body = f"""
+    <h2 style="color:#2d5a27;margin-top:0;">&#127807; New Cardamom Listing — Act Fast!</h2>
+    <p>A new premium green cardamom lot is now live and open for bidding on Cardamom Spices Centre.</p>
+    <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;width:140px;">Product</td><td style="padding:8px 12px;background:#f8f8f4;">{name}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:bold;">Grade / Size</td><td style="padding:8px 12px;">{size}</td></tr>
+      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;">Seller</td><td style="padding:8px 12px;background:#f8f8f4;">{seller_company}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:bold;">Base Price</td><td style="padding:8px 12px;">{price_str}</td></tr>
+      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;">Available Qty</td><td style="padding:8px 12px;background:#f8f8f4;">{qty_str}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:bold;">Bidding Window</td><td style="padding:8px 12px;">{duration_hrs} hour{"s" if duration_hrs != 1 else ""}</td></tr>
+    </table>
+    <p style="color:#c0392b;font-weight:bold;">&#9200; Bidding closes in {duration_hrs} hour{"s" if duration_hrs != 1 else ""}. Don't miss out!</p>
+    <p style="text-align:center;margin:28px 0;">
+      <a href="{product_link}" style="background-color:#2d5a27;color:#ffffff;padding:12px 28px;border-radius:5px;text-decoration:none;font-size:14px;font-weight:bold;">View &amp; Place Bid &#8594;</a>
+    </p>
+    <p>Questions? Call us at <a href="tel:+918838226519" style="color:#2d5a27;">+91-8838226519</a> or reply to this email.</p>"""
+
+    subject = f"New Listing: {name} — Open for Bidding | Cardamom Spices Centre"
+    html = _html_wrap("New Cardamom Listing", body)
+
+    # Send in batches of 50 with a small delay between batches
+    batch_size = 50
+    for i in range(0, len(buyer_emails), batch_size):
+        batch = buyer_emails[i:i + batch_size]
+        for email in batch:
+            await _smtp_send(email, subject, html)
+        if i + batch_size < len(buyer_emails):
+            await asyncio.sleep(0.5)
+
+    logger.info(f"Buyer notifications sent for product '{name}' to {len(buyer_emails)} buyers")
+
+
 # ==================== MODELS ====================
 
 class Product(BaseModel):
@@ -1102,6 +1151,19 @@ async def update_product_status(
     except Exception as e:
         logger.warning(f"Push notification failed: {e}")
 
+    # On approval: email all approved buyers about the new listing
+    if approval_status == "approved":
+        try:
+            approved_buyers = await db.users.find(
+                {"role": {"$in": ["buyer", "both"]}, "status": "approved"},
+                {"_id": 0, "email": 1}
+            ).to_list(5000)
+            buyer_emails = [u["email"] for u in approved_buyers if u.get("email")]
+            if buyer_emails:
+                asyncio.create_task(_email_buyers_new_product(product, buyer_emails))
+        except Exception as e:
+            logger.warning(f"Failed to queue buyer notification emails: {e}")
+
     logger.info(f"Admin {approval_status} product: {product_id}")
     return {"message": f"Product {approval_status}", "product": product}
 
@@ -1465,6 +1527,10 @@ async def create_bid(
     bid_data: BidCreate,
     current_user: User = Depends(get_current_approved_buyer)
 ):
+    # Sellers cannot place bids (only buyers or both roles can)
+    if current_user.role == "seller":
+        raise HTTPException(status_code=403, detail="Sellers cannot place bids. Only buyers can bid.")
+
     has_qty = bid_data.quantity_kg or bid_data.quantity_lot
     has_price = bid_data.price_per_kg or bid_data.price_per_lot
     if not has_qty or not has_price:
@@ -1473,6 +1539,10 @@ async def create_bid(
     product = await db.products.find_one({"id": bid_data.product_id, "approval_status": "approved"}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    # Sellers cannot bid on their own products (covers "both" role)
+    if product.get("seller_id") and product.get("seller_id") == current_user.id:
+        raise HTTPException(status_code=403, detail="You cannot bid on your own product.")
 
     if product.get("listing_status") in ("expired", "sold", "archived"):
         raise HTTPException(status_code=400, detail="Bidding is closed for this product")
