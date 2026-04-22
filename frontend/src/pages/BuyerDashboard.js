@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Gavel, ArrowRight, ShoppingBag, Package } from 'lucide-react';
+import { Gavel, ArrowRight, ShoppingBag } from 'lucide-react';
+import { getProductImage } from '../utils/imageHelper';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -194,10 +195,24 @@ const BuyerDashboard = () => {
                       data-testid={`buyer-bid-${b.id}`}
                       className="flex items-center gap-3 p-3 border border-border rounded-xl hover:border-primary/40 transition-colors group"
                     >
-                      {/* Product thumbnail placeholder */}
-                      <div className="w-20 h-20 rounded-xl bg-primary/10 flex flex-col items-center justify-center flex-shrink-0 overflow-hidden">
-                        <span className="text-3xl select-none">🌿</span>
-                      </div>
+                      {/* Product thumbnail */}
+                      {(() => {
+                        const imgSrc = getProductImage({
+                          image_url: b.product_image_url,
+                          media_paths: b.product_media_paths || []
+                        });
+                        return imgSrc ? (
+                          <img
+                            src={imgSrc}
+                            alt={b.product_name}
+                            className="w-20 h-20 rounded-xl object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-3xl select-none">🌿</span>
+                          </div>
+                        );
+                      })()}
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Phone, Mail, MessageCircle, Instagram, LogIn, LogOut, LayoutDashboard, User } from 'lucide-react';
+
+const DARK_GREEN = '#2d5a27';
 import { useAuth } from '../context/AuthContext';
 import LoginModal from './LoginModal';
 
@@ -72,11 +74,12 @@ const Navbar = () => {
                 </Link>
               ))}
               
-              {/* Contact Icons */}
+              {/* Desktop: Phone · WhatsApp · Auth only */}
               <div className="flex items-center gap-2">
                 <a
                   href="tel:+918838226519"
-                  className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-all"
+                  style={{ backgroundColor: DARK_GREEN }}
+                  className="w-10 h-10 rounded-full text-white flex items-center justify-center hover:opacity-85 transition-all"
                   title="Call Us"
                 >
                   <Phone size={16} />
@@ -85,35 +88,21 @@ const Navbar = () => {
                   href="https://wa.me/918838226519"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition-all"
+                  style={{ backgroundColor: DARK_GREEN }}
+                  className="w-10 h-10 rounded-full text-white flex items-center justify-center hover:opacity-85 transition-all"
                   title="WhatsApp"
                 >
                   <MessageCircle size={16} />
                 </a>
-                <a
-                  href="mailto:cardamomspicescentre@gmail.com"
-                  className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-all"
-                  title="Email Us"
-                >
-                  <Mail size={16} />
-                </a>
-                <a
-                  href="https://www.instagram.com/cardamom_spicescentre?igsh=MTFxMGI3N2ZmenB4ZA=="
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 text-white flex items-center justify-center hover:opacity-90 transition-all"
-                  title="Instagram"
-                >
-                  <Instagram size={16} />
-                </a>
-                
+
                 {/* Auth Buttons */}
                 {isAuthenticated ? (
                   <>
                     <Link
                       to={isAdmin ? '/admin' : isSeller ? '/seller' : '/dashboard'}
                       data-testid="nav-dashboard-button"
-                      className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent/90 transition-all"
+                      style={{ backgroundColor: DARK_GREEN }}
+                      className="w-10 h-10 rounded-full text-white flex items-center justify-center hover:opacity-85 transition-all"
                       title="Dashboard"
                     >
                       <LayoutDashboard size={16} />
@@ -121,7 +110,8 @@ const Navbar = () => {
                     <button
                       onClick={handleLogout}
                       data-testid="nav-logout-button"
-                      className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all"
+                      style={{ backgroundColor: DARK_GREEN }}
+                      className="w-10 h-10 rounded-full text-white flex items-center justify-center hover:opacity-85 transition-all"
                       title="Logout"
                     >
                       <LogOut size={16} />
@@ -131,7 +121,8 @@ const Navbar = () => {
                   <button
                     onClick={openLogin}
                     data-testid="nav-login-button"
-                    className="w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent/90 transition-all"
+                    style={{ backgroundColor: DARK_GREEN }}
+                    className="w-10 h-10 rounded-full text-white flex items-center justify-center hover:opacity-85 transition-all"
                     title="Login"
                   >
                     <LogIn size={16} />

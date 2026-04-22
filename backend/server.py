@@ -1336,7 +1336,24 @@ async def get_seller_bids(
             b["created_at"] = datetime.fromisoformat(b["created_at"])
         if isinstance(b.get("updated_at"), str):
             b["updated_at"] = datetime.fromisoformat(b["updated_at"])
-    return [Bid(**b).model_dump() for b in bids]
+
+    # Enrich each bid with product image fields
+    product_ids = list({b["product_id"] for b in bids if b.get("product_id")})
+    products_map = {}
+    if product_ids:
+        product_docs = await db.products.find(
+            {"id": {"$in": product_ids}}, {"_id": 0, "id": 1, "image_url": 1, "media_paths": 1}
+        ).to_list(len(product_ids))
+        products_map = {p["id"]: p for p in product_docs}
+
+    result = []
+    for b in bids:
+        bid_dict = Bid(**b).model_dump()
+        prod = products_map.get(b.get("product_id"), {})
+        bid_dict["product_image_url"] = prod.get("image_url")
+        bid_dict["product_media_paths"] = prod.get("media_paths") or []
+        result.append(bid_dict)
+    return result
 
 # Seller: accept/reject bid on own product
 @api_router.put("/seller/bids/{bid_id}")
@@ -1625,7 +1642,24 @@ async def get_my_bids(current_user: User = Depends(get_current_approved_buyer)):
             b["created_at"] = datetime.fromisoformat(b["created_at"])
         if isinstance(b.get("updated_at"), str):
             b["updated_at"] = datetime.fromisoformat(b["updated_at"])
-    return [Bid(**b).model_dump() for b in bids]
+
+    # Enrich each bid with product image fields
+    product_ids = list({b["product_id"] for b in bids if b.get("product_id")})
+    products_map = {}
+    if product_ids:
+        product_docs = await db.products.find(
+            {"id": {"$in": product_ids}}, {"_id": 0, "id": 1, "image_url": 1, "media_paths": 1}
+        ).to_list(len(product_ids))
+        products_map = {p["id"]: p for p in product_docs}
+
+    result = []
+    for b in bids:
+        bid_dict = Bid(**b).model_dump()
+        prod = products_map.get(b.get("product_id"), {})
+        bid_dict["product_image_url"] = prod.get("image_url")
+        bid_dict["product_media_paths"] = prod.get("media_paths") or []
+        result.append(bid_dict)
+    return result
 
 
 # ==================== FILE UPLOAD & SERVE ====================
