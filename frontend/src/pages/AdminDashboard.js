@@ -47,6 +47,12 @@ const AdminDashboard = () => {
   });
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [loadingLots, setLoadingLots] = useState(false);
+  const [showAddLotForm, setShowAddLotForm] = useState(false);
+  const [addingLot, setAddingLot] = useState(false);
+  const [lotForm, setLotForm] = useState({
+    product_name: '', grade: '6mm to 7mm', quantity_kg: '', number_of_lots: 1,
+    starting_price: '', bid_increment: 10, currency: 'INR', description: ''
+  });
 
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
@@ -334,6 +340,36 @@ const AdminDashboard = () => {
       toast.success('Lot closed!');
       if (selectedEventId) fetchEventLots(selectedEventId);
     } catch { toast.error('Failed to close lot'); }
+  };
+
+  const addAndApproveLot = async (e) => {
+    e.preventDefault();
+    if (!selectedEventId) return;
+    setAddingLot(true);
+    try {
+      const payload = {
+        auction_event_id: selectedEventId,
+        product_name: lotForm.product_name,
+        grade: lotForm.grade,
+        quantity_kg: parseFloat(lotForm.quantity_kg),
+        number_of_lots: parseInt(lotForm.number_of_lots, 10),
+        starting_price: parseFloat(lotForm.starting_price),
+        bid_increment: parseFloat(lotForm.bid_increment),
+        currency: lotForm.currency,
+        description: lotForm.description,
+      };
+      const res = await axios.post(`${API_URL}/api/auction/lots`, payload, authHeaders);
+      const newLot = res.data;
+      await axios.patch(`${API_URL}/api/auction/lots/${newLot.id}/approve`, {}, authHeaders);
+      toast.success('Lot added and approved! ✅');
+      setLotForm({ product_name: '', grade: '6mm to 7mm', quantity_kg: '', number_of_lots: 1, starting_price: '', bid_increment: 10, currency: 'INR', description: '' });
+      setShowAddLotForm(false);
+      fetchEventLots(selectedEventId);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to add lot');
+    } finally {
+      setAddingLot(false);
+    }
   };
 
   const tabs = [
@@ -1093,33 +1129,171 @@ const AdminDashboard = () => {
                 </div>
 
                 {/* ── Section 3: Lot Management ── */}
-                {selectedEventId && (
-                  <div>
-                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                      <Gavel size={16} className="text-primary" />
-                      Lots for: {auctionEvents.find(e => e.id === selectedEventId)?.title}
-                    </h3>
-                    {loadingLots ? (
-                      <div className="text-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" /></div>
-                    ) : eventLots.length === 0 ? (
-                      <p className="text-muted-foreground text-sm py-4 text-center">No lots registered yet</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {eventLots.map(lot => {
-                          const lotStatusColor = {
-                            registered: 'bg-yellow-100 text-yellow-700',
-                            approved: 'bg-blue-100 text-blue-700',
-                            live: 'bg-red-100 text-red-700',
-                            sold: 'bg-green-100 text-green-700',
-                            unsold: 'bg-gray-100 text-gray-500',
-                          };
-                          const selectedEvent = auctionEvents.find(e => e.id === selectedEventId);
-                          return (
+                {selectedEventId && (() => {
+                  const selectedEvent = auctionEvents.find(e => e.id === selectedEventId);
+                  const lotStatusColor = {
+                    registered: 'bg-yellow-100 text-yellow-700',
+                    approved:   'bg-blue-100 text-blue-700',
+                    live:       'bg-red-100 text-red-700',
+                    sold:       'bg-green-100 text-green-700',
+                    unsold:     'bg-gray-100 text-gray-500',
+                  };
+
+                  return (
+                    <div>
+                      {/* Header row */}
+                      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                        <h3 className="font-semibold text-foreground flex items-center gap-2">
+                          <Gavel size={16} className="text-primary" />
+                          Lots for: <span className="text-primary">{selectedEvent?.title}</span>
+                        </h3>
+                        <button
+                          onClick={() => setShowAddLotForm(v => !v)}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border-2 border-green-600 text-green-700 text-sm font-semibold hover:bg-green-50 transition-colors"
+                        >
+                          <Plus size={15} />
+                          {showAddLotForm ? 'Cancel' : 'Add New Lot'}
+                        </button>
+                      </div>
+
+                      {/* ── Collapsible Add Lot Form ── */}
+                      {showAddLotForm && (
+                        <form onSubmit={addAndApproveLot} className="border-2 border-green-200 bg-green-50/40 rounded-xl p-5 mb-5 space-y-4">
+                          <p className="text-xs font-semibold text-green-800 uppercase tracking-wide">New Lot — will be auto-approved</p>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-medium text-foreground mb-1">Product Name *</label>
+                              <input
+                                required
+                                value={lotForm.product_name}
+                                onChange={e => setLotForm({...lotForm, product_name: e.target.value})}
+                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                                placeholder="Green Cardamom"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-foreground mb-1">Grade *</label>
+                              <select
+                                required
+                                value={lotForm.grade}
+                                onChange={e => setLotForm({...lotForm, grade: e.target.value})}
+                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                              >
+                                <option>6mm to 7mm</option>
+                                <option>7mm to 8mm</option>
+                                <option>8mm &amp; Above</option>
+                                <option>Bulk</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-foreground mb-1">Quantity (kg) *</label>
+                              <input
+                                required type="number" min="1" step="0.01"
+                                value={lotForm.quantity_kg}
+                                onChange={e => setLotForm({...lotForm, quantity_kg: e.target.value})}
+                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                                placeholder="100"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-foreground mb-1">Number of Lots</label>
+                              <input
+                                type="number" min="1"
+                                value={lotForm.number_of_lots}
+                                onChange={e => setLotForm({...lotForm, number_of_lots: e.target.value})}
+                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-foreground mb-1">Starting Price / kg *</label>
+                              <input
+                                required type="number" min="1" step="0.01"
+                                value={lotForm.starting_price}
+                                onChange={e => setLotForm({...lotForm, starting_price: e.target.value})}
+                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                                placeholder="2500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-foreground mb-1">Bid Increment</label>
+                              <input
+                                type="number" min="1" step="1"
+                                value={lotForm.bid_increment}
+                                onChange={e => setLotForm({...lotForm, bid_increment: e.target.value})}
+                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Currency toggle */}
+                          <div>
+                            <label className="block text-xs font-medium text-foreground mb-1">Currency</label>
+                            <div className="flex gap-2">
+                              {['INR', 'USD'].map(c => (
+                                <button
+                                  key={c} type="button"
+                                  onClick={() => setLotForm({...lotForm, currency: c})}
+                                  className={`px-5 py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                                    lotForm.currency === c
+                                      ? 'bg-green-600 text-white border-green-600'
+                                      : 'bg-white text-foreground border-border hover:border-green-400'
+                                  }`}
+                                >
+                                  {c}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-foreground mb-1">Description (optional)</label>
+                            <textarea
+                              rows={2}
+                              value={lotForm.description}
+                              onChange={e => setLotForm({...lotForm, description: e.target.value})}
+                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-white"
+                              placeholder="Extra details about this lot…"
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={addingLot}
+                            className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                          >
+                            <CheckCircle size={16} />
+                            {addingLot ? 'Adding…' : 'Add & Approve Lot'}
+                          </button>
+                        </form>
+                      )}
+
+                      {/* ── Lots list ── */}
+                      {loadingLots ? (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+                        </div>
+                      ) : eventLots.length === 0 ? (
+                        <div className="text-center py-10 text-muted-foreground text-sm">
+                          No lots yet — use "Add New Lot" above to get started.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {eventLots.map(lot => (
                             <div key={lot.id} className="border border-border rounded-xl p-4">
                               <div className="flex flex-wrap items-start justify-between gap-3">
+
+                                {/* Left: lot info */}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                    <span className="text-xs text-muted-foreground font-mono">LOT {lot.lot_number}</span>
+                                    <span className="text-[10px] font-bold text-white bg-gray-500 px-2 py-0.5 rounded-full font-mono">
+                                      LOT {lot.lot_number}
+                                    </span>
                                     <h4 className="font-semibold text-foreground">{lot.product_name}</h4>
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${lotStatusColor[lot.lot_status] || 'bg-gray-100 text-gray-500'}`}>
                                       {lot.lot_status}
@@ -1129,7 +1303,7 @@ const AdminDashboard = () => {
                                     {lot.grade} · {lot.quantity_kg} kg · Starting: {lot.currency} {lot.starting_price?.toLocaleString('en-IN')}/kg
                                   </p>
                                   <p className="text-xs text-muted-foreground">
-                                    Seller: <span className="font-medium text-foreground">{lot.seller_name}</span>
+                                    Seller: <span className="font-medium text-foreground">{lot.seller_name || 'Admin'}</span>
                                     {lot.seller_company ? ` · ${lot.seller_company}` : ''}
                                   </p>
                                   {lot.lot_status === 'live' && (
@@ -1144,11 +1318,13 @@ const AdminDashboard = () => {
                                     </p>
                                   )}
                                 </div>
+
+                                {/* Right: action buttons */}
                                 <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                                   {lot.lot_status === 'registered' && (
                                     <button onClick={() => approveLot(lot.id)}
                                       className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors inline-flex items-center gap-1">
-                                      <CheckCircle size={13} /> Approve Lot
+                                      <CheckCircle size={13} /> Approve
                                     </button>
                                   )}
                                   {lot.lot_status === 'approved' && selectedEvent?.status === 'live' && (
@@ -1166,12 +1342,12 @@ const AdminDashboard = () => {
                                 </div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
               </div>
             )}
