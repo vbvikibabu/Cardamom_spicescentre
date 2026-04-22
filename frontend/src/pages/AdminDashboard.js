@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, Film, Gavel, ChevronDown, ChevronUp, Tag, Scale, Clock } from 'lucide-react';
+import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, Film, Gavel, ChevronDown, ChevronUp, Tag, Scale, Clock, Radio } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -37,9 +37,21 @@ const AdminDashboard = () => {
   // Bid response state
   const [bidNotes, setBidNotes] = useState({});
 
+  // Auction state
+  const [auctionEvents, setAuctionEvents] = useState([]);
+  const [selectedEventId, setSelectedEventId] = useState(null);
+  const [eventLots, setEventLots] = useState([]);
+  const [auctionForm, setAuctionForm] = useState({
+    title: '', description: '', location: '', agent_name: '', agent_phone: '',
+    auction_date: '', registration_deadline: ''
+  });
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [loadingLots, setLoadingLots] = useState(false);
+
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (activeTab === 'auctions') fetchAuctionEvents(); }, [activeTab]);
 
   const fetchData = async () => {
     try {
@@ -263,11 +275,73 @@ const AdminDashboard = () => {
     );
   }
 
+  // ─── Auction Actions ───
+  const fetchAuctionEvents = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/auction/events`, authHeaders);
+      setAuctionEvents(res.data);
+    } catch { toast.error('Failed to load auction events'); }
+  };
+
+  const fetchEventLots = async (eventId) => {
+    setLoadingLots(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/auction/events/${eventId}/lots`, authHeaders);
+      setEventLots(res.data);
+    } catch { toast.error('Failed to load lots'); }
+    finally { setLoadingLots(false); }
+  };
+
+  const createAuctionEvent = async (e) => {
+    e.preventDefault();
+    setCreatingEvent(true);
+    try {
+      await axios.post(`${API_URL}/api/auction/events`, auctionForm, authHeaders);
+      toast.success('Auction event created!');
+      setAuctionForm({ title: '', description: '', location: '', agent_name: '', agent_phone: '', auction_date: '', registration_deadline: '' });
+      fetchAuctionEvents();
+    } catch (err) { toast.error(err.response?.data?.detail || 'Failed to create event'); }
+    finally { setCreatingEvent(false); }
+  };
+
+  const updateEventStatus = async (eventId, status) => {
+    try {
+      await axios.patch(`${API_URL}/api/auction/events/${eventId}/status?status=${status}`, {}, authHeaders);
+      toast.success(`Event status → ${status}`);
+      fetchAuctionEvents();
+    } catch { toast.error('Failed to update status'); }
+  };
+
+  const approveLot = async (lotId) => {
+    try {
+      await axios.patch(`${API_URL}/api/auction/lots/${lotId}/approve`, {}, authHeaders);
+      toast.success('Lot approved!');
+      if (selectedEventId) fetchEventLots(selectedEventId);
+    } catch { toast.error('Failed to approve lot'); }
+  };
+
+  const startLot = async (lotId) => {
+    try {
+      await axios.post(`${API_URL}/api/auction/lots/${lotId}/start`, {}, authHeaders);
+      toast.success('Bidding started!');
+      if (selectedEventId) fetchEventLots(selectedEventId);
+    } catch (err) { toast.error(err.response?.data?.detail || 'Failed to start lot'); }
+  };
+
+  const closeLot = async (lotId) => {
+    try {
+      await axios.post(`${API_URL}/api/auction/lots/${lotId}/close`, {}, authHeaders);
+      toast.success('Lot closed!');
+      if (selectedEventId) fetchEventLots(selectedEventId);
+    } catch { toast.error('Failed to close lot'); }
+  };
+
   const tabs = [
     { key: 'users', label: 'Users' },
     { key: 'pending-products', label: `Pending Products (${products.filter(p => p.approval_status === 'pending').length})` },
     { key: 'bids', label: 'Bids' },
-    { key: 'products', label: 'All Products' }
+    { key: 'products', label: 'All Products' },
+    { key: 'auctions', label: 'Auctions' },
   ];
 
   return (
@@ -891,6 +965,214 @@ const AdminDashboard = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* ═══ AUCTIONS TAB ═══ */}
+            {activeTab === 'auctions' && (
+              <div className="space-y-8">
+
+                {/* ── Section 1: Create Event ── */}
+                <div>
+                  <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Radio size={16} className="text-primary" /> Create Auction Event
+                  </h3>
+                  <form onSubmit={createAuctionEvent} className="border border-border rounded-xl p-5 bg-muted/30 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Title *</label>
+                        <input required value={auctionForm.title} onChange={e => setAuctionForm({...auctionForm, title: e.target.value})}
+                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                          placeholder="Bodinayakanur Cardamom Auction — June 2026" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Location *</label>
+                        <input required value={auctionForm.location} onChange={e => setAuctionForm({...auctionForm, location: e.target.value})}
+                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                          placeholder="Bodinayakanur / Thevaram" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Agent Name *</label>
+                        <input required value={auctionForm.agent_name} onChange={e => setAuctionForm({...auctionForm, agent_name: e.target.value})}
+                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                          placeholder="Agent / Auctioneer name" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Agent Phone *</label>
+                        <input required value={auctionForm.agent_phone} onChange={e => setAuctionForm({...auctionForm, agent_phone: e.target.value})}
+                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                          placeholder="+91 98765 43210" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Auction Date & Time *</label>
+                        <input required type="datetime-local" value={auctionForm.auction_date} onChange={e => setAuctionForm({...auctionForm, auction_date: e.target.value})}
+                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Registration Deadline *</label>
+                        <input required type="datetime-local" value={auctionForm.registration_deadline} onChange={e => setAuctionForm({...auctionForm, registration_deadline: e.target.value})}
+                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Description *</label>
+                      <textarea required rows={2} value={auctionForm.description} onChange={e => setAuctionForm({...auctionForm, description: e.target.value})}
+                        className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none bg-white"
+                        placeholder="Live auction details, rules, etc." />
+                    </div>
+                    <button type="submit" disabled={creatingEvent}
+                      className="bg-primary text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2">
+                      {creatingEvent ? 'Creating...' : <><Radio size={15} /> Create Auction Event</>}
+                    </button>
+                  </form>
+                </div>
+
+                {/* ── Section 2: Existing Events ── */}
+                <div>
+                  <h3 className="font-semibold text-foreground mb-4">Auction Events</h3>
+                  {auctionEvents.length === 0 ? (
+                    <p className="text-muted-foreground text-sm py-4 text-center">No events created yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {auctionEvents.map(ev => {
+                        const statusColors = {
+                          upcoming: 'bg-blue-100 text-blue-700',
+                          registration_open: 'bg-green-100 text-green-700',
+                          live: 'bg-red-100 text-red-700',
+                          completed: 'bg-gray-100 text-gray-500',
+                          cancelled: 'bg-gray-100 text-gray-400',
+                        };
+                        const nextStatuses = {
+                          upcoming: ['registration_open', 'cancelled'],
+                          registration_open: ['live', 'upcoming', 'cancelled'],
+                          live: ['completed', 'cancelled'],
+                          completed: [],
+                          cancelled: [],
+                        };
+                        return (
+                          <div key={ev.id} className="border border-border rounded-xl p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <h4 className="font-semibold text-foreground">{ev.title}</h4>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColors[ev.status] || 'bg-gray-100 text-gray-500'}`}>
+                                    {ev.status.replace('_', ' ')}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  📍 {ev.location} · 👤 {ev.agent_name} · 📅 {new Date(ev.auction_date).toLocaleString('en-IN')}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                                {nextStatuses[ev.status]?.map(s => (
+                                  <button key={s} onClick={() => updateEventStatus(ev.id, s)}
+                                    className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-xs font-semibold hover:bg-muted/80 transition-colors capitalize">
+                                    → {s.replace('_', ' ')}
+                                  </button>
+                                ))}
+                                <button
+                                  onClick={() => {
+                                    setSelectedEventId(ev.id);
+                                    fetchEventLots(ev.id);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                    selectedEventId === ev.id
+                                      ? 'bg-primary text-white'
+                                      : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                  }`}
+                                >
+                                  Manage Lots →
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Section 3: Lot Management ── */}
+                {selectedEventId && (
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <Gavel size={16} className="text-primary" />
+                      Lots for: {auctionEvents.find(e => e.id === selectedEventId)?.title}
+                    </h3>
+                    {loadingLots ? (
+                      <div className="text-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" /></div>
+                    ) : eventLots.length === 0 ? (
+                      <p className="text-muted-foreground text-sm py-4 text-center">No lots registered yet</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {eventLots.map(lot => {
+                          const lotStatusColor = {
+                            registered: 'bg-yellow-100 text-yellow-700',
+                            approved: 'bg-blue-100 text-blue-700',
+                            live: 'bg-red-100 text-red-700',
+                            sold: 'bg-green-100 text-green-700',
+                            unsold: 'bg-gray-100 text-gray-500',
+                          };
+                          const selectedEvent = auctionEvents.find(e => e.id === selectedEventId);
+                          return (
+                            <div key={lot.id} className="border border-border rounded-xl p-4">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                    <span className="text-xs text-muted-foreground font-mono">LOT {lot.lot_number}</span>
+                                    <h4 className="font-semibold text-foreground">{lot.product_name}</h4>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${lotStatusColor[lot.lot_status] || 'bg-gray-100 text-gray-500'}`}>
+                                      {lot.lot_status}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {lot.grade} · {lot.quantity_kg} kg · Starting: {lot.currency} {lot.starting_price?.toLocaleString('en-IN')}/kg
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Seller: <span className="font-medium text-foreground">{lot.seller_name}</span>
+                                    {lot.seller_company ? ` · ${lot.seller_company}` : ''}
+                                  </p>
+                                  {lot.lot_status === 'live' && (
+                                    <p className="text-xs text-green-700 font-semibold mt-1">
+                                      Current bid: {lot.currency} {lot.current_price?.toLocaleString('en-IN')}/kg
+                                      {lot.current_winner_name ? ` — ${lot.current_winner_name}` : ''}
+                                    </p>
+                                  )}
+                                  {lot.lot_status === 'sold' && (
+                                    <p className="text-xs text-green-700 font-semibold mt-1">
+                                      SOLD: {lot.currency} {lot.sold_price?.toLocaleString('en-IN')}/kg to {lot.current_winner_name}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                                  {lot.lot_status === 'registered' && (
+                                    <button onClick={() => approveLot(lot.id)}
+                                      className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors inline-flex items-center gap-1">
+                                      <CheckCircle size={13} /> Approve Lot
+                                    </button>
+                                  )}
+                                  {lot.lot_status === 'approved' && selectedEvent?.status === 'live' && (
+                                    <button onClick={() => startLot(lot.id)}
+                                      className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors inline-flex items-center gap-1">
+                                      <Radio size={13} /> Start Bidding
+                                    </button>
+                                  )}
+                                  {lot.lot_status === 'live' && (
+                                    <button onClick={() => closeLot(lot.id)}
+                                      className="px-3 py-1.5 bg-gray-700 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 transition-colors inline-flex items-center gap-1">
+                                      <XCircle size={13} /> Close Lot
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
             )}
           </div>

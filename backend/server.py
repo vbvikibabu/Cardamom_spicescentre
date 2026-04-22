@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response, RedirectResponse
 from dotenv import load_dotenv
@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator
 import re
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Set
 import uuid
 from datetime import datetime, timezone, timedelta
 import aiosmtplib
@@ -48,6 +48,7 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 SOLD_DISPLAY_MINUTES = int(os.environ.get("SOLD_DISPLAY_MINUTES", "30"))
 BID_TIMER_EXTENSION_HOURS = int(os.environ.get("BID_TIMER_EXTENSION_HOURS", "2"))
+AUCTION_BID_WINDOW_SECONDS = int(os.environ.get("AUCTION_BID_WINDOW_SECONDS", "30"))
 MAX_TIMER_EXTENSIONS = int(os.environ.get("MAX_TIMER_EXTENSIONS", "2"))
 
 security = HTTPBearer(auto_error=False)
@@ -265,9 +266,163 @@ async def background_timer_check():
             await _check_expired_products()
             await _archive_sold_products()
             await _check_timer_warnings()
+            await _check_auction_lots()
         except Exception as e:
             logger.warning(f"Background timer error: {e}")
         await asyncio.sleep(60)
+
+
+# ==================== AUCTION MODELS ====================
+class AuctionEvent(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    description: str
+    location: str
+    agent_name: str
+    agent_phone: str
+    auction_date: datetime
+    registration_deadline: datetime
+    status: Literal["upcoming", "registration_open", "live", "completed", "cancelled"] = "upcoming"
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AuctionEventCreate(BaseModel):
+    title: str
+    description: str
+    location: str
+    agent_name: str
+    agent_phone: str
+    auction_date: datetime
+    registration_deadline: datetime
+
+class AuctionLot(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    auction_event_id: str
+    seller_id: str
+    seller_name: str
+    seller_company: str
+    lot_number: int = 0
+    product_name: str
+    grade: str
+    quantity_kg: float
+    number_of_lots: int = 1
+    starting_price: float
+    bid_increment: float = 10.0
+    currency: Literal["INR", "USD"] = "INR"
+    current_price: float = 0.0
+    current_winner_id: Optional[str] = None
+    current_winner_name: Optional[str] = None
+    current_winner_company: Optional[str] = None
+    lot_status: Literal["registered", "approved", "live", "sold", "unsold"] = "registered"
+    media_paths: List[str] = Field(default_factory=list)
+    description: str = ""
+    auction_end_time: Optional[datetime] = None
+    sold_at: Optional[datetime] = None
+    sold_price: Optional[float] = None
+    total_bids: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AuctionLotCreate(BaseModel):
+    auction_event_id: str
+    product_name: str
+    grade: str
+    quantity_kg: float
+    number_of_lots: int = 1
+    starting_price: float
+    bid_increment: float = 10.0
+    currency: Literal["INR", "USD"] = "INR"
+    description: str = ""
+    media_paths: List[str] = Field(default_factory=list)
+
+class AuctionBidPlace(BaseModel):
+    bid_amount: float
+
+
+# ==================== AUCTION WEBSOCKET MANAGER ====================
+class AuctionConnectionManager:
+    def __init__(self):
+        self.lot_connections: Dict[str, Set[WebSocket]] = {}
+
+    async def connect(self, lot_id: str, websocket: WebSocket):
+        await websocket.accept()
+        if lot_id not in self.lot_connections:
+            self.lot_connections[lot_id] = set()
+        self.lot_connections[lot_id].add(websocket)
+
+    def disconnect(self, lot_id: str, websocket: WebSocket):
+        if lot_id in self.lot_connections:
+            self.lot_connections[lot_id].discard(websocket)
+            if not self.lot_connections[lot_id]:
+                del self.lot_connections[lot_id]
+
+    async def broadcast_to_lot(self, lot_id: str, message: dict):
+        if lot_id not in self.lot_connections:
+            return
+        dead = set()
+        for ws in self.lot_connections[lot_id].copy():
+            try:
+                await ws.send_json(message)
+            except Exception:
+                dead.add(ws)
+        for ws in dead:
+            self.lot_connections[lot_id].discard(ws)
+
+    def get_viewer_count(self, lot_id: str) -> int:
+        return len(self.lot_connections.get(lot_id, set()))
+
+auction_manager = AuctionConnectionManager()
+
+
+# ==================== AUCTION BACKGROUND CHECK ====================
+async def _check_auction_lots():
+    """Close live auction lots when their timer expires."""
+    live_lots = await db.auction_lots.find(
+        {"lot_status": "live"}, {"_id": 0}
+    ).to_list(100)
+
+    for lot in live_lots:
+        end_time_str = lot.get("auction_end_time")
+        if not end_time_str:
+            continue
+        end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+
+        if now >= end_time:
+            if lot.get("current_winner_id"):
+                sold_price = lot["current_price"]
+                await db.auction_lots.update_one(
+                    {"id": lot["id"]},
+                    {"$set": {"lot_status": "sold", "sold_price": sold_price, "sold_at": now.isoformat()}}
+                )
+                await auction_manager.broadcast_to_lot(lot["id"], {
+                    "type": "lot_sold",
+                    "lot_id": lot["id"],
+                    "final_price": sold_price,
+                    "winner_name": lot.get("current_winner_name"),
+                    "winner_company": lot.get("current_winner_company"),
+                    "product_name": lot["product_name"]
+                })
+                logger.info(f"Auction lot SOLD: {lot['id']} at {sold_price}")
+            else:
+                await db.auction_lots.update_one(
+                    {"id": lot["id"]}, {"$set": {"lot_status": "unsold"}}
+                )
+                await auction_manager.broadcast_to_lot(lot["id"], {
+                    "type": "lot_unsold",
+                    "lot_id": lot["id"],
+                    "product_name": lot["product_name"]
+                })
+
+        elif (end_time - now).total_seconds() <= 10:
+            secs = int((end_time - now).total_seconds())
+            await auction_manager.broadcast_to_lot(lot["id"], {
+                "type": "timer_warning",
+                "lot_id": lot["id"],
+                "seconds_remaining": secs,
+                "message": "Going once..." if secs > 5 else "Going twice..."
+            })
 
 
 # ==================== APP ====================
@@ -1799,8 +1954,291 @@ async def _notify_bid_update(bid: dict, status: str, notes: str = None):
     asyncio.create_task(_email_bid_update_to_buyer(bid, status, notes))
 
 
+# ==================== AUCTION ROUTES ====================
+
+@api_router.post("/auction/events", response_model=AuctionEvent)
+async def create_auction_event(data: AuctionEventCreate, admin: User = Depends(get_current_admin)):
+    event = AuctionEvent(**data.model_dump(), created_by=admin.id)
+    doc = event.model_dump()
+    doc["auction_date"] = doc["auction_date"].isoformat()
+    doc["registration_deadline"] = doc["registration_deadline"].isoformat()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.auction_events.insert_one(doc)
+    logger.info(f"Auction event created: {event.title}")
+    return event
+
+@api_router.get("/auction/events")
+async def get_auction_events(status: Optional[str] = None):
+    query = {}
+    if status:
+        query["status"] = status
+    events = await db.auction_events.find(query, {"_id": 0}).sort("auction_date", 1).to_list(100)
+    return events
+
+@api_router.get("/auction/events/upcoming")
+async def get_upcoming_auctions():
+    events = await db.auction_events.find(
+        {"status": {"$in": ["upcoming", "registration_open", "live"]}}, {"_id": 0}
+    ).sort("auction_date", 1).to_list(20)
+    return events
+
+@api_router.get("/auction/events/{event_id}")
+async def get_auction_event(event_id: str):
+    event = await db.auction_events.find_one({"id": event_id}, {"_id": 0})
+    if not event:
+        raise HTTPException(404, "Event not found")
+    lots = await db.auction_lots.find(
+        {"auction_event_id": event_id, "lot_status": {"$in": ["approved", "live", "sold", "unsold"]}},
+        {"_id": 0}
+    ).sort("lot_number", 1).to_list(100)
+    return {"event": event, "lots": lots}
+
+@api_router.patch("/auction/events/{event_id}/status")
+async def update_auction_event_status(event_id: str, status: str, admin: User = Depends(get_current_admin)):
+    result = await db.auction_events.update_one({"id": event_id}, {"$set": {"status": status}})
+    if result.matched_count == 0:
+        raise HTTPException(404, "Event not found")
+    return {"message": f"Event status updated to {status}"}
+
+@api_router.post("/auction/lots", response_model=AuctionLot)
+async def register_auction_lot(data: AuctionLotCreate, current_user: User = Depends(get_current_user)):
+    if current_user.status != "approved":
+        raise HTTPException(403, "Account not approved")
+    if current_user.role not in ["seller", "both", "admin"]:
+        raise HTTPException(403, "Sellers only")
+    event = await db.auction_events.find_one({"id": data.auction_event_id})
+    if not event:
+        raise HTTPException(404, "Event not found")
+    if event["status"] not in ["upcoming", "registration_open"]:
+        raise HTTPException(400, "Registration closed for this event")
+    lot_count = await db.auction_lots.count_documents({"auction_event_id": data.auction_event_id})
+    lot = AuctionLot(
+        **data.model_dump(),
+        seller_id=current_user.id,
+        seller_name=current_user.full_name,
+        seller_company=current_user.company_name or "",
+        lot_number=lot_count + 1,
+        current_price=data.starting_price,
+    )
+    doc = lot.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.auction_lots.insert_one(doc)
+    logger.info(f"Lot registered: {lot.product_name} by {current_user.full_name}")
+    return lot
+
+@api_router.get("/auction/lots/my")
+async def get_my_auction_lots(current_user: User = Depends(get_current_user)):
+    lots = await db.auction_lots.find({"seller_id": current_user.id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return lots
+
+@api_router.get("/auction/events/{event_id}/lots")
+async def get_event_lots(event_id: str, admin: User = Depends(get_current_admin)):
+    lots = await db.auction_lots.find({"auction_event_id": event_id}, {"_id": 0}).sort("lot_number", 1).to_list(200)
+    return lots
+
+@api_router.patch("/auction/lots/{lot_id}/approve")
+async def approve_auction_lot(lot_id: str, admin: User = Depends(get_current_admin)):
+    result = await db.auction_lots.update_one({"id": lot_id}, {"$set": {"lot_status": "approved"}})
+    if result.matched_count == 0:
+        raise HTTPException(404, "Lot not found")
+    return {"message": "Lot approved"}
+
+@api_router.post("/auction/lots/{lot_id}/start")
+async def start_auction_lot(lot_id: str, admin: User = Depends(get_current_admin)):
+    lot = await db.auction_lots.find_one({"id": lot_id}, {"_id": 0})
+    if not lot:
+        raise HTTPException(404, "Lot not found")
+    if lot["lot_status"] != "approved":
+        raise HTTPException(400, "Lot must be approved before starting")
+    end_time = datetime.now(timezone.utc) + timedelta(seconds=AUCTION_BID_WINDOW_SECONDS)
+    await db.auction_lots.update_one(
+        {"id": lot_id},
+        {"$set": {"lot_status": "live", "auction_end_time": end_time.isoformat(), "current_price": lot["starting_price"]}}
+    )
+    await auction_manager.broadcast_to_lot(lot_id, {
+        "type": "lot_started",
+        "lot_id": lot_id,
+        "product_name": lot["product_name"],
+        "grade": lot["grade"],
+        "quantity_kg": lot["quantity_kg"],
+        "starting_price": lot["starting_price"],
+        "current_price": lot["starting_price"],
+        "bid_increment": lot["bid_increment"],
+        "currency": lot["currency"],
+        "end_time": end_time.isoformat(),
+        "seconds_remaining": AUCTION_BID_WINDOW_SECONDS,
+        "viewer_count": auction_manager.get_viewer_count(lot_id)
+    })
+    logger.info(f"Auction lot started: {lot_id}")
+    return {"message": "Lot started", "end_time": end_time.isoformat()}
+
+@api_router.post("/auction/lots/{lot_id}/close")
+async def force_close_lot(lot_id: str, admin: User = Depends(get_current_admin)):
+    lot = await db.auction_lots.find_one({"id": lot_id}, {"_id": 0})
+    if not lot:
+        raise HTTPException(404, "Lot not found")
+    status = "sold" if lot.get("current_winner_id") else "unsold"
+    sold_price = lot["current_price"] if status == "sold" else None
+    await db.auction_lots.update_one(
+        {"id": lot_id},
+        {"$set": {"lot_status": status, "sold_price": sold_price, "sold_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    await auction_manager.broadcast_to_lot(lot_id, {
+        "type": "lot_sold" if status == "sold" else "lot_unsold",
+        "lot_id": lot_id,
+        "final_price": sold_price,
+        "winner_name": lot.get("current_winner_name"),
+        "winner_company": lot.get("current_winner_company"),
+        "product_name": lot["product_name"]
+    })
+    return {"message": f"Lot closed as {status}"}
+
+@api_router.post("/auction/lots/{lot_id}/bid")
+async def place_auction_bid(lot_id: str, bid_data: AuctionBidPlace, current_user: User = Depends(get_current_user)):
+    if current_user.status != "approved":
+        raise HTTPException(403, "Account not approved")
+    if current_user.role == "seller":
+        raise HTTPException(403, "Pure sellers cannot bid")
+    lot = await db.auction_lots.find_one({"id": lot_id}, {"_id": 0})
+    if not lot:
+        raise HTTPException(404, "Lot not found")
+    if lot["lot_status"] != "live":
+        raise HTTPException(400, "This lot is not currently live")
+    if lot.get("seller_id") == current_user.id:
+        raise HTTPException(403, "Cannot bid on your own lot")
+    end_time_str = lot.get("auction_end_time")
+    if end_time_str:
+        end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+        if datetime.now(timezone.utc) > end_time:
+            raise HTTPException(400, "Bidding time has expired")
+    min_bid = lot["current_price"] + lot["bid_increment"]
+    if bid_data.bid_amount < min_bid:
+        raise HTTPException(400, f"Bid must be at least {lot['currency']} {min_bid:.0f}/kg (increment: {lot['bid_increment']:.0f})")
+    new_end_time = datetime.now(timezone.utc) + timedelta(seconds=AUCTION_BID_WINDOW_SECONDS)
+    await db.auction_lots.update_one(
+        {"id": lot_id},
+        {
+            "$set": {
+                "current_price": bid_data.bid_amount,
+                "current_winner_id": current_user.id,
+                "current_winner_name": current_user.full_name,
+                "current_winner_company": current_user.company_name or "",
+                "auction_end_time": new_end_time.isoformat()
+            },
+            "$inc": {"total_bids": 1}
+        }
+    )
+    bid_record = {
+        "id": str(uuid.uuid4()),
+        "lot_id": lot_id,
+        "auction_event_id": lot["auction_event_id"],
+        "bidder_id": current_user.id,
+        "bidder_name": current_user.full_name,
+        "bidder_company": current_user.company_name or "",
+        "bid_amount": bid_data.bid_amount,
+        "currency": lot["currency"],
+        "bid_time": datetime.now(timezone.utc).isoformat()
+    }
+    await db.auction_bids.insert_one(bid_record)
+    await auction_manager.broadcast_to_lot(lot_id, {
+        "type": "bid_update",
+        "lot_id": lot_id,
+        "current_price": bid_data.bid_amount,
+        "current_winner": current_user.full_name,
+        "current_winner_company": current_user.company_name or "",
+        "min_next_bid": bid_data.bid_amount + lot["bid_increment"],
+        "bid_increment": lot["bid_increment"],
+        "currency": lot["currency"],
+        "end_time": new_end_time.isoformat(),
+        "seconds_remaining": AUCTION_BID_WINDOW_SECONDS,
+        "total_bids": lot["total_bids"] + 1,
+        "bidder_display": current_user.full_name[:3] + "***",
+        "viewer_count": auction_manager.get_viewer_count(lot_id)
+    })
+    logger.info(f"Auction bid: {current_user.full_name} bid {bid_data.bid_amount} on {lot_id}")
+    return {"message": "Bid placed successfully", "current_price": bid_data.bid_amount, "end_time": new_end_time.isoformat()}
+
+@api_router.get("/auction/lots/{lot_id}/live")
+async def get_lot_live_status(lot_id: str):
+    lot = await db.auction_lots.find_one({"id": lot_id}, {"_id": 0})
+    if not lot:
+        raise HTTPException(404, "Lot not found")
+    seconds_remaining = 0
+    if lot.get("auction_end_time") and lot["lot_status"] == "live":
+        end_time = datetime.fromisoformat(lot["auction_end_time"].replace("Z", "+00:00"))
+        diff = (end_time - datetime.now(timezone.utc)).total_seconds()
+        seconds_remaining = max(0, int(diff))
+    recent_bids = await db.auction_bids.find({"lot_id": lot_id}, {"_id": 0}).sort("bid_time", -1).to_list(10)
+    return {
+        "lot_id": lot_id,
+        "lot_status": lot["lot_status"],
+        "product_name": lot["product_name"],
+        "grade": lot["grade"],
+        "quantity_kg": lot["quantity_kg"],
+        "starting_price": lot["starting_price"],
+        "current_price": lot["current_price"],
+        "current_winner": lot.get("current_winner_name", "No bids yet"),
+        "current_winner_company": lot.get("current_winner_company", ""),
+        "min_next_bid": lot["current_price"] + lot["bid_increment"],
+        "bid_increment": lot["bid_increment"],
+        "currency": lot["currency"],
+        "seconds_remaining": seconds_remaining,
+        "end_time": lot.get("auction_end_time"),
+        "total_bids": lot.get("total_bids", 0),
+        "viewer_count": auction_manager.get_viewer_count(lot_id),
+        "recent_bids": [
+            {"bidder": b["bidder_name"][:3] + "***", "company": b["bidder_company"], "amount": b["bid_amount"], "time": b["bid_time"]}
+            for b in recent_bids
+        ]
+    }
+
+@api_router.get("/auction/lots/{lot_id}/bids")
+async def get_lot_bid_history(lot_id: str):
+    bids = await db.auction_bids.find({"lot_id": lot_id}, {"_id": 0}).sort("bid_time", -1).to_list(50)
+    return bids
+
+
 # ==================== APP SETUP ====================
 app.include_router(api_router)
+
+
+# ── WebSocket must be on app directly (not api_router) ──
+@app.websocket("/ws/auction/{lot_id}")
+async def auction_websocket(websocket: WebSocket, lot_id: str):
+    await auction_manager.connect(lot_id, websocket)
+    lot = await db.auction_lots.find_one({"id": lot_id}, {"_id": 0})
+    if lot:
+        seconds_remaining = 0
+        if lot.get("auction_end_time") and lot["lot_status"] == "live":
+            end_time = datetime.fromisoformat(lot["auction_end_time"].replace("Z", "+00:00"))
+            diff = (end_time - datetime.now(timezone.utc)).total_seconds()
+            seconds_remaining = max(0, int(diff))
+        await websocket.send_json({
+            "type": "connected",
+            "lot_id": lot_id,
+            "lot_status": lot["lot_status"],
+            "product_name": lot["product_name"],
+            "current_price": lot["current_price"],
+            "seconds_remaining": seconds_remaining,
+            "viewer_count": auction_manager.get_viewer_count(lot_id)
+        })
+        await auction_manager.broadcast_to_lot(lot_id, {
+            "type": "viewer_update",
+            "viewer_count": auction_manager.get_viewer_count(lot_id)
+        })
+    try:
+        while True:
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+            if msg.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        auction_manager.disconnect(lot_id, websocket)
+        await auction_manager.broadcast_to_lot(lot_id, {
+            "type": "viewer_update",
+            "viewer_count": auction_manager.get_viewer_count(lot_id)
+        })
+
 
 app.add_middleware(
     CORSMiddleware,
