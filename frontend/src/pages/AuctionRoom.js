@@ -71,7 +71,7 @@ export default function AuctionRoom() {
           min_next_bid: msg.min_next_bid,
           total_bids: msg.total_bids,
         }));
-        setTimeLeft(msg.seconds_remaining || 30);
+        setTimeLeft(msg.seconds_remaining || 45);
         if (msg.viewer_count !== undefined) setViewerCount(msg.viewer_count);
         setRecentBids(prev => [{
           bidder: msg.bidder_display,
@@ -83,7 +83,7 @@ export default function AuctionRoom() {
 
       case 'lot_started':
         setCurrentLotData(msg);
-        setTimeLeft(msg.seconds_remaining || 30);
+        setTimeLeft(msg.seconds_remaining || 45);
         setShowSold(false);
         setSoldData(null);
         setBidAmount(String((msg.starting_price || 0) + (msg.bid_increment || 10)));
@@ -100,7 +100,7 @@ export default function AuctionRoom() {
         setTimeout(() => {
           setShowSold(false);
           fetchLotStatus(activeLotRef.current);
-        }, 5000);
+        }, 8000);
         break;
 
       case 'lot_unsold':
@@ -235,18 +235,24 @@ export default function AuctionRoom() {
   return (
     <div className="min-h-screen bg-[#1a3a1a] pb-24 md:pb-0 pt-20 relative">
 
-      {/* SOLD overlay */}
+      {/* SOLD overlay — shows for 8s */}
       {showSold && soldData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-white rounded-2xl p-8 text-center mx-4 max-w-sm w-full animate-bounce">
-            <div className="text-6xl mb-4">🔨</div>
-            <h2 className="text-3xl font-bold text-[#2d5a27] mb-2">SOLD!</h2>
-            <p className="text-xl font-semibold text-gray-800 mb-1">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75">
+          <div className="bg-white rounded-2xl p-8 text-center mx-4 max-w-sm w-full animate-bounce shadow-2xl">
+            <div className="text-6xl mb-3">🔨</div>
+            <h2 className="text-4xl font-bold text-[#2d5a27] mb-1">SOLD!</h2>
+            <p className="text-2xl font-bold text-gray-800 mb-3">
               ₹{soldData.final_price?.toLocaleString('en-IN')}/kg
             </p>
-            <p className="text-gray-600">Winner: {soldData.winner_name}</p>
-            <p className="text-gray-500 text-sm">{soldData.winner_company}</p>
-            <p className="text-gray-400 text-xs mt-3">{soldData.product_name}</p>
+            <div className="bg-green-50 rounded-xl px-5 py-3 mb-3">
+              <p className="text-xs text-green-600 uppercase tracking-wider font-semibold mb-1">Winner</p>
+              <p className="text-lg font-bold text-[#2d5a27]">{soldData.winner_name}</p>
+              {soldData.winner_company && (
+                <p className="text-sm text-gray-500">{soldData.winner_company}</p>
+              )}
+            </div>
+            <p className="text-green-600 font-semibold text-sm">🎉 Congratulations!</p>
+            <p className="text-gray-400 text-xs mt-2">{soldData.product_name}</p>
           </div>
         </div>
       )}
@@ -303,7 +309,7 @@ export default function AuctionRoom() {
             <div className="mt-2 bg-white/20 rounded-full h-1.5 overflow-hidden">
               <div
                 className="bg-white h-full transition-all duration-1000 rounded-full"
-                style={{ width: `${Math.min(100, (timeLeft / 30) * 100)}%` }}
+                style={{ width: `${Math.min(100, (timeLeft / (currentLotData?.bid_window_seconds || 45)) * 100)}%` }}
               />
             </div>
           </div>
@@ -386,34 +392,60 @@ export default function AuctionRoom() {
                     : 'bg-[#0d2a0d] border-gray-700'
                 }`}
               >
-                <div className="flex justify-between items-center">
+                {lot.lot_status === 'sold' ? (
+                  /* Sold lot — prominent winner card */
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">LOT {lot.lot_number}</p>
-                    <p className={`font-semibold ${lot.lot_status === 'sold' ? 'text-gray-400' : 'text-white'}`}>
-                      {lot.product_name}
-                    </p>
-                    <p className="text-gray-400 text-sm">{lot.grade} · {lot.quantity_kg} kg</p>
-                    {lot.lot_status === 'sold' && (
-                      <p className="text-green-400 text-sm font-bold mt-1">
-                        SOLD: ₹{lot.sold_price?.toLocaleString('en-IN')}/kg
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-0.5">LOT {lot.lot_number}</p>
+                        <p className="font-semibold text-gray-400 text-sm">{lot.product_name}</p>
+                        <p className="text-gray-500 text-xs">{lot.grade} · {lot.quantity_kg} kg</p>
+                      </div>
+                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-900/60 text-green-300">✅ SOLD</span>
+                    </div>
+                    <div className="bg-green-900/30 rounded-lg px-3 py-2 mt-2">
+                      <p className="text-green-300 text-lg font-bold">
+                        ₹{(lot.sold_price || lot.current_price)?.toLocaleString('en-IN')}/kg
                       </p>
-                    )}
+                      {lot.current_winner_name && (
+                        <>
+                          <p className="text-white text-sm font-semibold">Winner: {lot.current_winner_name}</p>
+                          {lot.current_winner_company && (
+                            <p className="text-gray-400 text-xs">{lot.current_winner_company}</p>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                    lot.lot_status === 'live'
-                      ? 'bg-red-500 text-white animate-pulse'
-                      : lot.lot_status === 'sold'
-                      ? 'bg-gray-600 text-gray-300'
-                      : lot.lot_status === 'approved'
-                      ? 'bg-amber-500/20 text-amber-300'
-                      : 'bg-gray-700 text-gray-400'
-                  }`}>
-                    {lot.lot_status === 'live' ? '🔴 LIVE'
-                      : lot.lot_status === 'sold' ? '✅ SOLD'
-                      : lot.lot_status === 'approved' ? 'NEXT UP'
-                      : lot.lot_status.toUpperCase()}
-                  </span>
-                </div>
+                ) : (
+                  /* Normal lot row */
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">LOT {lot.lot_number}</p>
+                      <p className="text-white font-semibold">{lot.product_name}</p>
+                      <p className="text-gray-400 text-sm">{lot.grade} · {lot.quantity_kg} kg</p>
+                      {lot.lot_status === 'live' && lot.current_price && (
+                        <p className="text-green-300 text-sm font-bold mt-1">
+                          Current: ₹{lot.current_price?.toLocaleString('en-IN')}/kg
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                      lot.lot_status === 'live'
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : lot.lot_status === 'unsold'
+                        ? 'bg-gray-700 text-gray-400'
+                        : lot.lot_status === 'approved'
+                        ? 'bg-amber-500/20 text-amber-300'
+                        : 'bg-gray-700 text-gray-400'
+                    }`}>
+                      {lot.lot_status === 'live' ? '🔴 LIVE'
+                        : lot.lot_status === 'approved' ? 'NEXT UP'
+                        : lot.lot_status === 'unsold' ? '❌ NO BIDS'
+                        : lot.lot_status.toUpperCase()}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
 

@@ -53,6 +53,8 @@ const AdminDashboard = () => {
     product_name: '', grade: '6mm to 7mm', quantity_kg: '', number_of_lots: 1,
     starting_price: '', bid_increment: 10, currency: 'INR', description: ''
   });
+  const [lotMediaFiles, setLotMediaFiles] = useState([]); // {file, preview, path, uploading}
+  const lotFileInputRef = useRef(null);
 
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
@@ -342,9 +344,60 @@ const AdminDashboard = () => {
     } catch { toast.error('Failed to close lot'); }
   };
 
+  const handleLotMediaUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    const current = lotMediaFiles.length;
+    if (current + files.length > 4) {
+      toast.error(`Max 4 files. You already have ${current}.`);
+      return;
+    }
+    for (const file of files) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        toast.error(`${file.name}: Unsupported format`);
+        continue;
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error(`${file.name}: Max 50MB`);
+        continue;
+      }
+      const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+      const entry = { file, preview, path: null, uploading: true, type: file.type.startsWith('video/') ? 'video' : 'image' };
+      setLotMediaFiles(prev => [...prev, entry]);
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await axios.post(`${API_URL}/api/upload`, fd, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+        });
+        setLotMediaFiles(prev => prev.map(m => m.file === file ? { ...m, path: res.data.path, uploading: false } : m));
+      } catch {
+        toast.error(`Failed to upload ${file.name}`);
+        setLotMediaFiles(prev => prev.filter(m => m.file !== file));
+      }
+    }
+    if (lotFileInputRef.current) lotFileInputRef.current.value = '';
+  };
+
+  const removeLotMediaFile = (idx) => {
+    setLotMediaFiles(prev => {
+      const updated = [...prev];
+      if (updated[idx].preview) URL.revokeObjectURL(updated[idx].preview);
+      updated.splice(idx, 1);
+      return updated;
+    });
+  };
+
   const addAndApproveLot = async (e) => {
     e.preventDefault();
     if (!selectedEventId) return;
+    if (lotMediaFiles.length === 0) {
+      toast.error('Please upload at least 1 photo');
+      return;
+    }
+    if (lotMediaFiles.some(m => m.uploading)) {
+      toast.error('Wait for uploads to finish');
+      return;
+    }
     setAddingLot(true);
     try {
       const payload = {
@@ -357,12 +410,14 @@ const AdminDashboard = () => {
         bid_increment: parseFloat(lotForm.bid_increment),
         currency: lotForm.currency,
         description: lotForm.description,
+        media_paths: lotMediaFiles.filter(m => m.path).map(m => m.path),
       };
       const res = await axios.post(`${API_URL}/api/auction/lots`, payload, authHeaders);
       const newLot = res.data;
       await axios.patch(`${API_URL}/api/auction/lots/${newLot.id}/approve`, {}, authHeaders);
       toast.success('Lot added and approved! ✅');
       setLotForm({ product_name: '', grade: '6mm to 7mm', quantity_kg: '', number_of_lots: 1, starting_price: '', bid_increment: 10, currency: 'INR', description: '' });
+      setLotMediaFiles([]);
       setShowAddLotForm(false);
       fetchEventLots(selectedEventId);
     } catch (err) {
@@ -374,9 +429,9 @@ const AdminDashboard = () => {
 
   const tabs = [
     { key: 'users', label: 'Users' },
-    { key: 'pending-products', label: `Pending Products (${products.filter(p => p.approval_status === 'pending').length})` },
+    { key: 'pending-products', label: `Pending (${products.filter(p => p.approval_status === 'pending').length})` },
     { key: 'bids', label: 'Bids' },
-    { key: 'products', label: 'All Products' },
+    { key: 'products', label: 'Products' },
     { key: 'auctions', label: 'Auctions' },
   ];
 
@@ -414,13 +469,13 @@ const AdminDashboard = () => {
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="border-b border-border">
-            <div className="flex">
+            <div className="flex overflow-x-auto scrollbar-none">
               {tabs.map(t => (
                 <button
                   key={t.key}
                   data-testid={`admin-tab-${t.key}`}
                   onClick={() => setActiveTab(t.key)}
-                  className={`px-6 py-4 font-semibold text-sm transition-colors ${
+                  className={`px-4 md:px-6 py-4 font-semibold text-sm transition-colors whitespace-nowrap flex-shrink-0 ${
                     activeTab === t.key ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -1141,6 +1196,46 @@ const AdminDashboard = () => {
 
                   return (
                     <div>
+                      {/* Event status controls — prominent row above lots */}
+                      {selectedEvent && (
+                        <div className="mb-5 p-4 bg-muted/50 rounded-xl border border-border">
+                          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                            <div>
+                              <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Event Status: </span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ml-1 ${
+                                {upcoming:'bg-blue-100 text-blue-700', registration_open:'bg-green-100 text-green-700', live:'bg-red-100 text-red-700', completed:'bg-gray-100 text-gray-500', cancelled:'bg-gray-100 text-gray-400'}[selectedEvent.status] || 'bg-gray-100 text-gray-500'
+                              }`}>{selectedEvent.status.replace('_',' ')}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedEvent.status !== 'live' && selectedEvent.status !== 'completed' && selectedEvent.status !== 'cancelled' && (
+                              <button onClick={() => updateEventStatus(selectedEventId, 'live')}
+                                className="flex-1 sm:flex-none min-h-[44px] px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition-colors inline-flex items-center justify-center gap-2">
+                                <Radio size={15} /> → Go LIVE
+                              </button>
+                            )}
+                            {selectedEvent.status === 'upcoming' && (
+                              <button onClick={() => updateEventStatus(selectedEventId, 'registration_open')}
+                                className="flex-1 sm:flex-none min-h-[44px] px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors inline-flex items-center justify-center">
+                                → Open Registration
+                              </button>
+                            )}
+                            {selectedEvent.status === 'live' && (
+                              <button onClick={() => updateEventStatus(selectedEventId, 'completed')}
+                                className="flex-1 sm:flex-none min-h-[44px] px-4 py-2.5 bg-gray-700 text-white rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors inline-flex items-center justify-center">
+                                → Mark Completed
+                              </button>
+                            )}
+                            {selectedEvent.status !== 'completed' && selectedEvent.status !== 'cancelled' && (
+                              <button onClick={() => updateEventStatus(selectedEventId, 'cancelled')}
+                                className="min-h-[44px] px-4 py-2.5 bg-muted text-muted-foreground rounded-lg text-xs font-semibold hover:bg-muted/80 transition-colors inline-flex items-center justify-center">
+                                → Cancel Event
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Header row */}
                       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                         <h3 className="font-semibold text-foreground flex items-center gap-2">
@@ -1148,7 +1243,13 @@ const AdminDashboard = () => {
                           Lots for: <span className="text-primary">{selectedEvent?.title}</span>
                         </h3>
                         <button
-                          onClick={() => setShowAddLotForm(v => !v)}
+                          onClick={() => {
+                            if (showAddLotForm) {
+                              setLotMediaFiles([]);
+                              setLotForm({ product_name: '', grade: '6mm to 7mm', quantity_kg: '', number_of_lots: 1, starting_price: '', bid_increment: 10, currency: 'INR', description: '' });
+                            }
+                            setShowAddLotForm(v => !v);
+                          }}
                           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border-2 border-green-600 text-green-700 text-sm font-semibold hover:bg-green-50 transition-colors"
                         >
                           <Plus size={15} />
@@ -1262,9 +1363,57 @@ const AdminDashboard = () => {
                             />
                           </div>
 
+                          {/* Photo / Video upload */}
+                          <div>
+                            <label className="block text-xs font-medium text-foreground mb-1">
+                              Photos & Videos <span className="text-red-500">*</span>
+                              <span className="text-muted-foreground font-normal"> (min 1, max 4) — {lotMediaFiles.length}/4 files</span>
+                            </label>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {lotMediaFiles.map((m, idx) => (
+                                <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border bg-gray-100 flex-shrink-0">
+                                  {m.uploading ? (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-green-500 border-t-transparent" />
+                                    </div>
+                                  ) : m.type === 'video' ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                      <Film size={18} className="text-muted-foreground" />
+                                    </div>
+                                  ) : (
+                                    <img src={m.preview} alt="" className="w-full h-full object-cover" />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeLotMediaFile(idx)}
+                                    className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/60 text-white rounded-full flex items-center justify-center text-[10px] font-bold hover:bg-red-500"
+                                  >×</button>
+                                </div>
+                              ))}
+                              {lotMediaFiles.length < 4 && (
+                                <button
+                                  type="button"
+                                  onClick={() => lotFileInputRef.current?.click()}
+                                  className="w-16 h-16 rounded-lg border-2 border-dashed border-green-400 flex flex-col items-center justify-center text-green-600 hover:bg-green-50 transition-colors text-xs gap-0.5"
+                                >
+                                  <Upload size={16} />
+                                  <span>Add</span>
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              ref={lotFileInputRef}
+                              type="file"
+                              multiple
+                              accept=".jpg,.jpeg,.png,.webp,.mp4,.mov"
+                              onChange={handleLotMediaUpload}
+                              className="hidden"
+                            />
+                          </div>
+
                           <button
                             type="submit"
-                            disabled={addingLot}
+                            disabled={addingLot || lotMediaFiles.some(m => m.uploading)}
                             className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
                           >
                             <CheckCircle size={16} />
@@ -1285,61 +1434,82 @@ const AdminDashboard = () => {
                       ) : (
                         <div className="space-y-3">
                           {eventLots.map(lot => (
-                            <div key={lot.id} className="border border-border rounded-xl p-4">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div key={lot.id} className={`border rounded-xl p-4 ${
+                              lot.lot_status === 'live' ? 'border-red-400 bg-red-50/30' :
+                              lot.lot_status === 'sold' ? 'border-green-400 bg-green-50/30' :
+                              lot.lot_status === 'unsold' ? 'border-gray-300 bg-gray-50/50' :
+                              'border-border'
+                            }`}>
+                              {/* Lot header */}
+                              <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[10px] font-bold text-white bg-gray-500 px-2 py-0.5 rounded-full font-mono">
+                                    LOT {lot.lot_number}
+                                  </span>
+                                  <h4 className="font-semibold text-foreground">{lot.product_name}</h4>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${lotStatusColor[lot.lot_status] || 'bg-gray-100 text-gray-500'}`}>
+                                    {lot.lot_status}
+                                  </span>
+                                </div>
+                              </div>
 
-                                {/* Left: lot info */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                    <span className="text-[10px] font-bold text-white bg-gray-500 px-2 py-0.5 rounded-full font-mono">
-                                      LOT {lot.lot_number}
-                                    </span>
-                                    <h4 className="font-semibold text-foreground">{lot.product_name}</h4>
-                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${lotStatusColor[lot.lot_status] || 'bg-gray-100 text-gray-500'}`}>
-                                      {lot.lot_status}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {lot.grade} · {lot.quantity_kg} kg · Starting: {lot.currency} {lot.starting_price?.toLocaleString('en-IN')}/kg
+                              {/* Lot details */}
+                              <p className="text-xs text-muted-foreground mb-1">
+                                {lot.grade} · {lot.quantity_kg} kg · Start: {lot.currency} {lot.starting_price?.toLocaleString('en-IN')}/kg
+                              </p>
+
+                              {/* Live: show current bid */}
+                              {lot.lot_status === 'live' && (
+                                <div className="bg-red-100 rounded-lg px-3 py-2 mb-3">
+                                  <p className="text-sm font-bold text-red-700">
+                                    🔴 LIVE · Current: {lot.currency} {lot.current_price?.toLocaleString('en-IN')}/kg
                                   </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Seller: <span className="font-medium text-foreground">{lot.seller_name || 'Admin'}</span>
-                                    {lot.seller_company ? ` · ${lot.seller_company}` : ''}
-                                  </p>
-                                  {lot.lot_status === 'live' && (
-                                    <p className="text-xs text-green-700 font-semibold mt-1">
-                                      Current bid: {lot.currency} {lot.current_price?.toLocaleString('en-IN')}/kg
-                                      {lot.current_winner_name ? ` — ${lot.current_winner_name}` : ''}
-                                    </p>
-                                  )}
-                                  {lot.lot_status === 'sold' && (
-                                    <p className="text-xs text-green-700 font-semibold mt-1">
-                                      SOLD: {lot.currency} {lot.sold_price?.toLocaleString('en-IN')}/kg to {lot.current_winner_name}
-                                    </p>
+                                  {lot.current_winner_name && (
+                                    <p className="text-xs text-red-600">Leading: {lot.current_winner_name}{lot.current_winner_company ? ` · ${lot.current_winner_company}` : ''}</p>
                                   )}
                                 </div>
+                              )}
 
-                                {/* Right: action buttons */}
-                                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                                  {lot.lot_status === 'registered' && (
-                                    <button onClick={() => approveLot(lot.id)}
-                                      className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors inline-flex items-center gap-1">
-                                      <CheckCircle size={13} /> Approve
-                                    </button>
-                                  )}
-                                  {lot.lot_status === 'approved' && (
-                                    <button onClick={() => startLot(lot.id)}
-                                      className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors inline-flex items-center gap-1">
-                                      <Radio size={13} /> ▶ Start Bidding
-                                    </button>
-                                  )}
-                                  {lot.lot_status === 'live' && (
-                                    <button onClick={() => closeLot(lot.id)}
-                                      className="px-3 py-1.5 bg-gray-700 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 transition-colors inline-flex items-center gap-1">
-                                      <XCircle size={13} /> Close Lot
-                                    </button>
+                              {/* Sold: winner details */}
+                              {lot.lot_status === 'sold' && (
+                                <div className="bg-green-100 rounded-lg px-3 py-2 mb-3">
+                                  <p className="text-sm font-bold text-green-700">
+                                    ✅ SOLD at {lot.currency} {(lot.sold_price || lot.current_price)?.toLocaleString('en-IN')}/kg
+                                  </p>
+                                  <p className="text-xs text-green-700 font-semibold">Winner: {lot.current_winner_name}</p>
+                                  {lot.current_winner_company && (
+                                    <p className="text-xs text-green-600">{lot.current_winner_company}</p>
                                   )}
                                 </div>
+                              )}
+
+                              {/* Unsold */}
+                              {lot.lot_status === 'unsold' && (
+                                <div className="bg-gray-100 rounded-lg px-3 py-2 mb-3">
+                                  <p className="text-sm text-gray-500 font-semibold">❌ No bids received</p>
+                                </div>
+                              )}
+
+                              {/* Action buttons — large, full-width on mobile */}
+                              <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                                {lot.lot_status === 'registered' && (
+                                  <button onClick={() => approveLot(lot.id)}
+                                    className="flex-1 min-h-[44px] bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors inline-flex items-center justify-center gap-2 px-4">
+                                    <CheckCircle size={16} /> ✅ Approve Lot
+                                  </button>
+                                )}
+                                {lot.lot_status === 'approved' && (
+                                  <button onClick={() => startLot(lot.id)}
+                                    className="flex-1 min-h-[44px] bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition-colors inline-flex items-center justify-center gap-2 px-4 shadow-md">
+                                    <Radio size={16} /> ▶ Start Bidding
+                                  </button>
+                                )}
+                                {lot.lot_status === 'live' && (
+                                  <button onClick={() => closeLot(lot.id)}
+                                    className="flex-1 min-h-[44px] bg-gray-800 text-white rounded-xl text-sm font-bold hover:bg-gray-900 transition-colors inline-flex items-center justify-center gap-2 px-4">
+                                    <XCircle size={16} /> ⏹ Close Lot
+                                  </button>
+                                )}
                               </div>
                             </div>
                           ))}
