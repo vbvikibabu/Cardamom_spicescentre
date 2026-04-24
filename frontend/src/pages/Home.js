@@ -48,6 +48,8 @@ export default function Home() {
   const [products, setProducts]           = useState([]);
   const [liveAuction, setLiveAuction]     = useState(null);
   const [upcomingAuction, setUpcomingAuction] = useState(null);
+  const [regOpenAuction, setRegOpenAuction]   = useState(null);
+  const [regBannerDismissed, setRegBannerDismissed] = useState(false);
   const [stats, setStats]                 = useState({ listings: 0, traders: '50+', bids: '—' });
   const [timeLeft, setTimeLeft]           = useState({});
 
@@ -68,7 +70,10 @@ export default function Home() {
       setStats(s => ({ ...s, listings: prods.length }));
 
       const events = auctionRes.data || [];
-      setLiveAuction(events.find(e => e.status === 'live') || null);
+      const live = events.find(e => e.status === 'live') || null;
+      const regOpen = events.find(e => e.status === 'registration_open') || null;
+      setLiveAuction(live);
+      setRegOpenAuction(regOpen);
       setUpcomingAuction(
         events.find(e => ['upcoming', 'registration_open'].includes(e.status)) || null
       );
@@ -101,6 +106,32 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
+
+      {/* ── Registration-open flash banner ── */}
+      {regOpenAuction && !regBannerDismissed && (
+        <div className="fixed top-20 left-0 right-0 z-[38] flex items-center justify-between px-4 py-2.5 text-white text-sm font-semibold shadow-md"
+          style={{ backgroundColor: '#16a34a' }}>
+          <span className="flex items-center gap-2 truncate">
+            <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping flex-shrink-0" />
+            📋 Registration Open: {regOpenAuction.title}
+            {regOpenAuction.location ? ` · ${regOpenAuction.location}` : ''}
+          </span>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+            <button
+              type="button"
+              onClick={() => navigate('/auctions')}
+              className="bg-white text-green-700 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-50 transition-colors whitespace-nowrap"
+            >
+              Register Lot →
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegBannerDismissed(true)}
+              className="text-white/70 hover:text-white text-xl leading-none"
+            >×</button>
+          </div>
+        </div>
+      )}
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 md:px-8 pt-24 md:pt-28 pb-10">

@@ -142,6 +142,8 @@ export default function AuctionList() {
     }
 
     setEventReg(eventId, { submitting: true });
+    // Lock scroll position so page doesn't jump when form collapses
+    const scrollY = window.scrollY;
     try {
       await axios.post(
         `${API_URL}/api/auction/lots`,
@@ -160,9 +162,12 @@ export default function AuctionList() {
       );
       toast.success('Lot registered! Admin will approve before auction starts.');
       setEventReg(eventId, { open: false, form: emptyForm(), mediaFiles: [], submitting: false });
+      // Restore scroll so page stays in place after form collapses
+      requestAnimationFrame(() => window.scrollTo(0, scrollY));
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to register lot');
       setEventReg(eventId, { submitting: false });
+      requestAnimationFrame(() => window.scrollTo(0, scrollY));
     }
   };
 
@@ -270,6 +275,7 @@ export default function AuctionList() {
                   {showRegBtn && (
                     <div className="px-5 pb-4" onClick={e => e.stopPropagation()}>
                       <button
+                        type="button"
                         onClick={() => toggleForm(event.id)}
                         className="w-full py-2.5 rounded-lg text-sm font-semibold border-2 border-[#2d5a27] text-[#2d5a27] hover:bg-[#2d5a27] hover:text-white transition-colors"
                       >
@@ -388,6 +394,7 @@ export default function AuctionList() {
                                   <img src={mf.url} alt="" className="w-full h-full object-cover" />
                                 )}
                                 <button
+                                  type="button"
                                   onClick={() => removeMedia(event.id, idx)}
                                   className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-bl-lg flex items-center justify-center"
                                 >×</button>
@@ -395,6 +402,7 @@ export default function AuctionList() {
                             ))}
                             {reg.mediaFiles.length < 4 && (
                               <button
+                                type="button"
                                 onClick={() => fileInputRefs.current[event.id]?.click()}
                                 className="w-16 h-16 rounded-lg border-2 border-dashed border-[#2d5a27] text-[#2d5a27] flex flex-col items-center justify-center text-xs font-semibold hover:bg-green-50 transition-colors"
                               >
@@ -416,6 +424,7 @@ export default function AuctionList() {
 
                         {/* Submit */}
                         <button
+                          type="button"
                           onClick={() => submitLot(event.id)}
                           disabled={reg.submitting || reg.mediaFiles.some(f => f.uploading)}
                           className="w-full py-3 rounded-lg bg-[#2d5a27] text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 mt-2"

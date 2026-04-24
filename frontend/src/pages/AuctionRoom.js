@@ -46,7 +46,7 @@ export default function AuctionRoom() {
   const [bidAmount, setBidAmount] = useState('');
   const [bidding, setBidding] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [initialSeconds, setInitialSeconds] = useState(45); // FIX 4 — track first server value
+  const [initialSeconds, setInitialSeconds] = useState(30); // matches AUCTION_BID_WINDOW_SECONDS default
   const [showSold, setShowSold] = useState(false);
   const [soldData, setSoldData] = useState(null);
   const [viewerCount, setViewerCount] = useState(0);
@@ -94,17 +94,15 @@ export default function AuctionRoom() {
         toast.success('🔴 Auction is LIVE! Place your bids!');
       }
 
-      // FIX 4 — Server time sync for active live lot (every 6s poll re-calcs time)
+      // Server time sync for active live lot (every 6s poll re-calcs time)
       if (activeLotRef.current && liveLot && liveLot.id === activeLotRef.current) {
         const remaining = calcRemaining(liveLot.auction_end_time);
         setTimeLeft(remaining);
+        // Keep initialSeconds in sync — if server extended timer, update it
+        setInitialSeconds(prev => remaining > prev ? remaining : prev);
         setCurrentLotData(prev => ({
           ...prev,
-          current_price: liveLot.current_price,
-          current_winner: liveLot.current_winner,
-          current_winner_company: liveLot.current_winner_company,
-          min_next_bid: liveLot.min_next_bid,
-          total_bids: liveLot.total_bids,
+          ...liveLot, // full sync every 6s — ensures media_paths, grade etc always fresh
         }));
       }
 
@@ -154,14 +152,14 @@ export default function AuctionRoom() {
           min_next_bid: msg.min_next_bid,
           total_bids: msg.total_bids,
         }));
-        // FIX 3 — sync initialSeconds on every bid so progress bar doesn't jump
+        // Sync timer on bid — reset initialSeconds so progress bar restarts from 100%
         if (msg.end_time) {
           const remaining = calcRemaining(msg.end_time);
           setTimeLeft(remaining);
-          setInitialSeconds(prev => Math.max(prev, remaining));
-        } else if (msg.seconds_remaining) {
+          setInitialSeconds(remaining);
+        } else if (msg.seconds_remaining !== undefined) {
           setTimeLeft(msg.seconds_remaining);
-          setInitialSeconds(prev => Math.max(prev, msg.seconds_remaining));
+          setInitialSeconds(msg.seconds_remaining);
         }
         if (msg.viewer_count !== undefined) setViewerCount(msg.viewer_count);
         setRecentBids(prev => [{
@@ -173,19 +171,19 @@ export default function AuctionRoom() {
         break;
 
       case 'lot_started':
-        // FIX 4 — use end_time for accurate server-derived initial value
         {
           const remaining = msg.end_time
             ? calcRemaining(msg.end_time)
-            : (msg.seconds_remaining || 45);
+            : (msg.seconds_remaining || 30);
           setTimeLeft(remaining);
           setInitialSeconds(remaining);
+          // Merge: keep any existing fields (media_paths etc.) and overlay WS data
+          setCurrentLotData(prev => ({ ...(prev || {}), ...msg }));
+          setShowSold(false);
+          setSoldData(null);
+          setBidAmount(String((msg.starting_price || 0) + (msg.bid_increment || 10)));
+          toast.info(`🔴 Auction started for ${msg.product_name}!`);
         }
-        setCurrentLotData(msg);
-        setShowSold(false);
-        setSoldData(null);
-        setBidAmount(String((msg.starting_price || 0) + (msg.bid_increment || 10)));
-        toast.info(`🔴 Auction started for ${msg.product_name}!`);
         break;
 
       case 'lot_sold':
@@ -364,18 +362,18 @@ export default function AuctionRoom() {
         </div>
       )}
 
-      {/* FIX 8 — Top bar: tighter, truncate, no overflow */}
-      <div className="bg-[#0d2a0d] px-3 py-2 flex justify-between items-center overflow-hidden gap-2">
-        <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="text-green-300 text-[10px] font-bold tracking-wider uppercase">Live Auction</p>
+      {/* Top bar */}
+      <div className="bg-[#0d2a0d] px-4 py-2.5 flex justify-between items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-green-300 text-[10px] font-bold tracking-widest uppercase">🔴 Live Auction</p>
           <p className="text-white font-semibold text-sm truncate">{event.title}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="text-right">
-            <p className="text-green-300 text-xs truncate max-w-28">📍 {event.location}</p>
+          <div className="text-right hidden sm:block">
+            <p className="text-green-300 text-xs truncate max-w-32">📍 {event.location}</p>
             <p className="text-gray-400 text-xs">👥 {viewerCount} watching</p>
           </div>
-          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
         </div>
       </div>
 
@@ -463,27 +461,47 @@ export default function AuctionRoom() {
             <div className="bg-white rounded-xl p-4">
               <p className="text-gray-500 text-[11px] mb-2 text-center">
                 Min: ₹{currentLotData.min_next_bid?.toLocaleString('en-IN')}/kg
-                {' '}(+₹{currentLotData.bid_increment} increment)
+                {' · '}+₹{currentLotData.bid_increment}/bid
               </p>
               {isLiveBidding ? (
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={bidAmount}
-                    onChange={e => setBidAmount(e.target.value)}
-                    placeholder={`Min ₹${currentLotData.min_next_bid}`}
-                    className="flex-1 min-w-0 border-2 border-[#2d5a27] rounded-lg px-3 py-3 text-lg font-bold text-center focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={e => { e.preventDefault(); e.stopPropagation(); placeBid(); }}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); placeBid(); } }}
-                    disabled={bidding}
-                    className="w-20 flex-shrink-0 bg-[#2d5a27] text-white px-2 py-3 rounded-lg font-bold text-sm disabled:opacity-50 active:scale-95 transition-transform"
-                  >
-                    {bidding ? '...' : '🔨 BID'}
-                  </button>
-                </div>
+                <>
+                  {/* Quick increment buttons */}
+                  <div className="flex gap-1.5 mb-2">
+                    {[1, 2, 5, 10].map(mult => {
+                      const inc = (currentLotData.bid_increment || 10) * mult;
+                      return (
+                        <button
+                          key={mult}
+                          type="button"
+                          onClick={() => setBidAmount(prev => String((parseFloat(prev) || currentLotData.min_next_bid || 0) + inc))}
+                          className="flex-1 py-1.5 bg-[#f0fdf4] border border-[#2d5a27]/30 text-[#2d5a27] text-xs font-bold rounded-lg hover:bg-[#2d5a27]/10 transition-colors"
+                        >
+                          +{inc}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Bid input + button */}
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={bidAmount}
+                      onChange={e => setBidAmount(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); placeBid(); } }}
+                      placeholder={`Min ₹${currentLotData.min_next_bid}`}
+                      className="flex-1 min-w-0 border-2 border-[#2d5a27] rounded-lg px-3 py-3 text-lg font-bold text-center focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); placeBid(); }}
+                      disabled={bidding}
+                      className="w-20 flex-shrink-0 bg-[#2d5a27] text-white px-2 py-3 rounded-lg font-bold text-sm disabled:opacity-50 active:scale-95 transition-transform"
+                    >
+                      {bidding ? '...' : '🔨 BID'}
+                    </button>
+                  </div>
+                  <p className="text-gray-400 text-[10px] text-center mt-1.5">Press Enter to bid</p>
+                </>
               ) : (
                 <div className="bg-red-50 border border-red-200 rounded-lg py-3 text-center">
                   <p className="text-red-600 font-bold text-sm">⏹ Bidding Closed</p>

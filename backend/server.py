@@ -411,6 +411,10 @@ async def _check_auction_lots():
                     "winner_company": lot.get("current_winner_company"),
                     "product_name": lot["product_name"]
                 })
+                # Email winner
+                event_doc = await db.auction_events.find_one({"id": lot.get("auction_event_id","")}, {"_id": 0})
+                lot_with_price = {**lot, "sold_price": sold_price}
+                asyncio.create_task(_email_auction_winner(lot_with_price, event_doc or {}))
                 logger.info(f"Auction lot SOLD: {lot['id']} at {sold_price}")
             else:
                 await db.auction_lots.update_one(
@@ -585,6 +589,56 @@ async def _email_auction_live(lot: dict, event: dict, lot_end_time: datetime) ->
                 logger.error(f"Auction live email error (to={buyer.get('email')}): {e}")
     except Exception as e:
         logger.warning(f"_email_auction_live failed: {e}")
+
+
+async def _email_auction_winner(lot: dict, event: dict) -> None:
+    """Email the auction lot winner with their win details."""
+    try:
+        winner_id = lot.get("current_winner_id")
+        if not winner_id:
+            return
+        winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "full_name": 1})
+        if not winner or not winner.get("email"):
+            return
+        currency_sym = "₹" if lot.get("currency", "INR") == "INR" else "$"
+        final_price = lot.get("sold_price") or lot.get("current_price", 0)
+        auction_url = f"https://cardamomspicescentre.com/auctions/{event.get('id', '')}"
+        html = f"""
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+  <div style="background:#2d5a27;padding:24px;text-align:center">
+    <h1 style="color:white;margin:0;font-size:24px">🏆 Congratulations! You Won!</h1>
+  </div>
+  <div style="padding:24px;background:#ffffff">
+    <p style="color:#1a3a1a;font-size:16px">Dear <b>{winner.get('full_name','')}</b>,</p>
+    <p style="color:#4b5563">You have won the following auction lot:</p>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0">
+      <h3 style="color:#1a3a1a;margin:0 0 8px 0">{lot.get('product_name','')}</h3>
+      <p style="margin:4px 0;color:#6b7280">Event: {event.get('title','')}</p>
+      <p style="margin:4px 0;color:#6b7280">Grade: {lot.get('grade','')}</p>
+      <p style="margin:4px 0;color:#6b7280">Quantity: {lot.get('quantity_kg','')} kg</p>
+      <p style="margin:8px 0 0 0;font-size:20px;font-weight:bold;color:#2d5a27">
+        Won at: {currency_sym}{final_price:,.0f}/kg
+      </p>
+      <p style="color:#4b5563;font-size:13px">
+        Total value: {currency_sym}{final_price * lot.get('quantity_kg', 0):,.0f}
+      </p>
+    </div>
+    <p style="color:#4b5563">Our team will contact you shortly to arrange payment and delivery.</p>
+    <p style="text-align:center;margin:24px 0">
+      <a href="{auction_url}"
+         style="background:#2d5a27;color:white;padding:12px 28px;border-radius:8px;
+                text-decoration:none;font-weight:bold;display:inline-block">
+        View Auction Details →
+      </a>
+    </p>
+    <p style="color:#9ca3af;font-size:12px">
+      Questions? Call +91-8838226519 or email cardamomspicescentre@gmail.com
+    </p>
+  </div>
+</div>"""
+        await _smtp_send(winner["email"], f"🏆 You Won: {lot.get('product_name','')} — Cardamom Spices Centre", html)
+    except Exception as e:
+        logger.warning(f"_email_auction_winner failed: {e}")
 
 
 # --- 1. New registration → admin ---
@@ -1872,6 +1926,37 @@ async def get_my_bids(current_user: User = Depends(get_current_approved_buyer)):
     return result
 
 
+# Buyer: won auction lots
+@api_router.get("/buyer/won-lots")
+async def get_won_lots(current_user: User = Depends(get_current_approved_buyer)):
+    lots = await db.auction_lots.find(
+        {"current_winner_id": current_user.id, "lot_status": "sold"},
+        {"_id": 0}
+    ).sort("sold_at", -1).to_list(200)
+    # Enrich with event title
+    event_ids = list({l.get("auction_event_id") for l in lots if l.get("auction_event_id")})
+    events_map = {}
+    if event_ids:
+        evts = await db.auction_events.find(
+            {"id": {"$in": event_ids}}, {"_id": 0, "id": 1, "title": 1, "location": 1}
+        ).to_list(len(event_ids))
+        events_map = {e["id"]: e for e in evts}
+    for lot in lots:
+        evt = events_map.get(lot.get("auction_event_id"), {})
+        lot["event_title"] = evt.get("title", "")
+        lot["event_location"] = evt.get("location", "")
+    return lots
+
+
+# Become a seller (buyer upgrades role to "both")
+@api_router.patch("/users/me/become-seller")
+async def become_seller(current_user: User = Depends(get_current_user)):
+    if current_user.role not in ("buyer",):
+        raise HTTPException(400, "Only buyers can request seller access")
+    await db.users.update_one({"id": current_user.id}, {"$set": {"role": "both"}})
+    return {"message": "Role updated to buyer+seller", "role": "both"}
+
+
 # ==================== FILE UPLOAD & SERVE ====================
 @api_router.post("/upload")
 async def upload_file(
@@ -2126,8 +2211,14 @@ async def start_auction_lot(lot_id: str, admin: User = Depends(get_current_admin
         "current_price": lot["starting_price"],
         "bid_increment": lot["bid_increment"],
         "currency": lot["currency"],
+        "description": lot.get("description", ""),
+        "media_paths": lot.get("media_paths", []),
+        "seller_name": lot.get("seller_name", ""),
+        "seller_company": lot.get("seller_company", ""),
+        "lot_number": lot.get("lot_number", 0),
         "end_time": end_time.isoformat(),
         "seconds_remaining": AUCTION_BID_WINDOW_SECONDS,
+        "lot_status": "live",
         "viewer_count": auction_manager.get_viewer_count(lot_id)
     })
     logger.info(f"Auction lot started: {lot_id}")
@@ -2160,7 +2251,36 @@ async def force_close_lot(lot_id: str, admin: User = Depends(get_current_admin))
         "winner_company": lot.get("current_winner_company"),
         "product_name": lot["product_name"]
     })
+    if status == "sold":
+        event_doc = await db.auction_events.find_one({"id": lot.get("auction_event_id","")}, {"_id": 0})
+        asyncio.create_task(_email_auction_winner({**lot, "sold_price": sold_price}, event_doc or {}))
     return {"message": f"Lot closed as {status}"}
+
+
+@api_router.post("/auction/lots/{lot_id}/reset")
+async def reset_lot_to_approved(lot_id: str, admin: User = Depends(get_current_admin)):
+    """Admin: reset an unsold/registered lot back to 'approved' so it can be re-run."""
+    lot = await db.auction_lots.find_one({"id": lot_id}, {"_id": 0})
+    if not lot:
+        raise HTTPException(404, "Lot not found")
+    if lot["lot_status"] not in ("unsold", "registered"):
+        raise HTTPException(400, f"Lot is '{lot['lot_status']}' — only unsold or registered lots can be reset")
+    await db.auction_lots.update_one(
+        {"id": lot_id},
+        {"$set": {
+            "lot_status": "approved",
+            "current_price": lot["starting_price"],
+            "current_winner_id": None,
+            "current_winner_name": None,
+            "current_winner_company": None,
+            "auction_end_time": None,
+            "sold_at": None,
+            "sold_price": None,
+            "total_bids": 0,
+        }}
+    )
+    return {"message": "Lot reset to approved — ready to re-run"}
+
 
 @api_router.post("/auction/lots/{lot_id}/bid")
 async def place_auction_bid(lot_id: str, bid_data: AuctionBidPlace, current_user: User = Depends(get_current_user)):

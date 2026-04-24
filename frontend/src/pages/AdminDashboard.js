@@ -345,6 +345,15 @@ const AdminDashboard = () => {
     } catch { toast.error('Failed to close lot'); }
   };
 
+  const resetLot = async (lotId) => {
+    if (!window.confirm('Reset this lot back to Approved so it can be re-run?')) return;
+    try {
+      await axios.post(`${API_URL}/api/auction/lots/${lotId}/reset`, {}, authHeaders);
+      toast.success('Lot reset — ready to re-run!');
+      if (selectedEventId) fetchEventLots(selectedEventId);
+    } catch (err) { toast.error(err.response?.data?.detail || 'Failed to reset lot'); }
+  };
+
   const handleLotMediaUpload = async (e) => {
     const files = Array.from(e.target.files);
     const current = lotMediaFiles.length;
@@ -1568,6 +1577,12 @@ const AdminDashboard = () => {
                                   <button onClick={() => closeLot(lot.id)}
                                     className="flex-1 min-h-[44px] bg-gray-800 text-white rounded-xl text-sm font-bold hover:bg-gray-900 transition-colors inline-flex items-center justify-center gap-2 px-4">
                                     <XCircle size={16} /> ⏹ Close Lot
+                                  </button>
+                                )}
+                                {(lot.lot_status === 'unsold' || lot.lot_status === 'registered') && (
+                                  <button onClick={() => resetLot(lot.id)}
+                                    className="flex-shrink-0 min-h-[44px] bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-colors inline-flex items-center justify-center gap-2 px-4">
+                                    🔄 Reset & Re-run
                                   </button>
                                 )}
                               </div>
