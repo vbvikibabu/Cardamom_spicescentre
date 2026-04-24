@@ -334,7 +334,14 @@ class AuctionLotCreate(BaseModel):
     bid_increment: float = 10.0
     currency: Literal["INR", "USD"] = "INR"
     description: str = ""
-    media_paths: Optional[List[str]] = Field(default_factory=list)
+    media_paths: Optional[List[Optional[str]]] = Field(default_factory=list)
+
+    @field_validator("media_paths", mode="before")
+    @classmethod
+    def strip_null_paths(cls, v):
+        if not v:
+            return []
+        return [p for p in v if p and isinstance(p, str) and p.strip()]
 
 class AuctionBidPlace(BaseModel):
     bid_amount: float

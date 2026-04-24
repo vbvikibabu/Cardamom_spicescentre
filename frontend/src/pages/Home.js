@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -43,6 +44,7 @@ const HOW_IT_WORKS = [
 
 export default function Home() {
   const navigate = useNavigate();
+  const { user, isAuthenticated, isSeller } = useAuth();
   const [products, setProducts]           = useState([]);
   const [liveAuction, setLiveAuction]     = useState(null);
   const [upcomingAuction, setUpcomingAuction] = useState(null);
@@ -335,15 +337,35 @@ export default function Home() {
                     </p>
                   )}
                 </div>
-                <div className="flex gap-3 flex-shrink-0">
+                <div className="flex gap-3 flex-shrink-0 flex-wrap">
                   {liveAuction ? (
+                    /* Live: everyone gets Join Now */
                     <button
                       onClick={() => navigate(`/auctions/${liveAuction.id}`)}
                       className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors whitespace-nowrap"
                     >
                       🔨 Join Now
                     </button>
+                  ) : isAuthenticated ? (
+                    /* Logged in + upcoming: context-aware CTAs */
+                    <>
+                      {isSeller && (
+                        <button
+                          onClick={() => navigate('/auctions')}
+                          className="border border-white/60 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors whitespace-nowrap"
+                        >
+                          📦 Register My Lot
+                        </button>
+                      )}
+                      <button
+                        onClick={() => navigate(`/auctions/${upcomingAuction.id}`)}
+                        className="bg-white text-[#1a3a1a] px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-100 transition-colors whitespace-nowrap"
+                      >
+                        View Auction →
+                      </button>
+                    </>
                   ) : (
+                    /* Not logged in: Register + View Details */
                     <>
                       <button
                         onClick={() => navigate('/register')}
@@ -352,7 +374,7 @@ export default function Home() {
                         Register
                       </button>
                       <button
-                        onClick={() => navigate(`/auctions/${upcomingAuction.id}`)}
+                        onClick={() => navigate('/auctions')}
                         className="bg-white text-[#1a3a1a] px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-100 transition-colors whitespace-nowrap"
                       >
                         View Details →

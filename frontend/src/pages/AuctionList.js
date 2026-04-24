@@ -154,7 +154,7 @@ export default function AuctionList() {
           bid_increment: parseFloat(form.bid_increment) || 10,
           currency: form.currency,
           description: form.description,
-          media_paths: mediaFiles.map(f => f.url),
+          media_paths: mediaFiles.map(f => f.url).filter(Boolean),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
