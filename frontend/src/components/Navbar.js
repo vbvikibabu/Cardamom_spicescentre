@@ -119,6 +119,14 @@ const Navbar = () => {
                 {/* Auth Buttons */}
                 {isAuthenticated ? (
                   <>
+                    {/* User name pill */}
+                    <span
+                      style={{ color: DARK_GREEN }}
+                      className="text-sm font-semibold max-w-[96px] truncate hidden lg:block"
+                      title={user?.full_name || user?.email}
+                    >
+                      {user?.full_name?.split(' ')[0] || 'Account'}
+                    </span>
                     <Link
                       to={isAdmin ? '/admin' : isSeller ? '/seller' : '/dashboard'}
                       data-testid="nav-dashboard-button"
@@ -139,15 +147,24 @@ const Navbar = () => {
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={openLogin}
-                    data-testid="nav-login-button"
-                    style={{ backgroundColor: DARK_GREEN }}
-                    className="w-10 h-10 rounded-full text-white flex items-center justify-center hover:opacity-85 transition-all"
-                    title="Login"
-                  >
-                    <LogIn size={16} />
-                  </button>
+                  <>
+                    <button
+                      onClick={openLogin}
+                      data-testid="nav-login-button"
+                      style={{ borderColor: DARK_GREEN, color: DARK_GREEN }}
+                      className="px-4 py-2 rounded-full border-2 text-sm font-semibold hover:opacity-80 transition-all whitespace-nowrap"
+                    >
+                      Login
+                    </button>
+                    <Link
+                      to="/register"
+                      data-testid="nav-register-button"
+                      style={{ backgroundColor: DARK_GREEN }}
+                      className="px-4 py-2 rounded-full text-white text-sm font-semibold hover:opacity-85 transition-all whitespace-nowrap"
+                    >
+                      Register
+                    </Link>
+                  </>
                 )}
               </div>
             </div>

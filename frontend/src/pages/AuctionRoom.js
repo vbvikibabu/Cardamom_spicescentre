@@ -154,12 +154,14 @@ export default function AuctionRoom() {
           min_next_bid: msg.min_next_bid,
           total_bids: msg.total_bids,
         }));
-        // FIX 4 — use end_time from bid_update if available, else seconds_remaining
+        // FIX 3 — sync initialSeconds on every bid so progress bar doesn't jump
         if (msg.end_time) {
           const remaining = calcRemaining(msg.end_time);
           setTimeLeft(remaining);
+          setInitialSeconds(prev => Math.max(prev, remaining));
         } else if (msg.seconds_remaining) {
           setTimeLeft(msg.seconds_remaining);
+          setInitialSeconds(prev => Math.max(prev, msg.seconds_remaining));
         }
         if (msg.viewer_count !== undefined) setViewerCount(msg.viewer_count);
         setRecentBids(prev => [{
@@ -381,24 +383,52 @@ export default function AuctionRoom() {
       {currentLotData?.lot_status === 'live' ? (
         <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
 
-          {/* Lot header card — FIX 6 image */}
+          {/* Lot header card — FIX 4 full details */}
           <div className="bg-[#0d2a0d] rounded-xl p-4">
             <div className="flex justify-between text-green-300 text-xs mb-2">
               <span>LOT {currentLotData.lot_number || '–'}</span>
               <span>{currentLotData.total_bids || 0} bids</span>
             </div>
-            {/* FIX 6 — Lot image */}
+            {/* Lot image */}
             {lotImage && (
               <img
                 src={lotImage}
                 alt={currentLotData.product_name}
                 className="w-full rounded-lg mt-1 mb-3"
-                style={{ height: '160px', objectFit: 'cover' }}
+                style={{ height: '180px', objectFit: 'cover' }}
                 onError={e => e.target.style.display = 'none'}
               />
             )}
             <h2 className="text-white text-lg font-serif font-bold mb-0.5 truncate">{currentLotData.product_name}</h2>
-            <p className="text-green-300 text-xs truncate">{currentLotData.grade} · {currentLotData.quantity_kg} kg</p>
+            {/* FIX 4 — 2×2 detail grid */}
+            <div className="grid grid-cols-2 gap-1.5 mt-3">
+              <div className="bg-[#1a4a1a] rounded-lg px-2.5 py-2">
+                <p className="text-green-400 text-[9px] uppercase tracking-wider mb-0.5">Grade</p>
+                <p className="text-white text-xs font-semibold">{currentLotData.grade || '—'}</p>
+              </div>
+              <div className="bg-[#1a4a1a] rounded-lg px-2.5 py-2">
+                <p className="text-green-400 text-[9px] uppercase tracking-wider mb-0.5">Quantity</p>
+                <p className="text-white text-xs font-semibold">{currentLotData.quantity_kg} kg</p>
+              </div>
+              <div className="bg-[#1a4a1a] rounded-lg px-2.5 py-2">
+                <p className="text-green-400 text-[9px] uppercase tracking-wider mb-0.5">Starting Price</p>
+                <p className="text-white text-xs font-semibold">₹{currentLotData.starting_price?.toLocaleString('en-IN')}/kg</p>
+              </div>
+              <div className="bg-[#1a4a1a] rounded-lg px-2.5 py-2">
+                <p className="text-green-400 text-[9px] uppercase tracking-wider mb-0.5">Min Increment</p>
+                <p className="text-white text-xs font-semibold">₹{currentLotData.bid_increment}</p>
+              </div>
+            </div>
+            {/* Description */}
+            {currentLotData.description && (
+              <p className="text-gray-400 text-xs mt-3 leading-relaxed line-clamp-2">{currentLotData.description}</p>
+            )}
+            {/* Seller info */}
+            {(currentLotData.seller_name || currentLotData.seller_company) && (
+              <p className="text-gray-500 text-xs mt-2">
+                Seller: {currentLotData.seller_name || ''}{currentLotData.seller_company ? ` · ${currentLotData.seller_company}` : ''}
+              </p>
+            )}
           </div>
 
           {/* Current bid — FIX 8 */}
@@ -445,7 +475,9 @@ export default function AuctionRoom() {
                     className="flex-1 min-w-0 border-2 border-[#2d5a27] rounded-lg px-3 py-3 text-lg font-bold text-center focus:outline-none"
                   />
                   <button
-                    onClick={placeBid}
+                    type="button"
+                    onClick={e => { e.preventDefault(); e.stopPropagation(); placeBid(); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); placeBid(); } }}
                     disabled={bidding}
                     className="w-20 flex-shrink-0 bg-[#2d5a27] text-white px-2 py-3 rounded-lg font-bold text-sm disabled:opacity-50 active:scale-95 transition-transform"
                   >
@@ -460,6 +492,7 @@ export default function AuctionRoom() {
             </div>
           ) : (
             <button
+              type="button"
               onClick={() => navigate('/login')}
               className="w-full bg-[#2d5a27] text-white py-4 rounded-xl font-bold text-lg"
             >
@@ -487,8 +520,25 @@ export default function AuctionRoom() {
         </div>
 
       ) : (
-        /* FIX 5 — Lobby/waiting view — auto-detects live every 6s */
+        /* FIX 2 — Lobby/waiting view — auto-detects live every 6s */
         <div className="px-4 py-6 max-w-lg mx-auto">
+          {/* FIX 2 — All lots done → Auction Completed screen */}
+          {lots.length > 0 && lots.every(l => ['sold', 'unsold'].includes(l.lot_status)) ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🏆</div>
+              <h2 className="text-white text-2xl font-bold mb-2">Auction Completed!</h2>
+              <p className="text-green-300 text-sm mb-1">All {lots.length} lot{lots.length !== 1 ? 's' : ''} have been auctioned.</p>
+              <p className="text-gray-400 text-xs mb-8">Thank you for participating.</p>
+              <button
+                type="button"
+                onClick={() => navigate('/auctions')}
+                className="bg-[#2d5a27] text-white px-8 py-3 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity"
+              >
+                Browse More Auctions →
+              </button>
+            </div>
+          ) : (
+            <>
           <div className="text-center mb-5">
             <p className="text-green-300 text-sm">
               {lots.filter(l => l.lot_status === 'approved').length > 0
@@ -602,6 +652,8 @@ export default function AuctionRoom() {
               </div>
             )}
           </div>
+            </>
+          )}
         </div>
       )}
     </div>

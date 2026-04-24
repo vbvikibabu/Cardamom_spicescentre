@@ -55,6 +55,7 @@ const AdminDashboard = () => {
   });
   const [lotMediaFiles, setLotMediaFiles] = useState([]); // {file, preview, path, uploading}
   const lotFileInputRef = useRef(null);
+  const [expandedLot, setExpandedLot] = useState(null); // FIX 5 — expanded lot id
 
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
@@ -1433,34 +1434,93 @@ const AdminDashboard = () => {
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {eventLots.map(lot => (
-                            <div key={lot.id} className={`border rounded-xl p-4 ${
+                          {eventLots.map(lot => {
+                            const isExpanded = expandedLot === lot.id;
+                            const lotImgs = (lot.media_paths || []).filter(u => /\.(jpg|jpeg|png|webp)/i.test(u) || u.includes('/image/upload/'));
+                            return (
+                            <div key={lot.id} className={`border rounded-xl overflow-hidden ${
                               lot.lot_status === 'live' ? 'border-red-400 bg-red-50/30' :
                               lot.lot_status === 'sold' ? 'border-green-400 bg-green-50/30' :
                               lot.lot_status === 'unsold' ? 'border-gray-300 bg-gray-50/50' :
                               'border-border'
                             }`}>
-                              {/* Lot header */}
-                              <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-[10px] font-bold text-white bg-gray-500 px-2 py-0.5 rounded-full font-mono">
-                                    LOT {lot.lot_number}
-                                  </span>
-                                  <h4 className="font-semibold text-foreground">{lot.product_name}</h4>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${lotStatusColor[lot.lot_status] || 'bg-gray-100 text-gray-500'}`}>
-                                    {lot.lot_status}
-                                  </span>
-                                </div>
-                              </div>
+                              {/* FIX 5 — Clickable lot header row */}
+                              <button
+                                type="button"
+                                onClick={() => setExpandedLot(isExpanded ? null : lot.id)}
+                                className="w-full flex items-center gap-2 p-4 text-left hover:bg-muted/30 transition-colors"
+                              >
+                                <span className="text-[10px] font-bold text-white bg-gray-500 px-2 py-0.5 rounded-full font-mono flex-shrink-0">
+                                  LOT {lot.lot_number}
+                                </span>
+                                <h4 className="font-semibold text-foreground flex-1 min-w-0 truncate">{lot.product_name}</h4>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase flex-shrink-0 ${lotStatusColor[lot.lot_status] || 'bg-gray-100 text-gray-500'}`}>
+                                  {lot.lot_status}
+                                </span>
+                                {isExpanded ? <ChevronUp size={14} className="text-muted-foreground flex-shrink-0" /> : <ChevronDown size={14} className="text-muted-foreground flex-shrink-0" />}
+                              </button>
 
-                              {/* Lot details */}
-                              <p className="text-xs text-muted-foreground mb-1">
+                              {/* Quick summary line (always visible) */}
+                              <p className="text-xs text-muted-foreground px-4 pb-3 -mt-1">
                                 {lot.grade} · {lot.quantity_kg} kg · Start: {lot.currency} {lot.starting_price?.toLocaleString('en-IN')}/kg
                               </p>
 
+                              {/* FIX 5 — Expanded detail panel */}
+                              {isExpanded && (
+                                <div className="border-t border-border bg-background/60 px-4 py-4 space-y-4">
+                                  {/* Images row */}
+                                  {lotImgs.length > 0 && (
+                                    <div className="flex gap-2 overflow-x-auto pb-1">
+                                      {lotImgs.map((url, i) => (
+                                        <img
+                                          key={i}
+                                          src={url}
+                                          alt={`Lot image ${i+1}`}
+                                          className="h-28 w-36 object-cover rounded-lg flex-shrink-0 border border-border"
+                                          onError={e => e.target.style.display = 'none'}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Full details grid */}
+                                  <div className="grid grid-cols-2 gap-3 text-xs">
+                                    <div>
+                                      <p className="text-muted-foreground">Grade</p>
+                                      <p className="font-semibold text-foreground">{lot.grade}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Quantity</p>
+                                      <p className="font-semibold text-foreground">{lot.quantity_kg} kg</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Starting Price</p>
+                                      <p className="font-semibold text-foreground">{lot.currency} {lot.starting_price?.toLocaleString('en-IN')}/kg</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Min Increment</p>
+                                      <p className="font-semibold text-foreground">{lot.currency} {lot.bid_increment}</p>
+                                    </div>
+                                    {lot.seller_email && (
+                                      <div className="col-span-2">
+                                        <p className="text-muted-foreground">Seller</p>
+                                        <p className="font-semibold text-foreground">{lot.seller_name || lot.seller_email}</p>
+                                        {lot.seller_company && <p className="text-muted-foreground">{lot.seller_company}</p>}
+                                      </div>
+                                    )}
+                                    {lot.description && (
+                                      <div className="col-span-2">
+                                        <p className="text-muted-foreground">Description</p>
+                                        <p className="text-foreground leading-relaxed">{lot.description}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
                               {/* Live: show current bid */}
                               {lot.lot_status === 'live' && (
-                                <div className="bg-red-100 rounded-lg px-3 py-2 mb-3">
+                                <div className="bg-red-100 mx-4 mb-3 rounded-lg px-3 py-2">
                                   <p className="text-sm font-bold text-red-700">
                                     🔴 LIVE · Current: {lot.currency} {lot.current_price?.toLocaleString('en-IN')}/kg
                                   </p>
@@ -1472,7 +1532,7 @@ const AdminDashboard = () => {
 
                               {/* Sold: winner details */}
                               {lot.lot_status === 'sold' && (
-                                <div className="bg-green-100 rounded-lg px-3 py-2 mb-3">
+                                <div className="bg-green-100 mx-4 mb-3 rounded-lg px-3 py-2">
                                   <p className="text-sm font-bold text-green-700">
                                     ✅ SOLD at {lot.currency} {(lot.sold_price || lot.current_price)?.toLocaleString('en-IN')}/kg
                                   </p>
@@ -1485,13 +1545,13 @@ const AdminDashboard = () => {
 
                               {/* Unsold */}
                               {lot.lot_status === 'unsold' && (
-                                <div className="bg-gray-100 rounded-lg px-3 py-2 mb-3">
+                                <div className="bg-gray-100 mx-4 mb-3 rounded-lg px-3 py-2">
                                   <p className="text-sm text-gray-500 font-semibold">❌ No bids received</p>
                                 </div>
                               )}
 
                               {/* Action buttons — large, full-width on mobile */}
-                              <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                              <div className="flex flex-col sm:flex-row gap-2 px-4 pb-4">
                                 {lot.lot_status === 'registered' && (
                                   <button onClick={() => approveLot(lot.id)}
                                     className="flex-1 min-h-[44px] bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors inline-flex items-center justify-center gap-2 px-4">
@@ -1512,7 +1572,8 @@ const AdminDashboard = () => {
                                 )}
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

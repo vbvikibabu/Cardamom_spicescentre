@@ -94,9 +94,9 @@ code {
     background-image: url('https://grainy-gradients.vercel.app/noise.svg');
 }
 
-/* Smooth scroll */
+/* No scroll jump on form submit */
 html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto !important;
 }
 
 /* Custom input styles */
