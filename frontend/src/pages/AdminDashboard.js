@@ -1151,41 +1151,43 @@ const AdminDashboard = () => {
                           cancelled: [],
                         };
                         return (
-                          <div key={ev.id} className="border border-border rounded-xl p-4">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div key={ev.id} className="border border-border rounded-xl p-4 space-y-3">
+                            {/* Row 1: title + status badge + Manage button */}
+                            <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <h4 className="font-semibold text-foreground">{ev.title}</h4>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColors[ev.status] || 'bg-gray-100 text-gray-500'}`}>
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <h4 className="font-semibold text-foreground truncate">{ev.title}</h4>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase flex-shrink-0 ${statusColors[ev.status] || 'bg-gray-100 text-gray-500'}`}>
                                     {ev.status.replace('_', ' ')}
                                   </span>
                                 </div>
-                                <p className="text-xs text-muted-foreground">
-                                  📍 {ev.location} · 👤 {ev.agent_name} · 📅 {new Date(ev.auction_date).toLocaleString('en-IN')}
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  📍 {ev.location} · 👤 {ev.agent_name}<br className="sm:hidden" />
+                                  <span className="hidden sm:inline"> · </span>📅 {new Date(ev.auction_date).toLocaleString('en-IN')}
                                 </p>
                               </div>
-                              <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                                {nextStatuses[ev.status]?.map(s => (
+                              <button
+                                onClick={() => { setSelectedEventId(ev.id); fetchEventLots(ev.id); }}
+                                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+                                  selectedEventId === ev.id
+                                    ? 'bg-primary text-white'
+                                    : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                }`}
+                              >
+                                Manage Lots →
+                              </button>
+                            </div>
+                            {/* Row 2: status change buttons — wrap freely */}
+                            {nextStatuses[ev.status]?.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {nextStatuses[ev.status].map(s => (
                                   <button key={s} onClick={() => updateEventStatus(ev.id, s)}
-                                    className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-xs font-semibold hover:bg-muted/80 transition-colors capitalize">
+                                    className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-xs font-semibold hover:bg-muted/80 transition-colors capitalize whitespace-nowrap">
                                     → {s.replace('_', ' ')}
                                   </button>
                                 ))}
-                                <button
-                                  onClick={() => {
-                                    setSelectedEventId(ev.id);
-                                    fetchEventLots(ev.id);
-                                  }}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                                    selectedEventId === ev.id
-                                      ? 'bg-primary text-white'
-                                      : 'bg-primary/10 text-primary hover:bg-primary/20'
-                                  }`}
-                                >
-                                  Manage Lots →
-                                </button>
                               </div>
-                            </div>
+                            )}
                           </div>
                         );
                       })}
