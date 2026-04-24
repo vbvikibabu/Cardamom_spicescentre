@@ -1147,8 +1147,8 @@ const AdminDashboard = () => {
                           upcoming: ['registration_open', 'cancelled'],
                           registration_open: ['live', 'upcoming', 'cancelled'],
                           live: ['completed', 'cancelled'],
-                          completed: [],
-                          cancelled: [],
+                          completed: ['upcoming', 'cancelled'],
+                          cancelled: ['upcoming'],
                         };
                         return (
                           <div key={ev.id} className="border border-border rounded-xl p-4 space-y-3">

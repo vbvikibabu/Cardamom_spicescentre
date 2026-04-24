@@ -90,16 +90,19 @@ export default function AuctionRoom() {
         setCurrentLotData(liveLot);
         const remaining = calcRemaining(liveLot.auction_end_time);
         setTimeLeft(remaining);
-        setInitialSeconds(remaining || 45);
+        setInitialSeconds(remaining || 30);
+        // Seed bid amount so +increment buttons work immediately
+        const seedBid = liveLot.min_next_bid || (liveLot.current_price
+          ? liveLot.current_price + (liveLot.bid_increment || 10)
+          : (liveLot.starting_price || 0) + (liveLot.bid_increment || 10));
+        setBidAmount(String(seedBid));
         toast.success('🔴 Auction is LIVE! Place your bids!');
       }
 
-      // Server time sync for active live lot (every 6s poll re-calcs time)
+      // Poll sync for active live lot — only update lot data, NOT the timer.
+      // Timer is authoritative from WS (bid_update / timer_warning).
+      // Overriding timer here causes jumps due to client/server clock skew.
       if (activeLotRef.current && liveLot && liveLot.id === activeLotRef.current) {
-        const remaining = calcRemaining(liveLot.auction_end_time);
-        setTimeLeft(remaining);
-        // Keep initialSeconds in sync — if server extended timer, update it
-        setInitialSeconds(prev => remaining > prev ? remaining : prev);
         setCurrentLotData(prev => ({
           ...prev,
           ...liveLot, // full sync every 6s — ensures media_paths, grade etc always fresh
@@ -152,14 +155,15 @@ export default function AuctionRoom() {
           min_next_bid: msg.min_next_bid,
           total_bids: msg.total_bids,
         }));
-        // Sync timer on bid — reset initialSeconds so progress bar restarts from 100%
-        if (msg.end_time) {
+        // Sync timer on bid — prefer seconds_remaining (server's exact reset value,
+        // no client/server clock skew). Fall back to end_time only if needed.
+        if (msg.seconds_remaining !== undefined) {
+          setTimeLeft(msg.seconds_remaining);
+          setInitialSeconds(msg.seconds_remaining);
+        } else if (msg.end_time) {
           const remaining = calcRemaining(msg.end_time);
           setTimeLeft(remaining);
           setInitialSeconds(remaining);
-        } else if (msg.seconds_remaining !== undefined) {
-          setTimeLeft(msg.seconds_remaining);
-          setInitialSeconds(msg.seconds_remaining);
         }
         if (msg.viewer_count !== undefined) setViewerCount(msg.viewer_count);
         setRecentBids(prev => [{
@@ -266,7 +270,11 @@ export default function AuctionRoom() {
           setCurrentLotData(liveLot);
           const remaining = calcRemaining(liveLot.auction_end_time);
           setTimeLeft(remaining);
-          setInitialSeconds(remaining || 45);
+          setInitialSeconds(remaining || 30);
+          // Seed bid input so +increment buttons work from first tap
+          const seedBid = liveLot.min_next_bid
+            || ((liveLot.current_price || 0) + (liveLot.bid_increment || 10));
+          setBidAmount(String(seedBid));
         }
       })
       .catch(console.error);
@@ -473,7 +481,16 @@ export default function AuctionRoom() {
                         <button
                           key={mult}
                           type="button"
-                          onClick={() => setBidAmount(prev => String((parseFloat(prev) || currentLotData.min_next_bid || 0) + inc))}
+                          onClick={() => setBidAmount(prev => {
+                            const parsed = parseFloat(prev);
+                            // Use current input if valid, otherwise fall back to min_next_bid,
+                            // then current_price+increment — never fall to 0
+                            const base = (!isNaN(parsed) && parsed > 0)
+                              ? parsed
+                              : (currentLotData.min_next_bid
+                                  || ((currentLotData.current_price || 0) + (currentLotData.bid_increment || 10)));
+                            return String(base + inc);
+                          })}
                           className="flex-1 py-1.5 bg-[#f0fdf4] border border-[#2d5a27]/30 text-[#2d5a27] text-xs font-bold rounded-lg hover:bg-[#2d5a27]/10 transition-colors"
                         >
                           +{inc}
