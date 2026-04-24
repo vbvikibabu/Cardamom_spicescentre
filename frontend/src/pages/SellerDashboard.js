@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart, Timer, Archive, RotateCcw, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
+import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart, Timer, Archive, RotateCcw, AlertCircle, Loader2, ArrowRight, Home, ShoppingBag, Megaphone, User } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
 
 const getGreeting = (firstName) => {
@@ -384,33 +384,38 @@ const SellerDashboard = () => {
   const greeting = getGreeting(firstName);
 
   return (
-    <div data-testid="seller-dashboard" className="min-h-screen bg-muted pt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 py-8 md:py-12">
-        <div className="flex items-start justify-between mb-5 gap-4">
+    <div data-testid="seller-dashboard" className="min-h-screen bg-[#f5f0e8] pt-20">
+      <div className="max-w-4xl mx-auto px-4 py-6">
+
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between mb-1 gap-3">
           <div className="flex-1 min-w-0">
-            <h1 className="font-serif text-3xl md:text-5xl font-bold text-foreground mb-1">{greeting} 👋</h1>
-            <p className="text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <h1 className="font-serif text-2xl md:text-3xl font-bold text-[#1a3a1a]">{greeting} 👋</h1>
+              <span className="text-[11px] font-bold bg-amber-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+                Seller
+              </span>
+            </div>
+            <p className="text-sm text-gray-500 mt-0.5">
               {products.filter(p => p.listing_status === 'active').length > 0
-                ? `You have ${products.filter(p => p.listing_status === 'active').length} active listing${products.filter(p => p.listing_status === 'active').length > 1 ? 's' : ''}.`
+                ? `${products.filter(p => p.listing_status === 'active').length} active listing${products.filter(p => p.listing_status === 'active').length > 1 ? 's' : ''} · ${bidsSummary.pending || 0} pending bid${bidsSummary.pending !== 1 ? 's' : ''}`
                 : 'No active listings. Add your first product to get started.'}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* FIX 7 — small role switch pill */}
             {user?.role === 'both' && (
               <Link
                 to="/dashboard"
                 data-testid="switch-to-buyer-btn"
-                className="text-xs font-semibold text-primary border border-primary/60 px-3 py-1.5 rounded-full hover:bg-primary/5 transition-colors whitespace-nowrap"
+                className="text-xs font-semibold text-[#2d5a27] border border-[#2d5a27]/60 px-3 py-1.5 rounded-full hover:bg-[#2d5a27]/5 transition-colors whitespace-nowrap"
               >
                 Switch to Buyer →
               </Link>
             )}
-            {/* Prominent Add Product CTA */}
             <button
               data-testid="seller-add-product-btn-header"
               onClick={() => { setActiveTab('products'); openProductForm(); }}
-              className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 bg-[#2d5a27] text-white px-4 py-2.5 rounded-full text-sm font-semibold hover:bg-[#1a3a1a] transition-colors shadow-sm"
             >
               <Plus size={16} />
               <span className="hidden sm:inline">Add Product</span>
@@ -419,13 +424,31 @@ const SellerDashboard = () => {
           </div>
         </div>
 
+        {/* ── Quick actions ── */}
+        <div className="flex gap-2 mb-5 mt-4 overflow-x-auto scrollbar-none">
+          {[
+            { icon: <Home size={14} />,        label: 'Home',     to: '/'         },
+            { icon: <ShoppingBag size={14} />, label: 'Products', to: '/products' },
+            { icon: <Megaphone size={14} />,   label: 'Auctions', to: '/auctions' },
+            { icon: <User size={14} />,        label: 'Profile',  to: '/profile'  },
+          ].map(({ icon, label, to }) => (
+            <Link
+              key={label}
+              to={to}
+              className="flex-shrink-0 inline-flex items-center gap-1.5 bg-white border border-gray-200 text-[#1a3a1a] px-3 py-2 rounded-full text-xs font-semibold hover:border-[#2d5a27] hover:text-[#2d5a27] transition-colors shadow-sm"
+            >
+              {icon} {label}
+            </Link>
+          ))}
+        </div>
+
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="border-b border-border">
+          <div className="border-b border-gray-100">
             <div className="flex">
               {tabs.map(t => (
                 <button key={t.key} data-testid={`seller-tab-${t.key}`} onClick={() => setActiveTab(t.key)}
-                  className={`px-6 py-4 font-semibold text-sm transition-colors ${activeTab === t.key ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+                  className={`px-6 py-4 font-semibold text-sm transition-colors ${activeTab === t.key ? 'text-[#2d5a27] border-b-2 border-[#2d5a27]' : 'text-gray-400 hover:text-[#1a3a1a]'}`}>
                   {t.label}
                 </button>
               ))}
@@ -958,3 +981,4 @@ const SellerDashboard = () => {
 };
 
 export default SellerDashboard;
+

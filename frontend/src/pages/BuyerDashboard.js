@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Gavel, ArrowRight, ShoppingBag } from 'lucide-react';
+import { Gavel, ArrowRight, Home, ShoppingBag, Megaphone, User } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -80,47 +80,65 @@ const BuyerDashboard = () => {
   const filteredBids = filter === 'all' ? bids : bids.filter(b => b.status === filter);
 
   return (
-    <div data-testid="buyer-dashboard" className="min-h-screen bg-muted pt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 py-8 md:py-12">
+    <div data-testid="buyer-dashboard" className="min-h-screen bg-[#f5f0e8] pt-20">
+      <div className="max-w-4xl mx-auto px-4 py-6">
 
-        {/* ── Header row ── */}
-        <div className="flex items-start justify-between mb-5 gap-4">
-          <div>
-            <h1 className="font-serif text-3xl md:text-5xl font-bold text-foreground mb-1">{greeting}</h1>
-            <p className="text-sm text-muted-foreground">{statusMsg}</p>
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between mb-1 gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <h1 className="font-serif text-2xl md:text-3xl font-bold text-[#1a3a1a]">{greeting}</h1>
+              <span className="text-[11px] font-bold bg-[#2d5a27] text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+                Buyer
+              </span>
+            </div>
+            {/* Live bid summary */}
+            {bids.length > 0 && (
+              <p className={`text-sm mt-0.5 ${filterCounts.pending > 0 ? 'text-amber-700' : 'text-gray-500'}`}>
+                {filterCounts.pending > 0
+                  ? `⏳ ${filterCounts.pending} pending · ${filterCounts.accepted} accepted bid${filterCounts.accepted !== 1 ? 's' : ''}`
+                  : filterCounts.accepted > 0
+                    ? `🎉 ${filterCounts.accepted} accepted bid${filterCounts.accepted !== 1 ? 's' : ''}`
+                    : `${bids.length} bid${bids.length !== 1 ? 's' : ''} placed`}
+              </p>
+            )}
           </div>
-          {/* FIX 7 — small role switch pill, only for "both" */}
           {user?.role === 'both' && (
             <Link
               to="/seller"
               data-testid="switch-to-seller-btn"
-              className="flex-shrink-0 text-xs font-semibold text-primary border border-primary/60 px-3 py-1.5 rounded-full hover:bg-primary/5 transition-colors whitespace-nowrap"
+              className="flex-shrink-0 text-xs font-semibold text-[#2d5a27] border border-[#2d5a27]/60 px-3 py-1.5 rounded-full hover:bg-[#2d5a27]/5 transition-colors whitespace-nowrap"
             >
               Switch to Seller →
             </Link>
           )}
         </div>
 
-        {/* ── Quick action buttons (small, single row) ── */}
-        <div className="flex gap-3 mb-6">
-          <Link
-            to="/products"
-            className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors"
-          >
-            <ShoppingBag size={15} /> Browse Products
-          </Link>
-          <div className="inline-flex items-center gap-2 bg-white border border-border px-4 py-2 rounded-full text-sm font-medium text-foreground">
-            <Gavel size={15} className="text-primary" /> {bids.length} Bid{bids.length !== 1 ? 's' : ''}
-          </div>
+        {/* ── Quick actions ── */}
+        <div className="flex gap-2 mb-5 mt-4 overflow-x-auto scrollbar-none">
+          {[
+            { icon: <Home size={14} />,        label: 'Home',     to: '/'         },
+            { icon: <ShoppingBag size={14} />, label: 'Browse',   to: '/products' },
+            { icon: <Megaphone size={14} />,   label: 'Auctions', to: '/auctions' },
+            { icon: <User size={14} />,        label: 'Profile',  to: '/profile'  },
+          ].map(({ icon, label, to }) => (
+            <Link
+              key={label}
+              to={to}
+              className="flex-shrink-0 inline-flex items-center gap-1.5 bg-white border border-gray-200 text-[#1a3a1a] px-3 py-2 rounded-full text-xs font-semibold hover:border-[#2d5a27] hover:text-[#2d5a27] transition-colors shadow-sm"
+            >
+              {icon} {label}
+            </Link>
+          ))}
         </div>
 
         {/* ── Bids section ── */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-border">
-            <h2 className="font-semibold text-foreground">My Bids</h2>
+          <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-100">
+            <h2 className="font-semibold text-[#1a3a1a]">My Bids</h2>
             <Link
               to="/products"
-              className="hidden md:inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:gap-2 transition-all"
+              className="hidden md:inline-flex items-center gap-1.5 text-sm text-[#2d5a27] font-medium hover:gap-2 transition-all"
             >
               Browse Products <ArrowRight size={14} />
             </Link>
@@ -254,3 +272,4 @@ const BuyerDashboard = () => {
 };
 
 export default BuyerDashboard;
+
