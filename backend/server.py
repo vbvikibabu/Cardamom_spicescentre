@@ -2070,6 +2070,45 @@ async def start_auction_lot(lot_id: str, admin: User = Depends(get_current_admin
         "viewer_count": auction_manager.get_viewer_count(lot_id)
     })
     logger.info(f"Auction lot started: {lot_id}")
+
+    # FIX 6 — Email all approved buyers/both in background
+    async def _send_lot_start_emails(lot_data: dict, event_id: str, lot_end_time: datetime):
+        try:
+            buyers = await db.users.find(
+                {"role": {"$in": ["buyer", "both"]}, "status": "approved"},
+                {"_id": 0, "email": 1, "full_name": 1}
+            ).to_list(500)
+            auction_url = f"https://cardamomspicescentre.com/auctions/{event_id}"
+            currency_sym = "₹" if lot_data.get("currency", "INR") == "INR" else "$"
+            end_str = lot_end_time.strftime("%I:%M %p UTC")
+            for buyer in buyers:
+                name = buyer.get("full_name", "Valued Buyer")
+                html = f"""
+<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f5f0e8;padding:24px">
+<div style="max-width:540px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  <div style="background:#b91c1c;padding:20px 24px;text-align:center">
+    <p style="color:white;font-size:22px;font-weight:700;margin:0">🔴 LIVE AUCTION STARTED</p>
+  </div>
+  <div style="padding:24px">
+    <p style="color:#374151;margin:0 0 16px">Hi {name},</p>
+    <p style="color:#374151;margin:0 0 20px">A new lot is now <strong>LIVE</strong> on Cardamom Spices Centre auction!</p>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px">
+      <p style="margin:0 0 6px;font-weight:700;font-size:16px;color:#1a3a1a">{lot_data.get('product_name','Cardamom')} — {lot_data.get('grade','')}</p>
+      <p style="margin:0 0 4px;color:#6b7280;font-size:14px">📦 Quantity: <strong>{lot_data.get('quantity_kg','')} kg</strong></p>
+      <p style="margin:0 0 4px;color:#6b7280;font-size:14px">💰 Starting: <strong>{currency_sym}{lot_data.get('starting_price',0):.0f}/kg</strong></p>
+      <p style="margin:0;color:#6b7280;font-size:14px">⏱ Bidding closes at: <strong>{end_str}</strong></p>
+    </div>
+    <a href="{auction_url}" style="display:block;text-align:center;background:#2d5a27;color:white;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:700;font-size:15px">Join Auction Now →</a>
+    <p style="color:#9ca3af;font-size:12px;margin-top:20px;text-align:center">Cardamom Spices Centre · Spiceboard Registered Exporter</p>
+  </div>
+</div>
+</body></html>"""
+                asyncio.create_task(_smtp_send(buyer["email"], "🔴 LIVE: Cardamom Auction Started!", html))
+        except Exception as e:
+            logger.warning(f"Failed to send lot-start emails: {e}")
+
+    asyncio.create_task(_send_lot_start_emails(lot, lot.get("auction_event_id", ""), end_time))
+
     return {"message": "Lot started", "end_time": end_time.isoformat()}
 
 @api_router.post("/auction/lots/{lot_id}/close")

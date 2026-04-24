@@ -273,7 +273,7 @@ export default function AuctionRoom() {
 
   useEffect(() => {
     if (activeLot) return;
-    const interval = setInterval(pollForLiveLot, 8000);
+    const interval = setInterval(pollForLiveLot, 5000);
     return () => clearInterval(interval);
   }, [activeLot, pollForLiveLot]);
 
