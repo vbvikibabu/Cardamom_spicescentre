@@ -9,21 +9,29 @@ const WS_URL = API_URL
   .replace('https://', 'wss://')
   .replace('http://', 'ws://');
 
-// FIX 3 — Extract best image URL from a lot
+// FIX 6 — Extract best image URL from a lot (updated regex)
 const getLotImage = (lot) => {
   if (!lot) return null;
-  if (lot.media_paths?.length > 0) {
-    const img = lot.media_paths.find(url =>
-      /\.(jpg|jpeg|png|webp)(\?|$)/i.test(url) ||
-      url.includes('/image/upload/')
-    );
-    if (img) return img;
-    const vid = lot.media_paths.find(url => url.includes('/video/upload/'));
-    if (vid) return vid
-      .replace('/video/upload/', '/video/upload/so_0,f_jpg,q_80/')
-      .replace(/\.(mp4|mov)$/, '.jpg');
-  }
+  const paths = lot.media_paths || [];
+  const img = paths.find(url =>
+    /\.(jpg|jpeg|png|webp)/i.test(url) || url.includes('/image/upload/')
+  );
+  if (img) return img;
+  const vid = paths.find(url =>
+    url.includes('/video/upload/') || /\.(mp4|mov)/i.test(url)
+  );
+  if (vid) return vid
+    .replace('/video/upload/', '/video/upload/so_0,f_jpg,q_80/')
+    .replace(/\.(mp4|mov)(\?|$)/, '.jpg$2');
   return null;
+};
+
+// FIX 4 — Calculate remaining seconds from server end_time string
+const calcRemaining = (endTimeStr) => {
+  if (!endTimeStr) return 0;
+  const end = new Date(endTimeStr);
+  const now = new Date();
+  return Math.max(0, Math.floor((end - now) / 1000));
 };
 
 export default function AuctionRoom() {
@@ -38,6 +46,7 @@ export default function AuctionRoom() {
   const [bidAmount, setBidAmount] = useState('');
   const [bidding, setBidding] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [initialSeconds, setInitialSeconds] = useState(45); // FIX 4 — track first server value
   const [showSold, setShowSold] = useState(false);
   const [soldData, setSoldData] = useState(null);
   const [viewerCount, setViewerCount] = useState(0);
@@ -53,66 +62,73 @@ export default function AuctionRoom() {
     activeLotRef.current = activeLot;
   }, [activeLot]);
 
-  // ── Fetch lot status from server (source of truth) ──
-  const fetchLotStatus = useCallback(async (lotId) => {
-    if (!lotId) return;
-    try {
-      const res = await axios.get(`${API_URL}/api/auction/lots/${lotId}/live`);
-      const data = res.data;
-      setCurrentLotData(data);
-      // FIX 1 — calculate time from server's end_time, not seconds_remaining
-      if (data.end_time) {
-        const serverEnd = new Date(data.end_time);
-        const now = new Date();
-        const remaining = Math.max(0, Math.floor((serverEnd - now) / 1000));
-        setTimeLeft(remaining);
-      } else {
-        setTimeLeft(data.seconds_remaining || 0);
-      }
-      setRecentBids(data.recent_bids || []);
-      setViewerCount(data.viewer_count || 0);
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
-
-  // FIX 1 — Server timer sync every 5 seconds while lot is live
+  // FIX 4 — Local countdown between server syncs (1s tick)
   useEffect(() => {
-    if (!activeLot) return;
+    if (timeLeft > 0 && currentLotData?.lot_status === 'live') {
+      timerRef.current = setTimeout(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
+    }
+    return () => clearTimeout(timerRef.current);
+  }, [timeLeft, currentLotData?.lot_status]);
 
-    const syncTimer = setInterval(async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/auction/lots/${activeLot}/live`);
-        const data = res.data;
+  // FIX 5 — Unified poll: runs every 6s always (lobby + live)
+  const pollEventStatus = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/auction/events/${eventId}`);
+      const data = res.data;
+      const newLots = data.lots || [];
+      setLots(newLots);
 
-        if (data.lot_status !== 'live') {
-          clearInterval(syncTimer);
-          setCurrentLotData(data);
-          return;
-        }
+      if (!data.event && !event) {
+        setEvent(data.event || null);
+      }
 
-        if (data.end_time) {
-          const serverEnd = new Date(data.end_time);
-          const now = new Date();
-          const remaining = Math.max(0, Math.floor((serverEnd - now) / 1000));
-          setTimeLeft(remaining);
-        }
+      const liveLot = newLots.find(l => l.lot_status === 'live');
 
+      // Lot just went live — connect and start bidding
+      if (liveLot && liveLot.id !== activeLotRef.current) {
+        setActiveLot(liveLot.id);
+        setCurrentLotData(liveLot);
+        const remaining = calcRemaining(liveLot.auction_end_time);
+        setTimeLeft(remaining);
+        setInitialSeconds(remaining || 45);
+        toast.success('🔴 Auction is LIVE! Place your bids!');
+      }
+
+      // FIX 4 — Server time sync for active live lot (every 6s poll re-calcs time)
+      if (activeLotRef.current && liveLot && liveLot.id === activeLotRef.current) {
+        const remaining = calcRemaining(liveLot.auction_end_time);
+        setTimeLeft(remaining);
         setCurrentLotData(prev => ({
           ...prev,
-          current_price: data.current_price,
-          current_winner: data.current_winner,
-          current_winner_company: data.current_winner_company,
-          min_next_bid: data.min_next_bid,
-          total_bids: data.total_bids,
+          current_price: liveLot.current_price,
+          current_winner: liveLot.current_winner,
+          current_winner_company: liveLot.current_winner_company,
+          min_next_bid: liveLot.min_next_bid,
+          total_bids: liveLot.total_bids,
         }));
-      } catch (e) {
-        console.error('Timer sync error:', e);
       }
-    }, 5000);
 
-    return () => clearInterval(syncTimer);
-  }, [activeLot]);
+      // Active lot closed
+      if (activeLotRef.current && !liveLot) {
+        const closedLot = newLots.find(
+          l => l.id === activeLotRef.current && l.lot_status !== 'live'
+        );
+        if (closedLot) {
+          setCurrentLotData(closedLot);
+          setActiveLot(null);
+        }
+      }
+    } catch (e) {
+      console.error('Poll error:', e);
+    }
+  }, [eventId, event]);
+
+  // FIX 5 — Always poll every 6s regardless of lobby/live state
+  useEffect(() => {
+    pollEventStatus();
+    const interval = setInterval(pollEventStatus, 6000);
+    return () => clearInterval(interval);
+  }, [pollEventStatus]);
 
   const handleWSMessage = useCallback((msg) => {
     switch (msg.type) {
@@ -121,9 +137,11 @@ export default function AuctionRoom() {
           ...prev,
           lot_status: msg.lot_status,
           current_price: msg.current_price,
-          seconds_remaining: msg.seconds_remaining,
         }));
-        if (msg.seconds_remaining) setTimeLeft(msg.seconds_remaining);
+        if (msg.seconds_remaining) {
+          setTimeLeft(msg.seconds_remaining);
+          setInitialSeconds(msg.seconds_remaining);
+        }
         if (msg.viewer_count !== undefined) setViewerCount(msg.viewer_count);
         break;
 
@@ -136,8 +154,13 @@ export default function AuctionRoom() {
           min_next_bid: msg.min_next_bid,
           total_bids: msg.total_bids,
         }));
-        // Use server's seconds_remaining from the message
-        if (msg.seconds_remaining) setTimeLeft(msg.seconds_remaining);
+        // FIX 4 — use end_time from bid_update if available, else seconds_remaining
+        if (msg.end_time) {
+          const remaining = calcRemaining(msg.end_time);
+          setTimeLeft(remaining);
+        } else if (msg.seconds_remaining) {
+          setTimeLeft(msg.seconds_remaining);
+        }
         if (msg.viewer_count !== undefined) setViewerCount(msg.viewer_count);
         setRecentBids(prev => [{
           bidder: msg.bidder_display,
@@ -148,8 +171,15 @@ export default function AuctionRoom() {
         break;
 
       case 'lot_started':
+        // FIX 4 — use end_time for accurate server-derived initial value
+        {
+          const remaining = msg.end_time
+            ? calcRemaining(msg.end_time)
+            : (msg.seconds_remaining || 45);
+          setTimeLeft(remaining);
+          setInitialSeconds(remaining);
+        }
         setCurrentLotData(msg);
-        setTimeLeft(msg.seconds_remaining || 45);
         setShowSold(false);
         setSoldData(null);
         setBidAmount(String((msg.starting_price || 0) + (msg.bid_increment || 10)));
@@ -165,19 +195,23 @@ export default function AuctionRoom() {
         toast.success(`SOLD! ${msg.product_name} to ${msg.winner_name}`);
         setTimeout(() => {
           setShowSold(false);
-          fetchLotStatus(activeLotRef.current);
+          setActiveLot(null);
         }, 8000);
         break;
 
       case 'lot_unsold':
         setCurrentLotData(prev => ({ ...prev, lot_status: 'unsold' }));
         toast.error(`${msg.product_name} — No bids received`);
-        setTimeout(() => fetchLotStatus(activeLotRef.current), 3000);
+        setTimeout(() => setActiveLot(null), 3000);
         break;
 
       case 'timer_warning':
-        // FIX 1 — always use server value
-        setTimeLeft(msg.seconds_remaining);
+        // FIX 4 — prefer end_time calculation
+        if (msg.end_time) {
+          setTimeLeft(calcRemaining(msg.end_time));
+        } else {
+          setTimeLeft(msg.seconds_remaining);
+        }
         break;
 
       case 'viewer_update':
@@ -187,7 +221,7 @@ export default function AuctionRoom() {
       default:
         break;
     }
-  }, [fetchLotStatus]);
+  }, []);
 
   const connectWS = useCallback((lotId) => {
     if (wsRef.current) wsRef.current.close();
@@ -220,62 +254,34 @@ export default function AuctionRoom() {
     ws.onerror = () => setWsConnected(false);
   }, [handleWSMessage]);
 
-  // Load event + lots on mount
+  // Load event on mount
   useEffect(() => {
     axios.get(`${API_URL}/api/auction/events/${eventId}`)
       .then(r => {
         setEvent(r.data.event);
-        setLots(r.data.lots);
-        const liveLot = r.data.lots.find(l => l.lot_status === 'live');
+        setLots(r.data.lots || []);
+        const liveLot = (r.data.lots || []).find(l => l.lot_status === 'live');
         if (liveLot) {
           setActiveLot(liveLot.id);
           setCurrentLotData(liveLot);
+          const remaining = calcRemaining(liveLot.auction_end_time);
+          setTimeLeft(remaining);
+          setInitialSeconds(remaining || 45);
         }
       })
       .catch(console.error);
   }, [eventId]);
 
-  // Connect WS + fetch status when active lot changes
+  // Connect WS when active lot changes
   useEffect(() => {
     if (!activeLot) return;
     connectWS(activeLot);
-    fetchLotStatus(activeLot);
     return () => {
       if (wsRef.current) wsRef.current.close();
       clearTimeout(timerRef.current);
       clearInterval(pingRef.current);
     };
-  }, [activeLot, connectWS, fetchLotStatus]);
-
-  // FIX 1 — Local countdown between server syncs (every 1s)
-  useEffect(() => {
-    if (timeLeft > 0 && currentLotData?.lot_status === 'live') {
-      timerRef.current = setTimeout(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
-    }
-    return () => clearTimeout(timerRef.current);
-  }, [timeLeft, currentLotData?.lot_status]);
-
-  // FIX 2 — Poll for lot going live when in lobby (every 8s)
-  const pollForLiveLot = useCallback(async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/auction/events/${eventId}`);
-      const liveLot = res.data.lots.find(l => l.lot_status === 'live');
-      if (liveLot && liveLot.id !== activeLotRef.current) {
-        setActiveLot(liveLot.id);
-        setCurrentLotData(liveLot);
-        toast.success('🔴 Auction is LIVE! Place your bids!');
-      }
-      setLots(res.data.lots);
-    } catch (e) {
-      console.error(e);
-    }
-  }, [eventId]);
-
-  useEffect(() => {
-    if (activeLot) return;
-    const interval = setInterval(pollForLiveLot, 5000);
-    return () => clearInterval(interval);
-  }, [activeLot, pollForLiveLot]);
+  }, [activeLot, connectWS]);
 
   const placeBid = async () => {
     if (!user || !token) {
@@ -283,7 +289,7 @@ export default function AuctionRoom() {
       navigate('/login');
       return;
     }
-    // FIX 1 — Hard block when timer is 0 or lot not live
+    // FIX 4 — Hard block when timer is 0 or lot not live
     if (timeLeft === 0 || currentLotData?.lot_status !== 'live') {
       toast.error('Bidding is closed for this lot');
       return;
@@ -291,7 +297,10 @@ export default function AuctionRoom() {
     const amount = parseFloat(bidAmount);
     if (!amount || isNaN(amount)) { toast.error('Enter a valid bid amount'); return; }
     const minBid = currentLotData?.min_next_bid || 0;
-    if (amount < minBid) { toast.error(`Minimum bid is ₹${minBid?.toLocaleString('en-IN')}/kg`); return; }
+    if (amount < minBid) {
+      toast.error(`Minimum bid is ₹${minBid?.toLocaleString('en-IN')}/kg`);
+      return;
+    }
 
     setBidding(true);
     try {
@@ -309,10 +318,13 @@ export default function AuctionRoom() {
     }
   };
 
+  // FIX 4 — Progress bar uses initialSeconds (no hardcoded 30/45)
   const timerColor = timeLeft <= 10 ? 'bg-red-600' : timeLeft <= 20 ? 'bg-amber-500' : 'bg-[#2d5a27]';
-  const timerText = timeLeft === 0 ? 'Bidding Closed' : timeLeft <= 5 ? 'Going twice...' : timeLeft <= 10 ? 'Going once...' : 'Time Remaining';
-  const bidWindowSeconds = currentLotData?.bid_window_seconds || 45;
+  const timerText  = timeLeft === 0 ? 'Bidding Closed' : timeLeft <= 5 ? 'Going twice...' : timeLeft <= 10 ? 'Going once...' : 'Time Remaining';
+  const progressPct = initialSeconds > 0 ? Math.min(100, (timeLeft / initialSeconds) * 100) : 0;
   const isLiveBidding = currentLotData?.lot_status === 'live' && timeLeft > 0;
+
+  const lotImage = getLotImage(currentLotData);
 
   if (!event) {
     return (
@@ -324,8 +336,6 @@ export default function AuctionRoom() {
       </div>
     );
   }
-
-  const lotImage = getLotImage(currentLotData);
 
   return (
     <div className="min-h-screen bg-[#1a3a1a] pb-24 md:pb-0 pt-20 relative">
@@ -352,16 +362,16 @@ export default function AuctionRoom() {
         </div>
       )}
 
-      {/* FIX 7 — Top bar: tighter, no overflow */}
-      <div className="bg-[#0d2a0d] px-4 py-2.5 flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
+      {/* FIX 8 — Top bar: tighter, truncate, no overflow */}
+      <div className="bg-[#0d2a0d] px-3 py-2 flex justify-between items-center overflow-hidden gap-2">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <p className="text-green-300 text-[10px] font-bold tracking-wider uppercase">Live Auction</p>
           <p className="text-white font-semibold text-sm truncate">{event.title}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="text-right">
-            <p className="text-green-300 text-[10px] truncate max-w-28">📍 {event.location}</p>
-            <p className="text-gray-400 text-[10px]">👥 {viewerCount} watching</p>
+            <p className="text-green-300 text-xs truncate max-w-28">📍 {event.location}</p>
+            <p className="text-gray-400 text-xs">👥 {viewerCount} watching</p>
           </div>
           <div className={`w-2 h-2 rounded-full flex-shrink-0 ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
         </div>
@@ -371,25 +381,27 @@ export default function AuctionRoom() {
       {currentLotData?.lot_status === 'live' ? (
         <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
 
-          {/* FIX 7 — Lot header card */}
+          {/* Lot header card — FIX 6 image */}
           <div className="bg-[#0d2a0d] rounded-xl p-4">
             <div className="flex justify-between text-green-300 text-xs mb-2">
               <span>LOT {currentLotData.lot_number || '–'}</span>
               <span>{currentLotData.total_bids || 0} bids</span>
             </div>
-            {/* FIX 3 — Lot image */}
+            {/* FIX 6 — Lot image */}
             {lotImage && (
               <img
                 src={lotImage}
                 alt={currentLotData.product_name}
-                className="w-full h-40 object-cover rounded-lg mb-3"
+                className="w-full rounded-lg mt-1 mb-3"
+                style={{ height: '160px', objectFit: 'cover' }}
+                onError={e => e.target.style.display = 'none'}
               />
             )}
             <h2 className="text-white text-lg font-serif font-bold mb-0.5 truncate">{currentLotData.product_name}</h2>
             <p className="text-green-300 text-xs truncate">{currentLotData.grade} · {currentLotData.quantity_kg} kg</p>
           </div>
 
-          {/* Current bid — FIX 7 smaller price on mobile */}
+          {/* Current bid — FIX 8 */}
           <div className="bg-white rounded-xl p-4 text-center">
             <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Current Bid</p>
             <p className="text-3xl md:text-4xl font-bold text-[#2d5a27] mb-1">
@@ -401,21 +413,22 @@ export default function AuctionRoom() {
             </p>
           </div>
 
-          {/* Countdown timer — FIX 7 text-4xl on mobile */}
+          {/* Countdown timer — FIX 4 progress bar uses initialSeconds, FIX 8 */}
           <div className={`${timerColor} rounded-xl p-4 text-center transition-colors duration-500`}>
             <p className="text-white/70 text-xs uppercase tracking-wider mb-1">{timerText}</p>
-            <p className={`text-white font-bold text-4xl md:text-5xl font-mono ${timeLeft <= 10 ? 'animate-pulse' : ''}`}>
+            <p className={`text-white font-bold font-mono text-4xl md:text-5xl ${timeLeft <= 10 ? 'animate-pulse' : ''}`}>
               {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
             </p>
+            {/* FIX 4 — no hardcoded 30/45: uses initialSeconds */}
             <div className="mt-2 bg-white/20 rounded-full h-1.5 overflow-hidden">
               <div
                 className="bg-white h-full transition-all duration-1000 rounded-full"
-                style={{ width: `${Math.min(100, (timeLeft / bidWindowSeconds) * 100)}%` }}
+                style={{ width: `${progressPct}%` }}
               />
             </div>
           </div>
 
-          {/* Bid input — FIX 1 blocked when timer=0, FIX 7 mobile layout */}
+          {/* Bid input — FIX 8 mobile layout */}
           {user ? (
             <div className="bg-white rounded-xl p-4">
               <p className="text-gray-500 text-[11px] mb-2 text-center">
@@ -429,12 +442,12 @@ export default function AuctionRoom() {
                     value={bidAmount}
                     onChange={e => setBidAmount(e.target.value)}
                     placeholder={`Min ₹${currentLotData.min_next_bid}`}
-                    className="flex-1 border-2 border-[#2d5a27] rounded-lg px-3 py-3 text-lg font-bold text-center focus:outline-none"
+                    className="flex-1 min-w-0 border-2 border-[#2d5a27] rounded-lg px-3 py-3 text-lg font-bold text-center focus:outline-none"
                   />
                   <button
                     onClick={placeBid}
                     disabled={bidding}
-                    className="bg-[#2d5a27] text-white px-4 py-3 rounded-lg font-bold text-base disabled:opacity-50 active:scale-95 transition-transform w-20"
+                    className="w-20 flex-shrink-0 bg-[#2d5a27] text-white px-2 py-3 rounded-lg font-bold text-sm disabled:opacity-50 active:scale-95 transition-transform"
                   >
                     {bidding ? '...' : '🔨 BID'}
                   </button>
@@ -454,7 +467,7 @@ export default function AuctionRoom() {
             </button>
           )}
 
-          {/* Bid history — FIX 7 max 5 items, truncate bidder name */}
+          {/* Bid history */}
           {recentBids.length > 0 && (
             <div className="bg-[#0d2a0d] rounded-xl p-4">
               <p className="text-green-300 text-xs uppercase tracking-wider mb-3">Bid History</p>
@@ -474,7 +487,7 @@ export default function AuctionRoom() {
         </div>
 
       ) : (
-        /* FIX 2 — Lobby/waiting view with polling */
+        /* FIX 5 — Lobby/waiting view — auto-detects live every 6s */
         <div className="px-4 py-6 max-w-lg mx-auto">
           <div className="text-center mb-5">
             <p className="text-green-300 text-sm">
@@ -482,11 +495,11 @@ export default function AuctionRoom() {
                 ? `⏳ ${lots.filter(l => l.lot_status === 'approved').length} lots queued — waiting for admin to start`
                 : 'Waiting for auction to begin...'}
             </p>
-            <p className="text-gray-500 text-xs mt-1">Page updates automatically every 8 seconds</p>
+            <p className="text-gray-500 text-xs mt-1">Page updates automatically every 6 seconds</p>
           </div>
           <div className="space-y-3">
             {lots.map(lot => {
-              const thumbImg = getLotImage(lot); // FIX 3 — thumbnails in lobby
+              const thumbImg = getLotImage(lot);
               return (
                 <div
                   key={lot.id}
@@ -508,7 +521,12 @@ export default function AuctionRoom() {
                     <div>
                       <div className="flex items-start gap-3 mb-2">
                         {thumbImg && (
-                          <img src={thumbImg} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0 opacity-60" />
+                          <img
+                            src={thumbImg}
+                            alt=""
+                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0 opacity-60"
+                            onError={e => e.target.style.display = 'none'}
+                          />
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-gray-500 mb-0.5">LOT {lot.lot_number}</p>
@@ -533,8 +551,14 @@ export default function AuctionRoom() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
+                      {/* FIX 6 — thumbnail in lobby */}
                       {thumbImg && (
-                        <img src={thumbImg} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                        <img
+                          src={thumbImg}
+                          alt=""
+                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                          onError={e => e.target.style.display = 'none'}
+                        />
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-gray-400 mb-0.5">LOT {lot.lot_number}</p>
@@ -559,9 +583,9 @@ export default function AuctionRoom() {
                           ? 'bg-amber-500/20 text-amber-300'
                           : 'bg-gray-700 text-gray-400'
                       }`}>
-                        {lot.lot_status === 'live' ? '🔴 LIVE'
+                        {lot.lot_status === 'live'    ? '🔴 LIVE'
                           : lot.lot_status === 'approved' ? 'NEXT'
-                          : lot.lot_status === 'unsold' ? '❌'
+                          : lot.lot_status === 'unsold'   ? '❌'
                           : lot.lot_status.toUpperCase()}
                       </span>
                     </div>
