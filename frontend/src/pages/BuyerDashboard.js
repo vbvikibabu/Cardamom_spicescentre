@@ -98,10 +98,10 @@ const BuyerDashboard = () => {
             </div>
             <p className="text-sm mt-0.5 text-gray-500">
               {filterCounts.pending > 0
-                ? `⏳ ${filterCounts.pending} pending · ${filterCounts.accepted} accepted bids`
+                ? `⏳ ${filterCounts.pending} pending · ${filterCounts.accepted} accepted enquiries`
                 : filterCounts.accepted > 0
-                  ? `🎉 ${filterCounts.accepted} accepted bids`
-                  : `${bids.length} bids placed`}
+                  ? `🎉 ${filterCounts.accepted} accepted enquiries`
+                  : `${bids.length} enquiries sent`}
             </p>
           </div>
           <div className="flex flex-col gap-2 flex-shrink-0 items-end">
@@ -147,7 +147,7 @@ const BuyerDashboard = () => {
         {/* ── Bids ── */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-[#1a3a1a]">My Bids</h2>
+            <h2 className="font-semibold text-[#1a3a1a]">My Enquiries</h2>
             <Link
               to="/products"
               className="hidden md:inline-flex items-center gap-1.5 text-sm text-[#2d5a27] font-medium hover:gap-2 transition-all"
@@ -189,8 +189,8 @@ const BuyerDashboard = () => {
               {bids.length === 0 ? (
                 <div className="text-center py-12">
                   <Gavel className="mx-auto text-muted-foreground mb-4" size={48} />
-                  <p className="text-muted-foreground mb-1 font-medium">No bids placed yet</p>
-                  <p className="text-sm text-muted-foreground mb-4">Browse active listings and place your first bid!</p>
+                  <p className="text-muted-foreground mb-1 font-medium">No enquiries sent yet</p>
+                  <p className="text-sm text-muted-foreground mb-4">Browse active listings and send your first enquiry!</p>
                   <Link
                     to="/products"
                     data-testid="buyer-browse-products"
@@ -201,9 +201,9 @@ const BuyerDashboard = () => {
                 </div>
               ) : filteredBids.length === 0 ? (
                 <div className="text-center py-10">
-                  <p className="text-muted-foreground">No {filter} bids.</p>
+                  <p className="text-muted-foreground">No {filter} enquiries.</p>
                   <button type="button" onClick={() => setFilter('all')} className="mt-2 text-primary text-sm font-semibold hover:underline">
-                    Show all bids
+                    Show all enquiries
                   </button>
                 </div>
               ) : (

@@ -32,12 +32,12 @@ const HOW_IT_WORKS = [
     desc: 'Create your account as buyer or seller. Admin verifies within 24 hours.',
   },
   {
-    step: '02', icon: '🔨', title: 'Trade or Bid',
-    desc: 'Browse live listings and place bids, or list your cardamom for buyers.',
+    step: '02', icon: '🔨', title: 'Request a Price',
+    desc: 'Browse live listings and send an enquiry, or list your cardamom for buyers.',
   },
   {
     step: '03', icon: '🤝', title: 'Close the Deal',
-    desc: "Seller accepts the best bid. Connect directly and complete your trade.",
+    desc: "Seller reviews and accepts the best offer. Connect directly and complete your trade.",
   },
 ];
 
@@ -149,7 +149,7 @@ export default function Home() {
                     onClick={e => { e.stopPropagation(); navigate(`/products/${products[0].id}`); }}
                     className="w-full bg-[#2d5a27] text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-[#1a3a1a] transition-colors"
                   >
-                    Place a Bid →
+                    Request a Price →
                   </button>
                 </div>
               </div>

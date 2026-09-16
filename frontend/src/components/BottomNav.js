@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Package, Gavel, LayoutDashboard, ShieldCheck } from 'lucide-react';
+import { Home, Package, MessageSquare, LayoutDashboard, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const BottomNav = () => {
@@ -52,7 +52,7 @@ const BottomNav = () => {
       <NavBar>
         <NavTab to="/" icon={<Home size={22} />} label="Home" active={isActive('/')} />
         <NavTab to="/products" icon={<Package size={22} />} label="Products" active={isActive('/products')} />
-        <NavTab to="/dashboard" icon={<Gavel size={22} />} label="My Bids" active={isActive('/dashboard')} />
+        <NavTab to="/dashboard" icon={<MessageSquare size={22} />} label="My Enquiries" active={isActive('/dashboard')} />
       </NavBar>
     );
   }

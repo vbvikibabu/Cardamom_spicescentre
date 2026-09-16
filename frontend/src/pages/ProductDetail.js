@@ -48,8 +48,8 @@ const DetailCountdown = ({ endTime, status }) => {
       <div className="flex items-center gap-2 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl mb-4">
         <AlertCircle size={18} className="text-orange-600 flex-shrink-0" />
         <div>
-          <p className="text-sm font-semibold text-orange-800">Bidding has ended</p>
-          <p className="text-xs text-orange-600">This listing has closed. No new bids can be placed.</p>
+          <p className="text-sm font-semibold text-orange-800">Enquiries have closed</p>
+          <p className="text-xs text-orange-600">This listing has closed. No new enquiries can be submitted.</p>
         </div>
       </div>
     );
@@ -62,7 +62,7 @@ const DetailCountdown = ({ endTime, status }) => {
       <Timer size={18} className={urgent ? 'text-red-600 animate-pulse' : 'text-green-700'} />
       <div>
         <p className={`text-xs font-semibold uppercase tracking-wide mb-0.5 ${urgent ? 'text-red-700' : 'text-green-800'}`}>
-          {urgent ? '⚡ Closing soon!' : 'Bidding open'}
+          {urgent ? '⚡ Closing soon!' : 'Enquiries open'}
         </p>
         <p className={`font-mono text-xl font-bold ${urgent ? 'text-red-700 animate-pulse' : 'text-green-800'}`}>
           {pad(time.h)}:{pad(time.m)}:{pad(time.s)}
@@ -178,7 +178,7 @@ const ProductDetail = () => {
 
     // Commitment checkbox
     if (!commitmentChecked) {
-      errors.commitment = 'Please confirm this is a genuine bid';
+      errors.commitment = 'Please confirm this is a genuine offer';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -201,10 +201,10 @@ const ProductDetail = () => {
       if (bidForm.price_per_lot) payload.price_per_lot = parseFloat(bidForm.price_per_lot);
 
       await axios.post(`${API}/bids`, payload, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success('Bid placed successfully! The seller will review your bid.');
+      toast.success('Enquiry sent successfully! The seller will review your request.');
       setShowBidModal(false);
     } catch (err) {
-      const detail = err.response?.data?.detail || 'Failed to place bid';
+      const detail = err.response?.data?.detail || 'Failed to send enquiry';
       // Map API errors back to inline fields
       if (detail.toLowerCase().includes('kg available')) {
         setBidErrors(prev => ({ ...prev, quantity_kg: detail }));
@@ -390,16 +390,16 @@ const ProductDetail = () => {
                   if (cannotBid) {
                     return (
                       <div className="w-full py-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-semibold text-sm text-center">
-                        {isOwnProduct ? '🚫 This is your listing — you cannot bid on it.' : '🚫 Sellers cannot place bids.'}
+                        {isOwnProduct ? '🚫 This is your listing — you cannot request a price on it.' : '🚫 Sellers cannot request prices.'}
                       </div>
                     );
                   }
                   return (
                     <>
                       <button data-testid="product-detail-place-bid" onClick={openBidModal} className="w-full inline-flex items-center justify-center gap-3 bg-foreground text-white py-4 rounded-xl font-semibold text-base hover:bg-foreground/90 transition-colors">
-                        <Gavel size={18} /> Place a Bid
+                        <Gavel size={18} /> Request a Price
                       </button>
-                      <p className="text-xs text-center text-muted-foreground">Bids are reviewed by the seller. You will be notified of the outcome.</p>
+                      <p className="text-xs text-center text-muted-foreground">Enquiries are reviewed by the seller. You will be notified of the outcome.</p>
                     </>
                   );
                 })()
@@ -409,7 +409,7 @@ const ProductDetail = () => {
                 </div>
               ) : (
                 <div className="w-full py-4 rounded-xl bg-muted text-muted-foreground font-semibold text-base text-center cursor-not-allowed">
-                  Bidding Closed
+                  Enquiries Closed
                 </div>
               )}
             </div>
@@ -422,7 +422,7 @@ const ProductDetail = () => {
         <DialogContent data-testid="bid-modal" className="sm:max-w-lg p-0 overflow-hidden rounded-2xl border-0">
           <div className="bg-foreground px-6 py-5">
             <DialogHeader>
-              <DialogTitle className="font-serif text-2xl font-bold text-white">Place a Bid</DialogTitle>
+              <DialogTitle className="font-serif text-2xl font-bold text-white">Request a Price</DialogTitle>
               <DialogDescription className="text-white/70 text-sm">{product?.name} — {product?.size}</DialogDescription>
             </DialogHeader>
           </div>
@@ -542,7 +542,7 @@ const ProductDetail = () => {
             {/* Below-base-price soft warning */}
             {product?.base_price && bidForm.price_per_kg && parseFloat(bidForm.price_per_kg) < product.base_price && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                ⚠️ Your bid is below the base price. The seller may still consider it.
+                ⚠️ Your offer is below the base price. The seller may still consider it.
               </p>
             )}
 
@@ -583,7 +583,7 @@ const ProductDetail = () => {
                   className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-foreground flex-shrink-0"
                 />
                 <span className="text-xs text-foreground leading-relaxed">
-                  I confirm this is a genuine bid and I am prepared to fulfil it if accepted by the seller.
+                  I confirm this is a genuine offer and I am prepared to fulfil it if accepted by the seller.
                 </span>
               </label>
               {bidErrors.commitment && (
@@ -600,7 +600,7 @@ const ProductDetail = () => {
               className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-foreground/90 transition-colors disabled:opacity-50"
             >
               {submitting ? <Loader2 size={16} className="animate-spin" /> : <Gavel size={16} />}
-              {submitting ? 'Placing Bid...' : 'Place Bid'}
+              {submitting ? 'Sending Request...' : 'Request Price'}
             </button>
           </form>
         </DialogContent>

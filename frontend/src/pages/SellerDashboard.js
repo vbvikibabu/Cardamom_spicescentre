@@ -56,7 +56,7 @@ const MiniCountdown = ({ endTime }) => {
     const id = setInterval(() => setTime(calc()), 1000);
     return () => clearInterval(id);
   });
-  if (!time) return <span className="text-xs text-orange-600 font-semibold">Bidding closed</span>;
+  if (!time) return <span className="text-xs text-orange-600 font-semibold">Enquiries closed</span>;
   const urgent = time.diff < 30 * 60 * 1000;
   return (
     <span className={`text-xs font-mono font-semibold ${urgent ? 'text-red-600 animate-pulse' : 'text-green-700'}`}>
@@ -341,11 +341,11 @@ const SellerDashboard = () => {
         status,
         notes: bidNotes[bidId] || null
       }, authHeaders);
-      toast.success(`Bid ${status}!`);
+      toast.success(`Offer ${status}!`);
       setBidNotes(prev => { const n = {...prev}; delete n[bidId]; return n; });
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to update bid');
+      toast.error(err.response?.data?.detail || 'Failed to update offer');
     }
   };
 
@@ -355,7 +355,7 @@ const SellerDashboard = () => {
       const url = filter === 'all' ? `${API_URL}/api/seller/bids` : `${API_URL}/api/seller/bids?status=${filter}`;
       const res = await axios.get(url, authHeaders);
       setBids(res.data);
-    } catch { toast.error('Failed to filter bids'); }
+    } catch { toast.error('Failed to filter offers'); }
   };
 
   const getMediaUrl = (path) => {
@@ -377,7 +377,7 @@ const SellerDashboard = () => {
 
   const tabs = [
     { key: 'products', label: 'My Products' },
-    { key: 'bids', label: 'Bids Received' }
+    { key: 'bids', label: 'Offers Received' }
   ];
 
   const firstName = user?.full_name?.split(' ')[0];
@@ -398,7 +398,7 @@ const SellerDashboard = () => {
             </div>
             <p className="text-sm text-gray-500 mt-0.5">
               {products.filter(p => p.listing_status === 'active').length > 0
-                ? `${products.filter(p => p.listing_status === 'active').length} active listing${products.filter(p => p.listing_status === 'active').length > 1 ? 's' : ''} · ${bidsSummary.pending || 0} pending bid${bidsSummary.pending !== 1 ? 's' : ''}`
+                ? `${products.filter(p => p.listing_status === 'active').length} active listing${products.filter(p => p.listing_status === 'active').length > 1 ? 's' : ''} · ${bidsSummary.pending || 0} pending offer${bidsSummary.pending !== 1 ? 's' : ''}`
                 : 'No active listings. Add your first product to get started.'}
             </p>
           </div>
@@ -587,7 +587,7 @@ const SellerDashboard = () => {
                           />
                           {productFormErrors.minimum_quantity_kg
                             ? <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.minimum_quantity_kg}</p>
-                            : <p className="text-[10px] text-muted-foreground mt-1">Minimum quantity per bid</p>
+                            : <p className="text-[10px] text-muted-foreground mt-1">Minimum quantity per enquiry</p>
                           }
                         </div>
                       </div>
@@ -597,7 +597,7 @@ const SellerDashboard = () => {
                     {!editingProduct && (
                       <div>
                         <label className="block text-xs font-medium text-foreground mb-1">
-                          <Timer size={12} className="inline mr-1" />Bidding Window *
+                          <Timer size={12} className="inline mr-1" />Enquiry Window *
                         </label>
                         <select
                           value={productForm.bid_duration_hours}
@@ -610,7 +610,7 @@ const SellerDashboard = () => {
                           ))}
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Bidding closes {productForm.bid_duration_hours} hour{productForm.bid_duration_hours > 1 ? 's' : ''} after submission.
+                          Enquiries close {productForm.bid_duration_hours} hour{productForm.bid_duration_hours > 1 ? 's' : ''} after submission.
                           You can extend up to 2 times after expiry.
                         </p>
                       </div>
@@ -801,7 +801,7 @@ const SellerDashboard = () => {
                               <Timer size={11} className="text-green-600" />
                               <span>Closes in:</span>
                               <MiniCountdown endTime={p.bid_end_time} />
-                              <span>• {p.total_bids_received || 0} bids</span>
+                              <span>• {p.total_bids_received || 0} offers</span>
                             </div>
                           )}
                           {p.listing_status === 'pending_approval' && (
@@ -813,7 +813,7 @@ const SellerDashboard = () => {
                           {p.listing_status === 'expired' && (
                             <div className="flex items-center gap-1.5 text-xs text-orange-600">
                               <AlertCircle size={11} />
-                              <span>Bidding ended · {p.total_bids_received || 0} bids</span>
+                              <span>Enquiries closed · {p.total_bids_received || 0} offers</span>
                             </div>
                           )}
                           {(p.listing_status === 'sold' || p.listing_status === 'archived') && p.sold_to_buyer_name && (
@@ -869,11 +869,11 @@ const SellerDashboard = () => {
                   {bids.length === 0 ? (
                     <div className="text-center py-12">
                       <Gavel className="mx-auto text-muted-foreground mb-4" size={48} />
-                      <p className="text-muted-foreground">No bids received yet</p>
+                      <p className="text-muted-foreground">No offers received yet</p>
                     </div>
                   ) : visibleBids.length === 0 ? (
                     <div className="text-center py-10">
-                      <p className="text-muted-foreground">No {bidsFilter} bids.</p>
+                      <p className="text-muted-foreground">No {bidsFilter} offers.</p>
                       <button onClick={() => setBidsFilter('all')} className="mt-2 text-primary text-sm font-semibold hover:underline">Show all</button>
                     </div>
                   ) : (

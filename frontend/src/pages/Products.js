@@ -47,7 +47,7 @@ const CountdownTimer = ({ endTime, status }) => {
   if (status === 'expired' || (status === 'active' && !time)) {
     return (
       <div className="absolute bottom-0 left-0 right-0 bg-orange-600/90 text-white text-center py-2 text-xs font-semibold tracking-wide">
-        BIDDING CLOSED
+        ENQUIRIES CLOSED
       </div>
     );
   }
@@ -327,7 +327,7 @@ const Products = () => {
                         )}
                         {product.listing_status === 'expired' && (
                           <div className="absolute bottom-0 left-0 right-0 bg-orange-600/90 text-white text-center py-1 text-[10px] md:text-xs font-semibold tracking-wide">
-                            BIDDING CLOSED
+                            ENQUIRIES CLOSED
                           </div>
                         )}
                       </div>
@@ -383,11 +383,11 @@ const Products = () => {
                           {product.listing_status === 'sold' ? (
                             <span className="text-blue-600 text-[11px] md:text-sm font-semibold">View Details</span>
                           ) : product.listing_status === 'expired' ? (
-                            <span className="text-orange-600 text-[11px] md:text-sm font-semibold">Bidding Closed</span>
+                            <span className="text-orange-600 text-[11px] md:text-sm font-semibold">Enquiries Closed</span>
                           ) : (
                             <span className="w-full h-8 md:h-auto bg-primary/10 md:bg-transparent text-primary text-[11px] md:text-sm font-semibold rounded-lg flex items-center justify-center md:justify-start gap-1 md:hover:underline">
-                              Bid <ArrowRight size={11} className="md:hidden" />
-                              <span className="hidden md:inline">→ View Details & Place Bid</span>
+                              Enquire <ArrowRight size={11} className="md:hidden" />
+                              <span className="hidden md:inline">→ View Details & Request Price</span>
                             </span>
                           )}
                         </div>

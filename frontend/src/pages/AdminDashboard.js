@@ -229,10 +229,10 @@ const AdminDashboard = () => {
         status,
         notes: bidNotes[bidId] || null
       }, authHeaders);
-      toast.success(`Bid ${status}!`);
+      toast.success(`Offer ${status}!`);
       setBidNotes(prev => { const n = {...prev}; delete n[bidId]; return n; });
       fetchData();
-    } catch { toast.error('Failed to update bid'); }
+    } catch { toast.error('Failed to update offer'); }
   };
 
   const fetchFilteredBids = async (filter) => {
@@ -241,7 +241,7 @@ const AdminDashboard = () => {
       const url = filter === 'all' ? `${API_URL}/api/bids` : `${API_URL}/api/bids?status=${filter}`;
       const res = await axios.get(url, authHeaders);
       setBids(res.data);
-    } catch { toast.error('Failed to filter bids'); }
+    } catch { toast.error('Failed to filter offers'); }
   };
 
   // ─── Helper: get display URL for a media path ───
@@ -266,7 +266,7 @@ const AdminDashboard = () => {
   const tabs = [
     { key: 'users', label: 'Users' },
     { key: 'pending-products', label: `Pending (${products.filter(p => p.approval_status === 'pending').length})` },
-    { key: 'bids', label: 'Bids' },
+    { key: 'bids', label: 'Offers' },
     { key: 'products', label: 'Products' },
   ];
 
@@ -284,7 +284,7 @@ const AdminDashboard = () => {
           {[
             { icon: User, color: 'primary', value: users.length, label: 'Total Users' },
             { icon: User, color: 'yellow-600', bg: 'yellow-100', value: users.filter(u => u.status === 'pending').length, label: 'Pending Approval' },
-            { icon: Gavel, color: 'blue-600', bg: 'blue-100', value: bids.length, label: 'Total Bids' },
+            { icon: Gavel, color: 'blue-600', bg: 'blue-100', value: bids.length, label: 'Total Offers' },
             { icon: Package, color: 'orange-600', bg: 'orange-100', value: products.length, label: 'Products' }
           ].map((s, i) => (
             <div key={i} className="bg-white p-5 rounded-xl shadow-sm">
@@ -538,7 +538,7 @@ const AdminDashboard = () => {
                                 )}
                                 {p.bid_duration_hours && (
                                   <div className="p-3 bg-muted rounded-lg">
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1"><Clock size={9} /> Bid Duration</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1"><Clock size={9} /> Enquiry Window</p>
                                     <p className="text-sm font-bold text-foreground">{p.bid_duration_hours}h</p>
                                   </div>
                                 )}
@@ -612,7 +612,7 @@ const AdminDashboard = () => {
 
                 {/* Bids Table */}
                 {bids.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No bids found</p>
+                  <p className="text-center text-muted-foreground py-8">No offers found</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table data-testid="admin-bids-table" className="w-full text-sm">
@@ -865,7 +865,7 @@ const AdminDashboard = () => {
                             </p>
                           )}
                           {p.listing_status === 'expired' && (
-                            <p className="text-xs text-orange-600 mt-0.5">Bidding closed · {p.total_bids_received || 0} bids</p>
+                            <p className="text-xs text-orange-600 mt-0.5">Enquiries closed · {p.total_bids_received || 0} offers</p>
                           )}
                         </div>
                         <div className="flex items-center gap-2">

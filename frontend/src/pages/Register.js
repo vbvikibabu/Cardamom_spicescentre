@@ -204,7 +204,7 @@ const Register = () => {
             <label className="block text-sm font-medium text-foreground mb-3">I want to *</label>
             <div className="grid grid-cols-3 gap-3" data-testid="register-role-selector">
               {[
-                { value: 'buyer', label: 'Buy', desc: 'Browse & bid on products' },
+                { value: 'buyer', label: 'Buy', desc: 'Browse & request prices' },
                 { value: 'seller', label: 'Sell', desc: 'List & sell your products' },
                 { value: 'both', label: 'Both', desc: 'Buy and sell products' }
               ].map(opt => (
