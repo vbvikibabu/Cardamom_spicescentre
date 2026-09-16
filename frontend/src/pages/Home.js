@@ -44,7 +44,6 @@ const HOW_IT_WORKS = [
 export default function Home() {
   const navigate = useNavigate();
   const [products, setProducts]           = useState([]);
-  const [stats, setStats]                 = useState({ listings: 0, traders: '50+', bids: '—' });
   const [timeLeft, setTimeLeft]           = useState({});
 
   useEffect(() => {
@@ -58,7 +57,6 @@ export default function Home() {
       const prodRes = await axios.get(`${API_URL}/api/products`);
       const prods = prodRes.data || [];
       setProducts(prods.slice(0, 4));
-      setStats(s => ({ ...s, listings: prods.length }));
     } catch (err) {
       console.error(err);
     }
@@ -102,14 +100,14 @@ export default function Home() {
 
             {/* Headline */}
             <h1 className="font-serif text-4xl md:text-5xl xl:text-6xl text-[#1a3a1a] leading-[1.15] mb-4">
-              India's First<br />
-              <span className="text-[#2d5a27]">Digital Cardamom</span><br />
-              Exchange
+              Export-Quality<br />
+              <span className="text-[#2d5a27]">Green Cardamom</span><br />
+              Direct From the Source
             </h1>
 
             <p className="text-gray-600 text-base md:text-lg mb-7 max-w-md leading-relaxed">
-              Real-time bidding. Verified traders.<br />
-              Direct from Bodinayakanur.
+              Sourced direct from Bodinayakanur &amp; Theni.<br />
+              Bulk B2B supply and retail cardamom garlands.
             </p>
 
             {/* CTA buttons */}
@@ -118,22 +116,14 @@ export default function Home() {
                 onClick={() => navigate('/products')}
                 className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#1a3a1a] transition-colors flex items-center gap-2 text-sm"
               >
-                🔨 Start Trading
+                🌿 Bulk B2B (India)
               </button>
-            </div>
-
-            {/* Live stats row */}
-            <div className="flex gap-3">
-              {[
-                { label: 'Active Listings', value: stats.listings || '—' },
-                { label: 'Verified Traders', value: stats.traders },
-                { label: 'Bids Today',       value: stats.bids    },
-              ].map((stat, i) => (
-                <div key={i} className="bg-white rounded-xl px-3 py-2.5 text-center shadow-sm border border-gray-100 flex-1">
-                  <p className="text-xl font-bold text-[#2d5a27] leading-none mb-1">{stat.value}</p>
-                  <p className="text-[11px] text-gray-500 leading-tight">{stat.label}</p>
-                </div>
-              ))}
+              <button
+                onClick={() => navigate('/products')}
+                className="border-2 border-[#2d5a27] text-[#2d5a27] px-6 py-3 rounded-xl font-semibold hover:bg-[#2d5a27] hover:text-white transition-colors text-sm"
+              >
+                💐 Cardamom Garlands
+              </button>
             </div>
           </div>
 
