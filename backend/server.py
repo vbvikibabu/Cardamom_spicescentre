@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response, RedirectResponse
 from dotenv import load_dotenv
@@ -78,6 +78,16 @@ def put_object(data: bytes, content_type: str) -> dict:
         unique_filename=True,
     )
     return {"path": result["secure_url"], "public_id": result["public_id"], "size": result.get("bytes", len(data))}
+
+def get_client_ip(request: Request) -> str:
+    """Best-effort client IP, honoring a proxy's X-Forwarded-For (Render sits behind one)."""
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+GUEST_BID_RATE_LIMIT = int(os.environ.get("GUEST_BID_RATE_LIMIT", "5"))
+GUEST_BID_RATE_WINDOW_MINUTES = int(os.environ.get("GUEST_BID_RATE_WINDOW_MINUTES", "60"))
 
 # ==================== LIFESPAN ====================
 @asynccontextmanager
@@ -161,6 +171,7 @@ async def lifespan(app: FastAPI):
         await db.products.create_index("listing_status")
         await db.bids.create_index("product_id")
         await db.bids.create_index("buyer_id")
+        await db.bids.create_index([("guest_ip", 1), ("created_at", -1)])
         logger.info("Database indexes ensured")
     except Exception as e:
         logger.warning(f"Index creation warning (may already exist): {e}")
@@ -1062,15 +1073,24 @@ class BidCreate(BaseModel):
     currency: Literal["INR", "USD"] = "INR"
     market_type: Literal["domestic", "export"] = "domestic"
     additional_notes: Optional[str] = None
+    # ── Guest (unauthenticated) enquiry fields — only used when no account is present ──
+    guest_name: Optional[str] = None
+    guest_company: Optional[str] = None
+    guest_phone: Optional[str] = None
+    guest_email: Optional[EmailStr] = None
+    # ── Honeypot — must stay empty. Real users never see or fill this field. ──
+    website: Optional[str] = None
 
 class Bid(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    buyer_id: str
+    buyer_id: Optional[str] = None
     buyer_name: str
     buyer_email: str
     buyer_phone: Optional[str] = None
     buyer_company: Optional[str] = None
+    is_guest: bool = False
+    guest_ip: Optional[str] = None
     seller_id: str = ""
     seller_name: str = ""
     product_id: str
@@ -1161,6 +1181,28 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     user = await db.users.find_one({"email": email}, {"_id": 0, "password": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+
+    if isinstance(user.get('created_at'), str):
+        user['created_at'] = datetime.fromisoformat(user['created_at'])
+
+    return User(**user)
+
+async def get_optional_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[User]:
+    """Like get_current_user, but returns None instead of raising when there's no/invalid token.
+    Used only where an endpoint has a deliberate guest path (e.g. POST /bids)."""
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            return None
+    except jwt.PyJWTError:
+        return None
+
+    user = await db.users.find_one({"email": email}, {"_id": 0, "password": 0})
+    if not user:
+        return None
 
     if isinstance(user.get('created_at'), str):
         user['created_at'] = datetime.fromisoformat(user['created_at'])
@@ -1804,15 +1846,39 @@ async def get_product(product_id: str):
     await _enrich_seller_company(product)
     return ProductPublic(**product)
 
-# Buyer: place bid
+# Buyer: place bid (also accepts an unauthenticated guest enquiry)
 @api_router.post("/bids", response_model=Bid)
 async def create_bid(
     bid_data: BidCreate,
-    current_user: User = Depends(get_current_approved_buyer)
+    request: Request,
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
-    # Sellers cannot place bids (only buyers or both roles can)
-    if current_user.role == "seller":
-        raise HTTPException(status_code=403, detail="Sellers cannot place bids. Only buyers can bid.")
+    # Honeypot — real users never see or fill this field; bots that autofill every field do.
+    if bid_data.website:
+        logger.warning(f"Guest bid honeypot triggered from {get_client_ip(request)}")
+        raise HTTPException(status_code=400, detail="Invalid submission")
+
+    is_guest = current_user is None
+    client_ip = get_client_ip(request) if is_guest else None
+
+    if current_user:
+        # Sellers cannot place bids (only buyers or both roles can)
+        if current_user.role == "seller":
+            raise HTTPException(status_code=403, detail="Sellers cannot place bids. Only buyers can bid.")
+        if current_user.status != "approved":
+            raise HTTPException(status_code=403, detail="Account pending approval")
+    else:
+        if not (bid_data.guest_name and bid_data.guest_phone and bid_data.guest_email):
+            raise HTTPException(status_code=400, detail="Name, phone and email are required")
+
+        window_start = (datetime.now(timezone.utc) - timedelta(minutes=GUEST_BID_RATE_WINDOW_MINUTES)).isoformat()
+        recent_count = await db.bids.count_documents({
+            "is_guest": True,
+            "guest_ip": client_ip,
+            "created_at": {"$gte": window_start}
+        })
+        if recent_count >= GUEST_BID_RATE_LIMIT:
+            raise HTTPException(status_code=429, detail="Too many enquiries from this network. Please try again later.")
 
     has_qty = bid_data.quantity_kg or bid_data.quantity_lot
     has_price = bid_data.price_per_kg or bid_data.price_per_lot
@@ -1823,8 +1889,8 @@ async def create_bid(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Sellers cannot bid on their own products (covers "both" role)
-    if product.get("seller_id") and product.get("seller_id") == current_user.id:
+    # Sellers cannot bid on their own products (covers "both" role) — guests have no product to own
+    if current_user and product.get("seller_id") and product.get("seller_id") == current_user.id:
         raise HTTPException(status_code=403, detail="You cannot bid on your own product.")
 
     if product.get("listing_status") in ("expired", "sold", "archived"):
@@ -1845,12 +1911,27 @@ async def create_bid(
                 detail=f"Only {remaining_qty} kg available for this product"
             )
 
+    if current_user:
+        buyer_id = current_user.id
+        buyer_name = current_user.full_name
+        buyer_email = current_user.email
+        buyer_phone = current_user.phone
+        buyer_company = current_user.company_name
+    else:
+        buyer_id = None
+        buyer_name = bid_data.guest_name
+        buyer_email = bid_data.guest_email
+        buyer_phone = bid_data.guest_phone
+        buyer_company = bid_data.guest_company
+
     bid = Bid(
-        buyer_id=current_user.id,
-        buyer_name=current_user.full_name,
-        buyer_email=current_user.email,
-        buyer_phone=current_user.phone,
-        buyer_company=current_user.company_name,
+        buyer_id=buyer_id,
+        buyer_name=buyer_name,
+        buyer_email=buyer_email,
+        buyer_phone=buyer_phone,
+        buyer_company=buyer_company,
+        is_guest=is_guest,
+        guest_ip=client_ip,
         seller_id=product.get("seller_id", ""),
         seller_name=product.get("seller_name", ""),
         product_id=bid_data.product_id,
@@ -1869,7 +1950,7 @@ async def create_bid(
     bid_dict["updated_at"] = bid_dict["updated_at"].isoformat()
     await db.bids.insert_one(bid_dict)
     await db.products.update_one({"id": bid_data.product_id}, {"$inc": {"total_bids_received": 1}})
-    logger.info(f"New bid: {current_user.email} on {product['name']}")
+    logger.info(f"New bid: {buyer_email} on {product['name']}{' (guest)' if is_guest else ''}")
 
     # Notify seller (push + email)
     try:
@@ -1878,7 +1959,7 @@ async def create_bid(
             await send_push_to_user(
                 seller_id,
                 "New Bid on Your Product",
-                f"{current_user.full_name} bid on {product['name']}",
+                f"{buyer_name} bid on {product['name']}",
                 "/seller"
             )
             seller_user = await db.users.find_one({"id": seller_id}, {"_id": 0, "email": 1})
@@ -1891,7 +1972,7 @@ async def create_bid(
     try:
         await send_push_to_admins(
             "New Bid Placed",
-            f"{current_user.full_name} bid on {product['name']}",
+            f"{buyer_name} bid on {product['name']}",
             "/admin"
         )
     except Exception as e:

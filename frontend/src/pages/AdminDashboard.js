@@ -635,8 +635,18 @@ const AdminDashboard = () => {
                           return (
                             <tr key={b.id} data-testid={`admin-bid-${b.id}`} className="border-b border-border last:border-0 hover:bg-muted/50">
                               <td className="py-3 px-2">
-                                <div className="font-medium text-foreground">{b.buyer_name}</div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <div className="font-medium text-foreground">{b.buyer_name}</div>
+                                  {b.is_guest && (
+                                    <span className="text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Guest</span>
+                                  )}
+                                </div>
                                 <div className="text-xs text-muted-foreground">{b.buyer_company}</div>
+                                {b.is_guest && (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {b.buyer_phone}{b.buyer_phone && b.buyer_email ? ' · ' : ''}{b.buyer_email}
+                                  </div>
+                                )}
                               </td>
                               <td className="py-3 px-2">
                                 <div className="font-medium text-foreground">{b.product_name}</div>

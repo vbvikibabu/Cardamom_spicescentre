@@ -110,9 +110,11 @@ const ProductDetail = () => {
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showBidModal, setShowBidModal] = useState(false);
-  const [bidForm, setBidForm] = useState({
-    quantity_kg: '', quantity_lot: '', price_per_kg: '', price_per_lot: '', currency: 'INR', market_type: 'domestic', additional_notes: ''
-  });
+  const emptyBidForm = {
+    quantity_kg: '', quantity_lot: '', price_per_kg: '', price_per_lot: '', currency: 'INR', market_type: 'domestic', additional_notes: '',
+    guest_name: '', guest_company: '', guest_phone: '', guest_email: '', website: ''
+  };
+  const [bidForm, setBidForm] = useState(emptyBidForm);
   const [commitmentChecked, setCommitmentChecked] = useState(false);
   const [bidErrors, setBidErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -142,12 +144,21 @@ const ProductDetail = () => {
     callback();
   };
 
-  const openBidModal = () => requireAuth(() => {
-    setBidForm({ quantity_kg: '', quantity_lot: '', price_per_kg: '', price_per_lot: '', currency: 'INR', market_type: 'domestic', additional_notes: '' });
+  const resetAndOpenBidModal = () => {
+    setBidForm(emptyBidForm);
     setCommitmentChecked(false);
     setBidErrors({});
     setShowBidModal(true);
-  });
+  };
+
+  // Logged-in buyers still go through the approval gate; guests skip straight to the form.
+  const openBidModal = () => {
+    if (isAuthenticated) {
+      requireAuth(resetAndOpenBidModal);
+    } else {
+      resetAndOpenBidModal();
+    }
+  };
 
   const submitBid = async (e) => {
     e.preventDefault();
@@ -176,6 +187,17 @@ const ProductDetail = () => {
       }
     }
 
+    // Guest contact details (only required when there's no account)
+    if (!isAuthenticated) {
+      if (!bidForm.guest_name.trim()) errors.guest_name = 'Please enter your name';
+      if (!bidForm.guest_phone.trim()) errors.guest_phone = 'Please enter a phone number';
+      if (!bidForm.guest_email.trim()) {
+        errors.guest_email = 'Please enter your email';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bidForm.guest_email.trim())) {
+        errors.guest_email = 'Enter a valid email address';
+      }
+    }
+
     // Commitment checkbox
     if (!commitmentChecked) {
       errors.commitment = 'Please confirm this is a genuine offer';
@@ -193,14 +215,22 @@ const ProductDetail = () => {
         product_id: product.id,
         currency: bidForm.currency,
         market_type: bidForm.market_type,
-        additional_notes: bidForm.additional_notes || undefined
+        additional_notes: bidForm.additional_notes || undefined,
+        website: bidForm.website || undefined
       };
       if (bidForm.quantity_kg) payload.quantity_kg = parseFloat(bidForm.quantity_kg);
       if (bidForm.quantity_lot) payload.quantity_lot = parseFloat(bidForm.quantity_lot);
       if (bidForm.price_per_kg) payload.price_per_kg = parseFloat(bidForm.price_per_kg);
       if (bidForm.price_per_lot) payload.price_per_lot = parseFloat(bidForm.price_per_lot);
+      if (!isAuthenticated) {
+        payload.guest_name = bidForm.guest_name.trim();
+        payload.guest_company = bidForm.guest_company.trim() || undefined;
+        payload.guest_phone = bidForm.guest_phone.trim();
+        payload.guest_email = bidForm.guest_email.trim();
+      }
 
-      await axios.post(`${API}/bids`, payload, { headers: { Authorization: `Bearer ${token}` } });
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      await axios.post(`${API}/bids`, payload, { headers });
       toast.success('Enquiry sent successfully! The seller will review your request.');
       setShowBidModal(false);
     } catch (err) {
@@ -452,6 +482,90 @@ const ProductDetail = () => {
                 </>
               )}
             </div>
+
+            {/* Guest contact details — only shown to logged-out visitors */}
+            {!isAuthenticated && (
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg space-y-3">
+                <p className="text-xs text-blue-800 font-medium">No account needed — we'll contact you directly about this enquiry.</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Your Name *</label>
+                    <input
+                      type="text" data-testid="bid-guest-name"
+                      value={bidForm.guest_name}
+                      onChange={e => {
+                        setBidForm({...bidForm, guest_name: e.target.value});
+                        if (bidErrors.guest_name) setBidErrors(prev => ({ ...prev, guest_name: undefined }));
+                      }}
+                      className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+                        bidErrors.guest_name ? 'border-red-400 bg-red-50' : 'border-border'
+                      }`}
+                      placeholder="Full name"
+                    />
+                    {bidErrors.guest_name && (
+                      <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={12} />{bidErrors.guest_name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Company (optional)</label>
+                    <input
+                      type="text" data-testid="bid-guest-company"
+                      value={bidForm.guest_company}
+                      onChange={e => setBidForm({...bidForm, guest_company: e.target.value})}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Company name"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Phone *</label>
+                    <input
+                      type="tel" data-testid="bid-guest-phone"
+                      value={bidForm.guest_phone}
+                      onChange={e => {
+                        setBidForm({...bidForm, guest_phone: e.target.value});
+                        if (bidErrors.guest_phone) setBidErrors(prev => ({ ...prev, guest_phone: undefined }));
+                      }}
+                      className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+                        bidErrors.guest_phone ? 'border-red-400 bg-red-50' : 'border-border'
+                      }`}
+                      placeholder="+91 98765 43210"
+                    />
+                    {bidErrors.guest_phone && (
+                      <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={12} />{bidErrors.guest_phone}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Email *</label>
+                    <input
+                      type="email" data-testid="bid-guest-email"
+                      value={bidForm.guest_email}
+                      onChange={e => {
+                        setBidForm({...bidForm, guest_email: e.target.value});
+                        if (bidErrors.guest_email) setBidErrors(prev => ({ ...prev, guest_email: undefined }));
+                      }}
+                      className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+                        bidErrors.guest_email ? 'border-red-400 bg-red-50' : 'border-border'
+                      }`}
+                      placeholder="you@example.com"
+                    />
+                    {bidErrors.guest_email && (
+                      <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={12} />{bidErrors.guest_email}</p>
+                    )}
+                  </div>
+                </div>
+                {/* Honeypot — invisible to real visitors, left for bots that autofill every field */}
+                <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+                  <label htmlFor="bid-website">Website</label>
+                  <input
+                    type="text" id="bid-website" name="website" tabIndex={-1} autoComplete="off"
+                    value={bidForm.website}
+                    onChange={e => setBidForm({...bidForm, website: e.target.value})}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

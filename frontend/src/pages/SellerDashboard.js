@@ -897,11 +897,20 @@ const SellerDashboard = () => {
                             <div className="p-4">
                               <div className="flex items-start justify-between gap-2 mb-2">
                                 <div>
-                                  <p className="font-semibold text-foreground text-sm">{b.buyer_name}</p>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="font-semibold text-foreground text-sm">{b.buyer_name}</p>
+                                    {b.is_guest && (
+                                      <span className="text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Guest</span>
+                                    )}
+                                  </div>
                                   {b.buyer_company && (
                                     <p className="text-xs text-muted-foreground">{b.buyer_company}</p>
                                   )}
-                                  {b.buyer_phone && (
+                                  {b.is_guest ? (
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                                      {b.buyer_phone}{b.buyer_phone && b.buyer_email ? ' · ' : ''}{b.buyer_email}
+                                    </p>
+                                  ) : b.buyer_phone && (
                                     <p className="text-[10px] text-green-700 font-semibold mt-0.5">🟢 Verified</p>
                                   )}
                                 </div>
