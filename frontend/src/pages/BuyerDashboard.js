@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Gavel, ArrowRight, Home, ShoppingBag, Megaphone, User, Trophy } from 'lucide-react';
+import { Gavel, ArrowRight, Home, ShoppingBag, User } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -29,10 +29,8 @@ const BuyerDashboard = () => {
   const { user, token, isApproved } = useAuth();
   const navigate = useNavigate();
   const [bids, setBids] = useState([]);
-  const [wonLots, setWonLots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState('bids'); // 'bids' | 'won'
   const [becomingSellerLoading, setBecomingSellerLoading] = useState(false);
 
   useEffect(() => {
@@ -42,12 +40,8 @@ const BuyerDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [bidsRes, wonRes] = await Promise.all([
-        axios.get(`${API_URL}/api/buyer/bids`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API_URL}/api/buyer/won-lots`, { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
+      const bidsRes = await axios.get(`${API_URL}/api/buyer/bids`, { headers: { Authorization: `Bearer ${token}` } });
       setBids(bidsRes.data);
-      setWonLots(wonRes.data);
     } catch {
       toast.error('Failed to load dashboard');
     } finally {
@@ -56,7 +50,7 @@ const BuyerDashboard = () => {
   };
 
   const handleBecomeSeller = async () => {
-    if (!window.confirm('Add seller access to your account? You\'ll be able to list lots in future auctions.')) return;
+    if (!window.confirm('Add seller access to your account?')) return;
     setBecomingSellerLoading(true);
     try {
       await axios.patch(`${API_URL}/api/users/me/become-seller`, {}, {
@@ -101,11 +95,6 @@ const BuyerDashboard = () => {
               <span className="text-[11px] font-bold bg-[#2d5a27] text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
                 Buyer
               </span>
-              {wonLots.length > 0 && (
-                <span className="text-[11px] font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
-                  🏆 {wonLots.length} Won
-                </span>
-              )}
             </div>
             <p className="text-sm mt-0.5 text-gray-500">
               {filterCounts.pending > 0
@@ -143,7 +132,6 @@ const BuyerDashboard = () => {
           {[
             { icon: <Home size={14} />,        label: 'Home',     to: '/'         },
             { icon: <ShoppingBag size={14} />, label: 'Browse',   to: '/products' },
-            { icon: <Megaphone size={14} />,   label: 'Auctions', to: '/auctions' },
             { icon: <User size={14} />,        label: 'Profile',  to: '/profile'  },
           ].map(({ icon, label, to }) => (
             <Link
@@ -156,47 +144,20 @@ const BuyerDashboard = () => {
           ))}
         </div>
 
-        {/* ── Tab switcher ── */}
-        <div className="flex gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
-          <button
-            type="button"
-            onClick={() => setActiveTab('bids')}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-              activeTab === 'bids'
-                ? 'bg-[#2d5a27] text-white'
-                : 'text-gray-500 hover:text-[#1a3a1a]'
-            }`}
-          >
-            My Bids ({bids.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('won')}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-              activeTab === 'won'
-                ? 'bg-amber-500 text-white'
-                : 'text-gray-500 hover:text-[#1a3a1a]'
-            }`}
-          >
-            <Trophy size={14} /> Won Auctions ({wonLots.length})
-          </button>
-        </div>
+        {/* ── Bids ── */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-100">
+            <h2 className="font-semibold text-[#1a3a1a]">My Bids</h2>
+            <Link
+              to="/products"
+              className="hidden md:inline-flex items-center gap-1.5 text-sm text-[#2d5a27] font-medium hover:gap-2 transition-all"
+            >
+              Browse Products <ArrowRight size={14} />
+            </Link>
+          </div>
 
-        {/* ── Bids tab ── */}
-        {activeTab === 'bids' && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-100">
-              <h2 className="font-semibold text-[#1a3a1a]">My Bids</h2>
-              <Link
-                to="/products"
-                className="hidden md:inline-flex items-center gap-1.5 text-sm text-[#2d5a27] font-medium hover:gap-2 transition-all"
-              >
-                Browse Products <ArrowRight size={14} />
-              </Link>
-            </div>
-
-            {/* Filter pills */}
-            {bids.length > 0 && (
+          {/* Filter pills */}
+          {bids.length > 0 && (
               <div className="flex gap-2 px-4 py-3 overflow-x-auto border-b border-border scrollbar-none">
                 {['all', 'pending', 'accepted', 'rejected'].map(f => {
                   const active = filter === f;
@@ -305,68 +266,6 @@ const BuyerDashboard = () => {
               )}
             </div>
           </div>
-        )}
-
-        {/* ── Won Auctions tab ── */}
-        {activeTab === 'won' && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-              <Trophy size={18} className="text-amber-500" />
-              <h2 className="font-semibold text-[#1a3a1a]">Auction Lots Won</h2>
-            </div>
-            <div className="p-4 md:p-6">
-              {wonLots.length === 0 ? (
-                <div className="text-center py-12">
-                  <Trophy className="mx-auto text-gray-300 mb-4" size={48} />
-                  <p className="text-muted-foreground mb-1 font-medium">No auction wins yet</p>
-                  <p className="text-sm text-muted-foreground mb-4">Join a live auction and place the winning bid!</p>
-                  <Link
-                    to="/auctions"
-                    className="inline-flex items-center gap-2 bg-[#2d5a27] text-white px-6 py-2.5 rounded-full font-semibold text-sm hover:opacity-90 transition-opacity"
-                  >
-                    Browse Auctions <ArrowRight size={14} />
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {wonLots.map(lot => {
-                    const imgUrl = (lot.media_paths || []).find(u =>
-                      /\.(jpg|jpeg|png|webp)/i.test(u) || u.includes('/image/upload/')
-                    );
-                    const finalPrice = lot.sold_price || lot.current_price || 0;
-                    const currency = lot.currency === 'USD' ? '$' : '₹';
-                    return (
-                      <div key={lot.id} className="flex items-center gap-3 p-3 border border-amber-200 bg-amber-50/40 rounded-xl">
-                        {imgUrl ? (
-                          <img src={imgUrl} alt={lot.product_name} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" onError={e => e.target.style.display='none'} />
-                        ) : (
-                          <div className="w-16 h-16 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                            <Trophy size={24} className="text-amber-500" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <p className="font-semibold text-sm text-[#1a3a1a] truncate">{lot.product_name}</p>
-                            <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex-shrink-0">✅ WON</span>
-                          </div>
-                          <p className="text-xs text-gray-500 truncate">{lot.event_title}{lot.event_location ? ` · ${lot.event_location}` : ''}</p>
-                          <p className="text-xs text-gray-500">{lot.grade} · {lot.quantity_kg} kg</p>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className="text-sm font-bold text-[#2d5a27]">{currency}{finalPrice.toLocaleString('en-IN')}/kg</span>
-                            <span className="text-xs text-gray-400">Total: {currency}{(finalPrice * lot.quantity_kg).toLocaleString('en-IN')}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <p className="text-xs text-gray-400 text-center pt-2">
-                    Our team will contact you to arrange payment and delivery.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
       </div>
     </div>

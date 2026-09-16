@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart, Timer, Archive, RotateCcw, AlertCircle, Loader2, ArrowRight, Home, ShoppingBag, Megaphone, User } from 'lucide-react';
+import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart, Timer, Archive, RotateCcw, AlertCircle, Loader2, ArrowRight, Home, ShoppingBag, User } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
 
 const getGreeting = (firstName) => {
@@ -429,7 +429,6 @@ const SellerDashboard = () => {
           {[
             { icon: <Home size={14} />,        label: 'Home',     to: '/'         },
             { icon: <ShoppingBag size={14} />, label: 'Products', to: '/products' },
-            { icon: <Megaphone size={14} />,   label: 'Auctions', to: '/auctions' },
             { icon: <User size={14} />,        label: 'Profile',  to: '/profile'  },
           ].map(({ icon, label, to }) => (
             <Link
