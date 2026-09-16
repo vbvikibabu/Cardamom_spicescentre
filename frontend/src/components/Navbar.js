@@ -54,7 +54,7 @@ const Navbar = () => {
               <div className="flex items-center gap-2">
                 <span className="font-serif text-2xl md:text-3xl font-bold text-foreground tracking-tight">Cardamom Spices Centre</span>
               </div>
-              <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Spiceboard Registered Cardamom Exporter</span>
+              <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Export-Quality Green Cardamom · Bodinayakanur &amp; Idukki</span>
             </Link>
 
             {/* Desktop Navigation */}

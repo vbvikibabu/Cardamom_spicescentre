@@ -16,9 +16,6 @@ const Footer = () => {
           {/* About */}
           <div>
             <h3 className="font-serif text-2xl font-bold mb-4">Cardamom Spices Centre</h3>
-            <p className="text-background/70 font-sans leading-relaxed mb-2">
-              Spiceboard Registered Cardamom Exporter
-            </p>
             <p className="text-background/70 font-sans leading-relaxed">
               Premium Green Cardamom - Wholesale & Export Supply
             </p>
@@ -109,7 +106,7 @@ const Footer = () => {
             &copy; {new Date().getFullYear()} Cardamom Spices Centre. All rights reserved.
           </p>
           <p className="text-center text-background/50 text-xs">
-            Registered Exporter - Spices Board of India | All supplies with valid GST invoice
+            All supplies with valid GST invoice
           </p>
         </div>
       </div>

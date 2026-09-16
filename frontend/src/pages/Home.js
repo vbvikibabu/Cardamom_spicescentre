@@ -91,13 +91,6 @@ export default function Home() {
 
           {/* Left — copy & CTAs */}
           <div className="flex-1 min-w-0">
-            {/* Pill badge */}
-            <div className="inline-flex items-center gap-2 border border-[#2d5a27] rounded-full px-3 py-1 mb-5">
-              <span className="text-[11px] text-[#2d5a27] font-bold tracking-widest uppercase">
-                🌿 Spiceboard Registered · Est. 2024
-              </span>
-            </div>
-
             {/* Headline */}
             <h1 className="font-serif text-4xl md:text-5xl xl:text-6xl text-[#1a3a1a] leading-[1.15] mb-4">
               Export-Quality<br />
