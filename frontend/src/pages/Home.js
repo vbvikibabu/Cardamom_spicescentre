@@ -99,7 +99,7 @@ export default function Home() {
             </h1>
 
             <p className="text-gray-600 text-base md:text-lg mb-7 max-w-md leading-relaxed">
-              Sourced direct from Bodinayakanur &amp; Theni.<br />
+              Sourced direct from Bodinayakanur &amp; Idukki.<br />
               Bulk B2B supply and retail cardamom garlands.
             </p>
 
