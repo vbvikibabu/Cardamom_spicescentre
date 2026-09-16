@@ -16,8 +16,6 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import BuyerDashboard from "@/pages/BuyerDashboard";
 import SellerDashboard from "@/pages/SellerDashboard";
 import PendingApproval from "@/pages/PendingApproval";
-import AuctionList from "@/pages/AuctionList";
-import AuctionRoom from "@/pages/AuctionRoom";
 import Footer from "@/components/Footer";
 
 function NotFound() {
@@ -71,8 +69,6 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="/pending-approval" element={<PendingApproval />} />
-            <Route path="/auctions" element={<AuctionList />} />
-            <Route path="/auctions/:eventId" element={<AuctionRoom />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </div>
