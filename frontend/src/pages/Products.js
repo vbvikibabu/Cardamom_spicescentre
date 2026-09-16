@@ -139,8 +139,6 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGrade, setActiveGrade] = useState('all');
-  const [liveAuction, setLiveAuction] = useState(null);
-  const [auctionDismissed, setAuctionDismissed] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -154,23 +152,6 @@ const Products = () => {
       }
     };
     fetchProducts();
-  }, []);
-
-  // FIX 4 — Poll for live auction event
-  useEffect(() => {
-    const checkAuction = async () => {
-      try {
-        const res = await axios.get(`${API}/auction/events/upcoming`);
-        const events = res.data || [];
-        const live = events.find(e => e.status === 'live');
-        setLiveAuction(live || null);
-      } catch {
-        setLiveAuction(null);
-      }
-    };
-    checkAuction();
-    const interval = setInterval(checkAuction, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   // Extract unique grades from products
@@ -207,31 +188,6 @@ const Products = () => {
 
   return (
     <div data-testid="products-page" className="pt-20 pb-20 md:pb-0">
-
-      {/* FIX 4 — Live auction banner */}
-      {liveAuction && !auctionDismissed && (
-        <div className="bg-red-600 text-white flex items-center justify-between px-4 py-2 text-sm font-semibold">
-          <span className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
-            🔴 LIVE AUCTION: {liveAuction.title}
-          </span>
-          <div className="flex items-center gap-3">
-            <Link
-              to={`/auctions/${liveAuction.id}`}
-              className="bg-white text-red-600 text-xs font-bold px-3 py-1 rounded-full hover:bg-red-50 transition-colors"
-            >
-              Join Now →
-            </Link>
-            <button
-              onClick={() => setAuctionDismissed(true)}
-              className="text-white/70 hover:text-white text-lg leading-none"
-              aria-label="Dismiss"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* FIX 1 — Compact 2-line header (max ~70px) */}
       <div className="px-4 pt-3 pb-2" data-testid="products-hero">

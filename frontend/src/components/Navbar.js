@@ -1,38 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Phone, Mail, MessageCircle, Instagram, LogIn, LogOut, LayoutDashboard, User } from 'lucide-react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import LoginModal from './LoginModal';
 
 const DARK_GREEN = '#2d5a27';
-const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [liveAuctionBanner, setLiveAuctionBanner] = useState(null);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, isSeller, isAdmin } = useAuth();
-
-  // FIX 4 — Poll for live auction every 30s (for all users)
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/auction/events/upcoming`);
-        const live = (res.data || []).find(e => e.status === 'live');
-        setLiveAuctionBanner(live || null);
-        // Reset dismiss if event changed
-        if (live) setBannerDismissed(prev => prev);
-      } catch { /* silent */ }
-    };
-    check();
-    const id = setInterval(check, 30000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -45,7 +25,6 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Products', path: '/products' },
-    { name: 'Auctions', path: '/auctions' },
     { name: 'Contact', path: '/contact' },
   ];
 
@@ -264,34 +243,6 @@ const Navbar = () => {
           </div>
         )}
       </nav>
-
-      {/* FIX 4 — Live auction notification banner */}
-      {liveAuctionBanner && !bannerDismissed && !location.pathname.startsWith('/auctions') && (
-        <div
-          style={{ backgroundColor: '#b91c1c' }}
-          className="fixed top-20 left-0 right-0 z-[39] flex items-center justify-between px-4 py-2.5 text-white text-sm font-semibold shadow-md"
-        >
-          <span className="flex items-center gap-2 truncate">
-            <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping flex-shrink-0" />
-            🔴 LIVE AUCTION: {liveAuctionBanner.title}
-            {liveAuctionBanner.location ? ` | ${liveAuctionBanner.location}` : ''}
-          </span>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-            <Link
-              to={`/auctions/${liveAuctionBanner.id}`}
-              onClick={() => setBannerDismissed(true)}
-              className="bg-white text-red-700 text-xs font-bold px-3 py-1 rounded-full hover:bg-red-50 transition-colors whitespace-nowrap"
-            >
-              Join Now →
-            </Link>
-            <button
-              onClick={() => setBannerDismissed(true)}
-              className="text-white/70 hover:text-white text-xl leading-none"
-              aria-label="Dismiss"
-            >×</button>
-          </div>
-        </div>
-      )}
 
       {/* Login Modal */}
       <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />

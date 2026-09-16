@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -44,12 +43,7 @@ const HOW_IT_WORKS = [
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, isSeller } = useAuth();
   const [products, setProducts]           = useState([]);
-  const [liveAuction, setLiveAuction]     = useState(null);
-  const [upcomingAuction, setUpcomingAuction] = useState(null);
-  const [regOpenAuction, setRegOpenAuction]   = useState(null);
-  const [regBannerDismissed, setRegBannerDismissed] = useState(false);
   const [stats, setStats]                 = useState({ listings: 0, traders: '50+', bids: '—' });
   const [timeLeft, setTimeLeft]           = useState({});
 
@@ -61,22 +55,10 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const [prodRes, auctionRes] = await Promise.all([
-        axios.get(`${API_URL}/api/products`),
-        axios.get(`${API_URL}/api/auction/events/upcoming`),
-      ]);
+      const prodRes = await axios.get(`${API_URL}/api/products`);
       const prods = prodRes.data || [];
       setProducts(prods.slice(0, 4));
       setStats(s => ({ ...s, listings: prods.length }));
-
-      const events = auctionRes.data || [];
-      const live = events.find(e => e.status === 'live') || null;
-      const regOpen = events.find(e => e.status === 'registration_open') || null;
-      setLiveAuction(live);
-      setRegOpenAuction(regOpen);
-      setUpcomingAuction(
-        events.find(e => ['upcoming', 'registration_open'].includes(e.status)) || null
-      );
     } catch (err) {
       console.error(err);
     }
@@ -102,36 +84,8 @@ export default function Home() {
     return () => clearInterval(id);
   }, [products]);
 
-  const featuredEvent = liveAuction || upcomingAuction;
-
   return (
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
-
-      {/* ── Registration-open flash banner ── */}
-      {regOpenAuction && !regBannerDismissed && (
-        <div className="fixed top-20 left-0 right-0 z-[38] flex items-center justify-between px-4 py-2.5 text-white text-sm font-semibold shadow-md"
-          style={{ backgroundColor: '#16a34a' }}>
-          <span className="flex items-center gap-2 truncate">
-            <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping flex-shrink-0" />
-            📋 Registration Open: {regOpenAuction.title}
-            {regOpenAuction.location ? ` · ${regOpenAuction.location}` : ''}
-          </span>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-            <button
-              type="button"
-              onClick={() => navigate('/auctions')}
-              className="bg-white text-green-700 text-xs font-bold px-3 py-1 rounded-full hover:bg-green-50 transition-colors whitespace-nowrap"
-            >
-              Register Lot →
-            </button>
-            <button
-              type="button"
-              onClick={() => setRegBannerDismissed(true)}
-              className="text-white/70 hover:text-white text-xl leading-none"
-            >×</button>
-          </div>
-        </div>
-      )}
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 md:px-8 pt-24 md:pt-28 pb-10">
@@ -166,12 +120,6 @@ export default function Home() {
               >
                 🔨 Start Trading
               </button>
-              <button
-                onClick={() => navigate('/auctions')}
-                className="border-2 border-[#2d5a27] text-[#2d5a27] px-6 py-3 rounded-xl font-semibold hover:bg-[#2d5a27] hover:text-white transition-colors text-sm"
-              >
-                📋 View Auctions
-              </button>
             </div>
 
             {/* Live stats row */}
@@ -189,27 +137,9 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right — live auction card / featured product / placeholder */}
+          {/* Right — featured product / placeholder */}
           <div className="w-full md:w-80 flex-shrink-0">
-            {liveAuction ? (
-              <div className="bg-[#1a3a1a] rounded-2xl p-5 text-white shadow-lg">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                  <span className="text-red-400 text-xs font-bold tracking-widest uppercase">Live Auction</span>
-                </div>
-                <h3 className="text-xl font-serif font-bold mb-1 leading-snug">{liveAuction.title}</h3>
-                <p className="text-green-300 text-sm mb-1">📍 {liveAuction.location}</p>
-                {liveAuction.agent_name && (
-                  <p className="text-gray-400 text-xs mb-5">Agent: {liveAuction.agent_name}</p>
-                )}
-                <button
-                  onClick={() => navigate(`/auctions/${liveAuction.id}`)}
-                  className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  🔨 Join Live Auction
-                </button>
-              </div>
-            ) : products[0] ? (
+            {products[0] ? (
               <div
                 className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => navigate(`/products/${products[0].id}`)}
@@ -338,88 +268,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── SECTION 4: AUCTION BANNER ────────────── */}
-      {featuredEvent && (
-        <section className="px-4 md:px-8 mb-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="bg-[#1a3a1a] rounded-2xl p-6 md:p-8 text-white shadow-md">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
-                <div className="flex-1 min-w-0">
-                  <p className="text-green-400 text-[11px] font-bold tracking-widest uppercase mb-2">
-                    {liveAuction ? '🔴 Live Now' : '🔔 Next Auction'}
-                  </p>
-                  <h3 className="text-xl md:text-2xl font-serif font-bold mb-1 leading-snug">
-                    {featuredEvent.title}
-                  </h3>
-                  <p className="text-green-300 text-sm mb-1">📍 {featuredEvent.location}</p>
-                  {!liveAuction && upcomingAuction?.auction_date && (
-                    <p className="text-gray-400 text-sm">
-                      📅 {new Date(upcomingAuction.auction_date).toLocaleDateString('en-IN', {
-                        weekday: 'long', day: 'numeric', month: 'long',
-                      })} · {new Date(upcomingAuction.auction_date).toLocaleTimeString('en-IN', {
-                        hour: '2-digit', minute: '2-digit',
-                      })} IST
-                    </p>
-                  )}
-                  {featuredEvent.agent_name && (
-                    <p className="text-gray-400 text-xs mt-1">
-                      Agent: {featuredEvent.agent_name}
-                      {featuredEvent.agent_phone ? ` · ${featuredEvent.agent_phone}` : ''}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-3 flex-shrink-0 flex-wrap">
-                  {liveAuction ? (
-                    /* Live: everyone gets Join Now */
-                    <button
-                      onClick={() => navigate(`/auctions/${liveAuction.id}`)}
-                      className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors whitespace-nowrap"
-                    >
-                      🔨 Join Now
-                    </button>
-                  ) : isAuthenticated ? (
-                    /* Logged in + upcoming: context-aware CTAs */
-                    <>
-                      {isSeller && (
-                        <button
-                          onClick={() => navigate('/auctions')}
-                          className="border border-white/60 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors whitespace-nowrap"
-                        >
-                          📦 Register My Lot
-                        </button>
-                      )}
-                      <button
-                        onClick={() => navigate(`/auctions/${upcomingAuction.id}`)}
-                        className="bg-white text-[#1a3a1a] px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-100 transition-colors whitespace-nowrap"
-                      >
-                        View Auction →
-                      </button>
-                    </>
-                  ) : (
-                    /* Not logged in: Register + View Details */
-                    <>
-                      <button
-                        onClick={() => navigate('/register')}
-                        className="border border-white/60 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors whitespace-nowrap"
-                      >
-                        Register
-                      </button>
-                      <button
-                        onClick={() => navigate('/auctions')}
-                        className="bg-white text-[#1a3a1a] px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-100 transition-colors whitespace-nowrap"
-                      >
-                        View Details →
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── SECTION 5: HOW IT WORKS ──────────────── */}
+      {/* ── SECTION 4: HOW IT WORKS ──────────────── */}
       <section className="max-w-7xl mx-auto px-4 md:px-8 py-8">
         <h2 className="font-serif text-2xl text-[#1a3a1a] mb-6 text-center">How It Works</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
