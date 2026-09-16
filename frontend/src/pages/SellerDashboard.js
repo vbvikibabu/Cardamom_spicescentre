@@ -79,7 +79,7 @@ const SellerDashboard = () => {
   // Product form state
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '', bid_duration_hours: 4, base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
+  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '', bid_duration_hours: 168, base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
   const [mediaFiles, setMediaFiles] = useState([]);
   const [existingMedia, setExistingMedia] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -167,7 +167,7 @@ const SellerDashboard = () => {
         size: product.size,
         description: product.description,
         features: product.features.join(', '),
-        bid_duration_hours: product.bid_duration_hours || 4,
+        bid_duration_hours: product.bid_duration_hours || 168,
         base_price: product.base_price ?? '',
         base_price_currency: product.base_price_currency || 'INR',
         minimum_quantity_kg: product.minimum_quantity_kg ?? '',
@@ -176,7 +176,7 @@ const SellerDashboard = () => {
       setExistingMedia(product.media_paths?.length > 0 ? product.media_paths : (product.image_url ? [product.image_url] : []));
     } else {
       setEditingProduct(null);
-      setProductForm({ name: '', size: '', description: '', features: '', bid_duration_hours: 4, base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
+      setProductForm({ name: '', size: '', description: '', features: '', bid_duration_hours: 168, base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
       setExistingMedia([]);
     }
     setMediaFiles([]);
@@ -291,7 +291,7 @@ const SellerDashboard = () => {
         features: productForm.features.split(',').map(f => f.trim()).filter(Boolean),
         image_url: imageUrl,
         media_paths: allMediaPaths,
-        bid_duration_hours: Number(productForm.bid_duration_hours) || 4,
+        bid_duration_hours: Number(productForm.bid_duration_hours) || 168,
         base_price: Number(productForm.base_price),
         base_price_currency: productForm.base_price_currency,
         minimum_quantity_kg: Number(productForm.minimum_quantity_kg),
@@ -605,12 +605,12 @@ const SellerDashboard = () => {
                           className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
                           data-testid="seller-bid-duration"
                         >
-                          {[1,2,3,4,5,6,7,8].map(h => (
-                            <option key={h} value={h}>{h} hour{h > 1 ? 's' : ''}</option>
+                          {[1, 2, 3, 5, 7, 10, 14, 21, 30].map(d => (
+                            <option key={d} value={d * 24}>{d} day{d > 1 ? 's' : ''}</option>
                           ))}
                         </select>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Enquiries close {productForm.bid_duration_hours} hour{productForm.bid_duration_hours > 1 ? 's' : ''} after submission.
+                          Enquiries close {Math.round(productForm.bid_duration_hours / 24)} day{Math.round(productForm.bid_duration_hours / 24) > 1 ? 's' : ''} after submission.
                           You can extend up to 2 times after expiry.
                         </p>
                       </div>

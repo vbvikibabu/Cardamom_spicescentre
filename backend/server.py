@@ -110,11 +110,11 @@ async def lifespan(app: FastAPI):
     # Migrate existing approved products without listing_status
     await db.products.update_many(
         {"listing_status": {"$exists": False}, "approval_status": "approved"},
-        {"$set": {"listing_status": "active", "bid_duration_hours": 4, "extension_count": 0, "total_bids_received": 0}}
+        {"$set": {"listing_status": "active", "bid_duration_hours": 168, "extension_count": 0, "total_bids_received": 0}}
     )
     await db.products.update_many(
         {"listing_status": {"$exists": False}},
-        {"$set": {"listing_status": "active", "bid_duration_hours": 4, "extension_count": 0, "total_bids_received": 0}}
+        {"$set": {"listing_status": "active", "bid_duration_hours": 168, "extension_count": 0, "total_bids_received": 0}}
     )
 
     # Migrate old bids: rename customer_* to buyer_*
@@ -890,7 +890,7 @@ async def _email_buyers_new_product(product: dict, buyer_emails: list) -> None:
     price_str = f"{currency_sym}{base_price:,.2f}/kg" if base_price else "On request"
     total_qty = product.get("total_quantity_kg")
     qty_str = f"{total_qty:,.0f} kg" if total_qty else "On request"
-    duration_hrs = product.get("bid_duration_hours", 4)
+    duration_hrs = product.get("bid_duration_hours", 168)
     product_id = product.get("id", "")
     product_link = f"https://cardamomspicescentre.com/products/{product_id}"
 
@@ -950,7 +950,7 @@ class Product(BaseModel):
     remaining_quantity_kg: Optional[float] = None
     # ── Bid timer fields ──────────────────────────────────────────
     bid_start_time: Optional[datetime] = None
-    bid_duration_hours: int = 4
+    bid_duration_hours: int = 168
     bid_end_time: Optional[datetime] = None
     listing_status: Literal["active", "expired", "sold", "archived", "pending_approval", "rejected"] = "active"
     sold_at: Optional[datetime] = None
@@ -968,7 +968,7 @@ class ProductCreate(BaseModel):
     features: List[str]
     image_url: str = ""
     media_paths: List[str] = Field(default_factory=list)
-    bid_duration_hours: int = Field(default=4, ge=1, le=8)
+    bid_duration_hours: int = Field(default=168, ge=24, le=720)
     base_price: float
     base_price_currency: Literal["INR", "USD"] = "INR"
     minimum_quantity_kg: float
@@ -994,7 +994,7 @@ class ProductPublic(BaseModel):
     total_quantity_kg: Optional[float] = None
     remaining_quantity_kg: Optional[float] = None
     bid_start_time: Optional[datetime] = None
-    bid_duration_hours: int = 4
+    bid_duration_hours: int = 168
     bid_end_time: Optional[datetime] = None
     listing_status: Literal["active", "expired", "sold", "archived", "pending_approval", "rejected"] = "active"
     total_bids_received: int = 0
@@ -1318,7 +1318,7 @@ async def create_product_admin(
     current_admin: User = Depends(get_current_admin)
 ):
     raw = product_data.model_dump()
-    duration_hrs = raw.pop("bid_duration_hours", 4)
+    duration_hrs = raw.pop("bid_duration_hours", 168)
     total_qty = raw.get("total_quantity_kg")
     now = datetime.now(timezone.utc)
     product = Product(
@@ -1384,7 +1384,7 @@ async def update_product_status(
 
     if approval_status == "approved":
         now = datetime.now(timezone.utc)
-        duration_hrs = product_before.get("bid_duration_hours", 4)
+        duration_hrs = product_before.get("bid_duration_hours", 168)
         update_fields = {
             "approval_status": "approved",
             "listing_status": "active",
@@ -1521,7 +1521,7 @@ async def create_product_seller(
     current_user: User = Depends(get_current_approved_seller)
 ):
     raw = product_data.model_dump()
-    duration_hrs = raw.pop("bid_duration_hours", 4)
+    duration_hrs = raw.pop("bid_duration_hours", 168)
     total_qty = raw.get("total_quantity_kg")
     product = Product(
         **raw,

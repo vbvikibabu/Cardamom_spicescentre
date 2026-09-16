@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight, Search, X, Timer, ArrowRight } from 'lucide-react';
+import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight, Search, X, ArrowRight } from 'lucide-react';
 import axios from 'axios';
 import { getProductImage } from '../utils/imageHelper';
 
@@ -17,51 +17,6 @@ const getMediaUrl = (path) => {
 const isVideoPath = (path) => {
   const lower = (path || '').toLowerCase();
   return lower.endsWith('.mp4') || lower.endsWith('.mov');
-};
-
-// Countdown timer displayed on product cards
-const CountdownTimer = ({ endTime, status }) => {
-  const calc = () => {
-    if (!endTime || status !== 'active') return null;
-    const diff = new Date(endTime) - Date.now();
-    if (diff <= 0) return null;
-    const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    return { h, m, s, diff };
-  };
-  const [time, setTime] = useState(calc);
-  useEffect(() => {
-    if (!endTime || status !== 'active') return;
-    const id = setInterval(() => setTime(calc()), 1000);
-    return () => clearInterval(id);
-  });
-
-  if (status === 'sold') {
-    return (
-      <div className="absolute inset-0 bg-blue-600/80 flex items-center justify-center">
-        <span className="text-white font-serif text-3xl font-bold tracking-widest">SOLD</span>
-      </div>
-    );
-  }
-  if (status === 'expired' || (status === 'active' && !time)) {
-    return (
-      <div className="absolute bottom-0 left-0 right-0 bg-orange-600/90 text-white text-center py-2 text-xs font-semibold tracking-wide">
-        ENQUIRIES CLOSED
-      </div>
-    );
-  }
-  if (!time) return null;
-
-  const urgent = time.diff < 30 * 60 * 1000; // < 30 min
-  return (
-    <div className={`absolute bottom-0 left-0 right-0 ${urgent ? 'bg-red-600/90' : 'bg-green-700/85'} text-white py-2 px-3 flex items-center gap-2`}>
-      <Timer size={13} className={urgent ? 'animate-pulse' : ''} />
-      <span className={`text-xs font-semibold ${urgent ? 'animate-pulse' : ''}`}>
-        {String(time.h).padStart(2,'0')}:{String(time.m).padStart(2,'0')}:{String(time.s).padStart(2,'0')} remaining
-      </span>
-    </div>
-  );
 };
 
 const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
@@ -314,20 +269,9 @@ const Products = () => {
                           </div>
                         )}
 
-                        {/* Countdown chip overlay */}
-                        {product.listing_status === 'active' && (
-                          <div className="absolute bottom-1 left-1 right-1 md:bottom-0 md:left-0 md:right-0">
-                            <CountdownTimer endTime={product.bid_end_time} status={product.listing_status} />
-                          </div>
-                        )}
                         {product.listing_status === 'sold' && (
                           <div className="absolute inset-0 bg-blue-600/80 flex items-center justify-center">
                             <span className="text-white font-serif text-xl md:text-3xl font-bold tracking-widest">SOLD</span>
-                          </div>
-                        )}
-                        {product.listing_status === 'expired' && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-orange-600/90 text-white text-center py-1 text-[10px] md:text-xs font-semibold tracking-wide">
-                            ENQUIRIES CLOSED
                           </div>
                         )}
                       </div>

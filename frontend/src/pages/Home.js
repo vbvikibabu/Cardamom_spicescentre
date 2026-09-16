@@ -44,7 +44,6 @@ const HOW_IT_WORKS = [
 export default function Home() {
   const navigate = useNavigate();
   const [products, setProducts]           = useState([]);
-  const [timeLeft, setTimeLeft]           = useState({});
 
   useEffect(() => {
     fetchData();
@@ -61,26 +60,6 @@ export default function Home() {
       console.error(err);
     }
   };
-
-  // 1-second countdown for product timer chips
-  useEffect(() => {
-    const tick = () => {
-      const next = {};
-      products.forEach(p => {
-        if (!p.bid_end_time) return;
-        const diff = new Date(p.bid_end_time) - Date.now();
-        if (diff <= 0) { next[p.id] = 'Closed'; return; }
-        const h = Math.floor(diff / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-        next[p.id] = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
-      });
-      setTimeLeft(next);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [products]);
 
   return (
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
@@ -142,9 +121,6 @@ export default function Home() {
                   <p className="text-[#2d5a27] font-bold text-lg mb-1">
                     ₹{products[0].base_price?.toLocaleString('en-IN')}/kg
                   </p>
-                  {timeLeft[products[0].id] && (
-                    <p className="text-xs text-gray-400 mb-3">⏰ {timeLeft[products[0].id]} left</p>
-                  )}
                   <button
                     onClick={e => { e.stopPropagation(); navigate(`/products/${products[0].id}`); }}
                     className="w-full bg-[#2d5a27] text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-[#1a3a1a] transition-colors"
@@ -222,16 +198,6 @@ export default function Home() {
                   ) : (
                     <div className="w-full bg-[#c8d8b8] flex items-center justify-center text-3xl" style={{ height: 130 }}>
                       🌿
-                    </div>
-                  )}
-                  {timeLeft[product.id] && timeLeft[product.id] !== 'Closed' && (
-                    <div className="absolute bottom-2 left-2 bg-black/65 text-white text-[10px] px-2 py-0.5 rounded-full">
-                      ⏰ {timeLeft[product.id]}
-                    </div>
-                  )}
-                  {timeLeft[product.id] === 'Closed' && (
-                    <div className="absolute bottom-2 left-2 bg-gray-600/80 text-white text-[10px] px-2 py-0.5 rounded-full">
-                      Closed
                     </div>
                   )}
                 </div>
