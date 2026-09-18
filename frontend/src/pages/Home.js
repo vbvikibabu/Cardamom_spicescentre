@@ -4,6 +4,8 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
+const formatINR = (n) => Math.round(n).toLocaleString('en-IN');
+
 const getProductImage = (product) => {
   if (!product) return null;
   if (product.media_paths?.length > 0) {
@@ -69,10 +71,16 @@ export default function Home() {
     const weightedAvg = totalQtySold > 0
       ? rows.reduce((s, r) => s + r.avg_price * (r.qty_sold_kg || 0), 0) / totalQtySold
       : rows.reduce((s, r) => s + r.avg_price, 0) / rows.length;
+    const minPrice = Math.min(...rows.map(r => r.min_price));
+    const maxPrice = Math.max(...rows.map(r => r.max_price));
+    const range = maxPrice - minPrice;
+    // Where the average marker sits along the gradient bar, proportional to the range — never hardcoded.
+    const avgPct = range > 0 ? Math.min(100, Math.max(0, ((weightedAvg - minPrice) / range) * 100)) : 50;
     return {
       weightedAvg,
-      minPrice: Math.min(...rows.map(r => r.min_price)),
-      maxPrice: Math.max(...rows.map(r => r.max_price)),
+      minPrice,
+      maxPrice,
+      avgPct,
       totalQtyArrived: rows.reduce((s, r) => s + (r.qty_arrived_kg || 0), 0),
       totalLots: rows.reduce((s, r) => s + (r.lots || 0), 0),
     };
@@ -213,32 +221,62 @@ export default function Home() {
           ) : marketRateStats && (
             <>
               <h2 className="font-serif text-2xl text-[#1a3a1a] mb-1">
-                Cardamom Auction Rates — {new Date(marketRates.auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                Cardamom auction rates — {new Date(marketRates.auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
               </h2>
-              <p className="text-xs text-gray-400 mb-5">Previous auction day's results, entered from the Spices Board bulletin.</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <div className="bg-white rounded-xl p-4 border border-gray-100">
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Weighted Avg</p>
-                  <p className="font-semibold text-[#1a3a1a] text-lg">₹{Math.round(marketRateStats.weightedAvg)}/kg</p>
+              <p className="text-xs text-gray-400 mb-5">Previous auction day's results from the Spices Board.</p>
+
+              <div className="bg-white rounded-xl p-6 border border-gray-100">
+                <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">Lots sold that day ranged from</p>
+                <p className="font-serif text-4xl md:text-5xl text-[#1a3a1a] mb-6">
+                  ₹{formatINR(marketRateStats.minPrice)} to ₹{formatINR(marketRateStats.maxPrice)}{' '}
+                  <span className="font-sans text-lg md:text-xl text-gray-400">per kg</span>
+                </p>
+
+                {/* Price scale, low to high */}
+                <div
+                  className="w-full rounded-full"
+                  style={{ height: 14, background: 'linear-gradient(to right, #c8d8b8, #2d5a27)' }}
+                />
+
+                <div className="relative mt-2 h-12">
+                  <div className="absolute left-0 top-0 flex flex-col items-start text-left">
+                    <div className="w-px h-2 bg-gray-300 mb-1" />
+                    <p className="text-[11px] text-gray-500 leading-tight">small, light lots</p>
+                    <p className="text-[11px] text-gray-400 leading-tight">6-7mm</p>
+                  </div>
+                  <div
+                    className="absolute top-0 flex flex-col items-center text-center"
+                    style={{ left: `${marketRateStats.avgPct}%`, transform: 'translateX(-50%)' }}
+                  >
+                    <div className="w-px h-2 bg-gray-300 mb-1" />
+                    <p className="text-[11px] text-gray-500 leading-tight">auction average</p>
+                    <p className="text-[11px] text-gray-400 leading-tight">₹{formatINR(marketRateStats.weightedAvg)} · 7-8mm</p>
+                  </div>
+                  <div className="absolute right-0 top-0 flex flex-col items-end text-right">
+                    <div className="w-px h-2 bg-gray-300 mb-1" />
+                    <p className="text-[11px] text-gray-500 leading-tight">bold, high liter weight</p>
+                    <p className="text-[11px] text-gray-400 leading-tight">8mm &amp; above</p>
+                  </div>
                 </div>
-                <div className="bg-white rounded-xl p-4 border border-gray-100">
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Range</p>
-                  <p className="font-semibold text-[#1a3a1a] text-lg">₹{Math.round(marketRateStats.minPrice)} – ₹{Math.round(marketRateStats.maxPrice)}</p>
+
+                <div className="border-t border-gray-100 mt-4 pt-5">
+                  <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                    That ₹{formatINR(marketRateStats.maxPrice - marketRateStats.minPrice)} spread is grade.
+                    A blended average tells you nothing about what your grade costs.
+                  </p>
+                  <Link
+                    to="/products"
+                    className="inline-block bg-[#2d5a27] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#1a3a1a] transition-colors"
+                  >
+                    Get a price for your grade
+                  </Link>
                 </div>
-                <div className="bg-white rounded-xl p-4 border border-gray-100">
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Qty Arrived</p>
-                  <p className="font-semibold text-[#1a3a1a] text-lg">{Math.round(marketRateStats.totalQtyArrived).toLocaleString('en-IN')} kg</p>
-                </div>
-                <div className="bg-white rounded-xl p-4 border border-gray-100">
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Lots</p>
-                  <p className="font-semibold text-[#1a3a1a] text-lg">{marketRateStats.totalLots}</p>
+
+                <div className="flex justify-between items-center mt-6 text-[11px] text-gray-400">
+                  <span>{formatINR(marketRateStats.totalQtyArrived)} kg arrived · {marketRateStats.totalLots} lots</span>
+                  <span>Source: Spices Board of India</span>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 leading-relaxed mb-2">
-                The range reflects grade — bold, high-liter-weight lots trade near the top and small, light lots near the bottom.
-                Enquire for a price on your specific grade and quantity.
-              </p>
-              <p className="text-[11px] text-gray-400">Source: Spices Board of India</p>
             </>
           )}
         </section>
