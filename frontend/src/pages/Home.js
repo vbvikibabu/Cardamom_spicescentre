@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -348,6 +348,14 @@ export default function Home() {
                               width={40}
                               tickCount={3}
                               domain={trendYDomain}
+                            />
+                            <Tooltip
+                              formatter={v => [`₹${formatINR(v)}`, 'Avg']}
+                              labelFormatter={d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: 'none' }}
+                              labelStyle={{ color: '#9ca3af', marginBottom: 2 }}
+                              itemStyle={{ color: '#1a3a1a' }}
+                              cursor={{ stroke: '#c8d8b8', strokeWidth: 1 }}
                             />
                             <Area
                               type="linear"
