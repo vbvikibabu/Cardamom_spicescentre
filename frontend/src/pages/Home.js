@@ -20,12 +20,6 @@ const getProductImage = (product) => {
   return null;
 };
 
-const MARKET_PRICES = [
-  { grade: '6mm – 7mm', price: '₹2,200', change: '+₹50',  up: true  },
-  { grade: '7mm – 8mm', price: '₹2,450', change: 'Stable', up: null  },
-  { grade: '8mm & Above', price: '₹2,650', change: '+₹100', up: true },
-];
-
 const HOW_IT_WORKS = [
   {
     step: '01', icon: '👤', title: 'Register & Verify',
@@ -143,32 +137,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── SECTION 2: MARKET PRICES ─────────────── */}
-      <section className="bg-white border-y border-gray-100 py-5">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-semibold text-[#1a3a1a] text-base">📊 Today's Market</h2>
-            <span className="text-xs text-gray-400">📍 Bodinayakanur</span>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {MARKET_PRICES.map((item, i) => (
-              <div key={i} className="bg-[#f5f0e8] rounded-xl p-3 md:p-4 text-center">
-                <p className="text-[11px] text-gray-500 mb-1 font-medium">{item.grade}</p>
-                <p className="text-lg md:text-2xl font-bold text-[#1a3a1a]">{item.price}</p>
-                <p className="text-[11px] text-gray-400">/kg</p>
-                <p className={`text-xs font-semibold mt-1.5 ${
-                  item.up === true  ? 'text-green-600' :
-                  item.up === false ? 'text-red-500'   : 'text-gray-400'
-                }`}>
-                  {item.up === true ? '▲ ' : item.up === false ? '▼ ' : '→ '}{item.change}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── SECTION 3: LIVE LISTINGS ─────────────── */}
+      {/* ── SECTION 2: LIVE LISTINGS ─────────────── */}
       {products.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 md:px-8 py-8">
           <div className="flex justify-between items-center mb-5">
@@ -211,7 +180,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── SECTION 4: HOW IT WORKS ──────────────── */}
+      {/* ── SECTION 3: HOW IT WORKS ──────────────── */}
       <section className="max-w-7xl mx-auto px-4 md:px-8 py-8">
         <h2 className="font-serif text-2xl text-[#1a3a1a] mb-6 text-center">How It Works</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
