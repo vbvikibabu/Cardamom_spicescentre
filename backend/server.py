@@ -1885,6 +1885,12 @@ async def create_bid(
     if not has_qty or not has_price:
         raise HTTPException(status_code=400, detail="At least one quantity and one price must be provided")
 
+    # `has_price` above is a truthiness check, not a value check — a negative price is truthy in Python.
+    if bid_data.price_per_kg is not None and bid_data.price_per_kg <= 0:
+        raise HTTPException(status_code=400, detail="Price per kg must be greater than zero")
+    if bid_data.price_per_lot is not None and bid_data.price_per_lot <= 0:
+        raise HTTPException(status_code=400, detail="Price per lot must be greater than zero")
+
     product = await db.products.find_one({"id": bid_data.product_id, "approval_status": "approved"}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")

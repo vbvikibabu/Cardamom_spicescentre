@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Leaf, ArrowLeft, ChevronLeft, ChevronRight, Film, Check, Gavel, Timer, AlertCircle, BadgeCheck, Tag, Scale, Loader2, XCircle } from 'lucide-react';
@@ -22,6 +22,52 @@ const getMediaUrl = (path) => {
 const isVideoPath = (path) => {
   const lower = (path || '').toLowerCase();
   return lower.endsWith('.mp4') || lower.endsWith('.mov');
+};
+
+const FieldError = ({ msg }) => msg ? (
+  <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={12} />{msg}</p>
+) : null;
+
+// Pure validator — recomputed on every render so errors appear as the user types, not just on submit.
+const computeBidErrors = (form, product, isAuthenticated, commitmentChecked) => {
+  const errors = {};
+  const isLot = form.quantity_unit === 'lot';
+  const qtyValue = isLot ? form.quantity_lot : form.quantity_kg;
+  const priceValue = isLot ? form.price_per_lot : form.price_per_kg;
+  const qtyNum = parseFloat(qtyValue);
+  const priceNum = parseFloat(priceValue);
+
+  if (!qtyValue || isNaN(qtyNum) || qtyNum <= 0) {
+    errors.quantity = 'Enter a quantity greater than 0';
+  } else if (!isLot) {
+    const minQty = product?.minimum_quantity_kg;
+    const remainingQty = product?.remaining_quantity_kg;
+    if (minQty && qtyNum < minQty) {
+      errors.quantity = `Minimum order is ${minQty} kg`;
+    } else if (remainingQty !== undefined && remainingQty !== null && qtyNum > remainingQty) {
+      errors.quantity = `Only ${remainingQty.toLocaleString('en-IN')} kg available`;
+    }
+  }
+
+  if (!priceValue || isNaN(priceNum) || priceNum <= 0) {
+    errors.price = 'Enter a price greater than 0';
+  }
+
+  if (!isAuthenticated) {
+    if (!form.guest_name.trim()) errors.guest_name = 'Enter your name';
+    if (!form.guest_phone.trim()) errors.guest_phone = 'Enter a phone number';
+    if (!form.guest_email.trim()) {
+      errors.guest_email = 'Enter your email';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.guest_email.trim())) {
+      errors.guest_email = 'Enter a valid email address';
+    }
+  }
+
+  if (!commitmentChecked) {
+    errors.commitment = 'Confirm this is a genuine offer';
+  }
+
+  return errors;
 };
 
 // Large countdown timer for product detail page
@@ -111,13 +157,23 @@ const ProductDetail = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showBidModal, setShowBidModal] = useState(false);
   const emptyBidForm = {
-    quantity_kg: '', quantity_lot: '', price_per_kg: '', price_per_lot: '', currency: 'INR', market_type: 'domestic', additional_notes: '',
+    quantity_unit: 'kg', quantity_kg: '', quantity_lot: '', price_per_kg: '', price_per_lot: '', currency: 'INR', market_type: 'domestic', additional_notes: '',
     guest_name: '', guest_company: '', guest_phone: '', guest_email: '', website: ''
   };
   const [bidForm, setBidForm] = useState(emptyBidForm);
   const [commitmentChecked, setCommitmentChecked] = useState(false);
-  const [bidErrors, setBidErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Recomputed every render — errors update live as the user types, not just on submit.
+  const bidFormErrors = useMemo(
+    () => computeBidErrors(bidForm, product, isAuthenticated, commitmentChecked),
+    [bidForm, product, isAuthenticated, commitmentChecked]
+  );
+  const isBidFormValid = Object.keys(bidFormErrors).length === 0;
+  const markTouched = (field) => setTouched(prev => (prev[field] ? prev : { ...prev, [field]: true }));
+  const showFieldError = (field) => (touched[field] || attemptedSubmit) ? bidFormErrors[field] : undefined;
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -147,7 +203,8 @@ const ProductDetail = () => {
   const resetAndOpenBidModal = () => {
     setBidForm(emptyBidForm);
     setCommitmentChecked(false);
-    setBidErrors({});
+    setTouched({});
+    setAttemptedSubmit(false);
     setShowBidModal(true);
   };
 
@@ -162,55 +219,12 @@ const ProductDetail = () => {
 
   const submitBid = async (e) => {
     e.preventDefault();
-    const errors = {};
-    const hasQty = bidForm.quantity_kg || bidForm.quantity_lot;
-    const hasPrice = bidForm.price_per_kg || bidForm.price_per_lot;
+    setAttemptedSubmit(true);
+    if (!isBidFormValid) return;
 
-    if (!hasQty) errors.qty = 'Please enter quantity in kg or lots';
-    if (!hasPrice) errors.price = 'Please enter price per kg or per lot';
-
-    // Remaining quantity check (blocking)
-    const remainingQty = product?.remaining_quantity_kg;
-    if (bidForm.quantity_kg && remainingQty !== undefined && remainingQty !== null) {
-      const qtyKg = parseFloat(bidForm.quantity_kg);
-      if (!isNaN(qtyKg) && qtyKg > remainingQty) {
-        errors.quantity_kg = `Only ${remainingQty.toLocaleString('en-IN')} kg available`;
-      }
-    }
-
-    // Minimum quantity check (blocking)
-    const minQty = product?.minimum_quantity_kg;
-    if (bidForm.quantity_kg && minQty) {
-      const qtyKg = parseFloat(bidForm.quantity_kg);
-      if (!isNaN(qtyKg) && qtyKg < minQty) {
-        errors.quantity_kg = `Minimum order is ${minQty} kg`;
-      }
-    }
-
-    // Guest contact details (only required when there's no account)
-    if (!isAuthenticated) {
-      if (!bidForm.guest_name.trim()) errors.guest_name = 'Please enter your name';
-      if (!bidForm.guest_phone.trim()) errors.guest_phone = 'Please enter a phone number';
-      if (!bidForm.guest_email.trim()) {
-        errors.guest_email = 'Please enter your email';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bidForm.guest_email.trim())) {
-        errors.guest_email = 'Enter a valid email address';
-      }
-    }
-
-    // Commitment checkbox
-    if (!commitmentChecked) {
-      errors.commitment = 'Please confirm this is a genuine offer';
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setBidErrors(errors);
-      return;
-    }
-
-    setBidErrors({});
     setSubmitting(true);
     try {
+      const isLot = bidForm.quantity_unit === 'lot';
       const payload = {
         product_id: product.id,
         currency: bidForm.currency,
@@ -218,10 +232,13 @@ const ProductDetail = () => {
         additional_notes: bidForm.additional_notes || undefined,
         website: bidForm.website || undefined
       };
-      if (bidForm.quantity_kg) payload.quantity_kg = parseFloat(bidForm.quantity_kg);
-      if (bidForm.quantity_lot) payload.quantity_lot = parseFloat(bidForm.quantity_lot);
-      if (bidForm.price_per_kg) payload.price_per_kg = parseFloat(bidForm.price_per_kg);
-      if (bidForm.price_per_lot) payload.price_per_lot = parseFloat(bidForm.price_per_lot);
+      if (isLot) {
+        payload.quantity_lot = parseFloat(bidForm.quantity_lot);
+        payload.price_per_lot = parseFloat(bidForm.price_per_lot);
+      } else {
+        payload.quantity_kg = parseFloat(bidForm.quantity_kg);
+        payload.price_per_kg = parseFloat(bidForm.price_per_kg);
+      }
       if (!isAuthenticated) {
         payload.guest_name = bidForm.guest_name.trim();
         payload.guest_company = bidForm.guest_company.trim() || undefined;
@@ -234,15 +251,7 @@ const ProductDetail = () => {
       toast.success('Enquiry sent successfully! The seller will review your request.');
       setShowBidModal(false);
     } catch (err) {
-      const detail = err.response?.data?.detail || 'Failed to send enquiry';
-      // Map API errors back to inline fields
-      if (detail.toLowerCase().includes('kg available')) {
-        setBidErrors(prev => ({ ...prev, quantity_kg: detail }));
-      } else if (detail.toLowerCase().includes('minimum order')) {
-        setBidErrors(prev => ({ ...prev, quantity_kg: detail }));
-      } else {
-        toast.error(detail);
-      }
+      toast.error(err.response?.data?.detail || 'Failed to send enquiry');
     } finally {
       setSubmitting(false);
     }
@@ -449,273 +458,260 @@ const ProductDetail = () => {
 
       {/* ─── Bid Modal ─── */}
       <Dialog open={showBidModal} onOpenChange={setShowBidModal}>
-        <DialogContent data-testid="bid-modal" className="sm:max-w-lg p-0 overflow-hidden rounded-2xl border-0">
-          <div className="bg-foreground px-6 py-5">
+        <DialogContent data-testid="bid-modal" className="sm:max-w-lg p-0 overflow-hidden rounded-2xl border-0 flex flex-col max-h-[90vh]">
+          <div className="bg-foreground px-6 py-5 flex-shrink-0">
             <DialogHeader>
               <DialogTitle className="font-serif text-2xl font-bold text-white">Request a Price</DialogTitle>
               <DialogDescription className="text-white/70 text-sm">{product?.name} — {product?.size}</DialogDescription>
             </DialogHeader>
           </div>
-          <form onSubmit={submitBid} data-testid="bid-form" className="px-6 pb-6 pt-3 space-y-4">
-            {/* Reference info bar */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 bg-muted rounded-lg text-xs">
-              {product?.base_price && (
-                <>
-                  <span className="text-muted-foreground">Base Price:</span>
-                  <span className="font-bold text-foreground">
-                    {product.base_price_currency === 'USD' ? '$' : '₹'}{product.base_price.toLocaleString('en-IN')}/kg
-                  </span>
-                </>
-              )}
-              {product?.minimum_quantity_kg && (
-                <>
-                  {product?.base_price && <span className="text-border">|</span>}
-                  <span className="text-muted-foreground">Min. Qty:</span>
-                  <span className="font-bold text-foreground">{product.minimum_quantity_kg} kg</span>
-                </>
-              )}
-              {product?.remaining_quantity_kg !== undefined && product?.remaining_quantity_kg !== null && (
-                <>
-                  <span className="text-border">|</span>
-                  <span className="text-muted-foreground">Max available:</span>
-                  <span className="font-bold text-green-700">{product.remaining_quantity_kg.toLocaleString('en-IN')} kg</span>
-                </>
-              )}
-            </div>
-
-            {/* Guest contact details — only shown to logged-out visitors */}
-            {!isAuthenticated && (
-              <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg space-y-3">
-                <p className="text-xs text-blue-800 font-medium">No account needed — we'll contact you directly about this enquiry.</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-foreground mb-1">Your Name *</label>
-                    <input
-                      type="text" data-testid="bid-guest-name"
-                      value={bidForm.guest_name}
-                      onChange={e => {
-                        setBidForm({...bidForm, guest_name: e.target.value});
-                        if (bidErrors.guest_name) setBidErrors(prev => ({ ...prev, guest_name: undefined }));
-                      }}
-                      className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
-                        bidErrors.guest_name ? 'border-red-400 bg-red-50' : 'border-border'
-                      }`}
-                      placeholder="Full name"
-                    />
-                    {bidErrors.guest_name && (
-                      <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={12} />{bidErrors.guest_name}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-foreground mb-1">Company (optional)</label>
-                    <input
-                      type="text" data-testid="bid-guest-company"
-                      value={bidForm.guest_company}
-                      onChange={e => setBidForm({...bidForm, guest_company: e.target.value})}
-                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="Company name"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-foreground mb-1">Phone *</label>
-                    <input
-                      type="tel" data-testid="bid-guest-phone"
-                      value={bidForm.guest_phone}
-                      onChange={e => {
-                        setBidForm({...bidForm, guest_phone: e.target.value});
-                        if (bidErrors.guest_phone) setBidErrors(prev => ({ ...prev, guest_phone: undefined }));
-                      }}
-                      className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
-                        bidErrors.guest_phone ? 'border-red-400 bg-red-50' : 'border-border'
-                      }`}
-                      placeholder="+91 98765 43210"
-                    />
-                    {bidErrors.guest_phone && (
-                      <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={12} />{bidErrors.guest_phone}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-foreground mb-1">Email *</label>
-                    <input
-                      type="email" data-testid="bid-guest-email"
-                      value={bidForm.guest_email}
-                      onChange={e => {
-                        setBidForm({...bidForm, guest_email: e.target.value});
-                        if (bidErrors.guest_email) setBidErrors(prev => ({ ...prev, guest_email: undefined }));
-                      }}
-                      className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
-                        bidErrors.guest_email ? 'border-red-400 bg-red-50' : 'border-border'
-                      }`}
-                      placeholder="you@example.com"
-                    />
-                    {bidErrors.guest_email && (
-                      <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={12} />{bidErrors.guest_email}</p>
-                    )}
-                  </div>
-                </div>
-                {/* Honeypot — invisible to real visitors, left for bots that autofill every field */}
-                <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
-                  <label htmlFor="bid-website">Website</label>
-                  <input
-                    type="text" id="bid-website" name="website" tabIndex={-1} autoComplete="off"
-                    value={bidForm.website}
-                    onChange={e => setBidForm({...bidForm, website: e.target.value})}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Quantity (kg)
-                  {product?.minimum_quantity_kg && (
-                    <span className="text-muted-foreground font-normal"> — min {product.minimum_quantity_kg} kg</span>
-                  )}
-                </label>
-                <input
-                  type="number" min="0" step="0.01" data-testid="bid-quantity-kg"
-                  max={product?.remaining_quantity_kg ?? undefined}
-                  value={bidForm.quantity_kg}
-                  onChange={e => {
-                    setBidForm({...bidForm, quantity_kg: e.target.value});
-                    if (bidErrors.quantity_kg || bidErrors.qty) setBidErrors(prev => ({ ...prev, quantity_kg: undefined, qty: undefined }));
-                  }}
-                  className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
-                    bidErrors.quantity_kg ? 'border-red-400 bg-red-50' : 'border-border'
-                  }`}
-                  placeholder={product?.minimum_quantity_kg ? `Min. ${product.minimum_quantity_kg} kg` : 'e.g. 500'}
-                />
-                {bidErrors.quantity_kg && (
-                  <p className="flex items-center gap-1 text-xs text-red-600 mt-1">
-                    <XCircle size={12} />{bidErrors.quantity_kg}
-                  </p>
+          <form onSubmit={submitBid} data-testid="bid-form" className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 overflow-y-auto px-6 pt-3 pb-4 space-y-4">
+              {/* Reference info bar */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 bg-muted rounded-lg text-xs">
+                {product?.base_price && (
+                  <>
+                    <span className="text-muted-foreground">Base Price:</span>
+                    <span className="font-bold text-foreground">
+                      {product.base_price_currency === 'USD' ? '$' : '₹'}{product.base_price.toLocaleString('en-IN')}/kg
+                    </span>
+                  </>
+                )}
+                {product?.minimum_quantity_kg && (
+                  <>
+                    {product?.base_price && <span className="text-border">|</span>}
+                    <span className="text-muted-foreground">Min. Qty:</span>
+                    <span className="font-bold text-foreground">{product.minimum_quantity_kg} kg</span>
+                  </>
+                )}
+                {product?.remaining_quantity_kg !== undefined && product?.remaining_quantity_kg !== null && (
+                  <>
+                    <span className="text-border">|</span>
+                    <span className="text-muted-foreground">Max available:</span>
+                    <span className="font-bold text-green-700">{product.remaining_quantity_kg.toLocaleString('en-IN')} kg</span>
+                  </>
                 )}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">Quantity (lots)</label>
-                <input
-                  type="number" min="0" step="0.01" data-testid="bid-quantity-lot"
-                  value={bidForm.quantity_lot}
-                  onChange={e => {
-                    setBidForm({...bidForm, quantity_lot: e.target.value});
-                    if (bidErrors.qty) setBidErrors(prev => ({ ...prev, qty: undefined }));
-                  }}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g. 10"
-                />
-              </div>
-            </div>
-            {bidErrors.qty && (
-              <p className="flex items-center gap-1 text-xs text-red-600 -mt-2">
-                <XCircle size={12} />{bidErrors.qty}
-              </p>
-            )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Price per kg
-                  {product?.base_price && <span className="text-muted-foreground font-normal"> (base ₹{product.base_price})</span>}
-                </label>
-                <input
-                  type="number" min="0" step="0.01" data-testid="bid-price-kg"
-                  value={bidForm.price_per_kg}
-                  onChange={e => {
-                    setBidForm({...bidForm, price_per_kg: e.target.value});
-                    if (bidErrors.price) setBidErrors(prev => ({ ...prev, price: undefined }));
-                  }}
-                  className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
-                    bidErrors.price ? 'border-red-400 bg-red-50' : 'border-border'
-                  }`}
-                  placeholder={product?.base_price ? `Base: ${product.base_price}` : 'e.g. 2500'}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">Price per lot</label>
-                <input
-                  type="number" min="0" step="0.01" data-testid="bid-price-lot"
-                  value={bidForm.price_per_lot}
-                  onChange={e => {
-                    setBidForm({...bidForm, price_per_lot: e.target.value});
-                    if (bidErrors.price) setBidErrors(prev => ({ ...prev, price: undefined }));
-                  }}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g. 50000"
-                />
-              </div>
-            </div>
-            {bidErrors.price && (
-              <p className="flex items-center gap-1 text-xs text-red-600 -mt-2">
-                <XCircle size={12} />{bidErrors.price}
-              </p>
-            )}
+              {/* Guest contact details — only shown to logged-out visitors */}
+              {!isAuthenticated && (
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg space-y-3">
+                  <p className="text-xs text-blue-800 font-medium">No account needed — we'll contact you directly about this enquiry.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Your Name *</label>
+                      <input
+                        type="text" data-testid="bid-guest-name"
+                        value={bidForm.guest_name}
+                        onChange={e => setBidForm({...bidForm, guest_name: e.target.value})}
+                        onBlur={() => markTouched('guest_name')}
+                        className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+                          showFieldError('guest_name') ? 'border-red-400 bg-red-50' : 'border-border'
+                        }`}
+                        placeholder="Full name"
+                      />
+                      <FieldError msg={showFieldError('guest_name')} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Company (optional)</label>
+                      <input
+                        type="text" data-testid="bid-guest-company"
+                        value={bidForm.guest_company}
+                        onChange={e => setBidForm({...bidForm, guest_company: e.target.value})}
+                        className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="Company name"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Phone *</label>
+                      <input
+                        type="tel" data-testid="bid-guest-phone"
+                        value={bidForm.guest_phone}
+                        onChange={e => setBidForm({...bidForm, guest_phone: e.target.value})}
+                        onBlur={() => markTouched('guest_phone')}
+                        className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+                          showFieldError('guest_phone') ? 'border-red-400 bg-red-50' : 'border-border'
+                        }`}
+                        placeholder="+91 98765 43210"
+                      />
+                      <FieldError msg={showFieldError('guest_phone')} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Email *</label>
+                      <input
+                        type="email" data-testid="bid-guest-email"
+                        value={bidForm.guest_email}
+                        onChange={e => setBidForm({...bidForm, guest_email: e.target.value})}
+                        onBlur={() => markTouched('guest_email')}
+                        className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+                          showFieldError('guest_email') ? 'border-red-400 bg-red-50' : 'border-border'
+                        }`}
+                        placeholder="you@example.com"
+                      />
+                      <FieldError msg={showFieldError('guest_email')} />
+                    </div>
+                  </div>
+                  {/* Honeypot — invisible to real visitors, left for bots that autofill every field */}
+                  <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+                    <label htmlFor="bid-website">Website</label>
+                    <input
+                      type="text" id="bid-website" name="website" tabIndex={-1} autoComplete="off"
+                      value={bidForm.website}
+                      onChange={e => setBidForm({...bidForm, website: e.target.value})}
+                    />
+                  </div>
+                </div>
+              )}
 
-            {/* Below-base-price soft warning */}
-            {product?.base_price && bidForm.price_per_kg && parseFloat(bidForm.price_per_kg) < product.base_price && (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                ⚠️ Your offer is below the base price. The seller may still consider it.
-              </p>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
+              {/* Quantity unit — kg and lots are mutually exclusive, pick one */}
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1">Currency *</label>
-                <select data-testid="bid-currency" value={bidForm.currency} onChange={e => setBidForm({...bidForm, currency: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                  <option value="INR">INR</option>
-                  <option value="USD">USD</option>
-                </select>
+                <label className="block text-xs font-medium text-foreground mb-1">Quote In *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBidForm(prev => ({ ...prev, quantity_unit: 'kg' }))}
+                    className={`py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                      bidForm.quantity_unit === 'kg' ? 'border-foreground bg-foreground text-white' : 'border-border text-muted-foreground hover:border-foreground/40'
+                    }`}
+                  >
+                    Per kg
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBidForm(prev => ({ ...prev, quantity_unit: 'lot' }))}
+                    className={`py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                      bidForm.quantity_unit === 'lot' ? 'border-foreground bg-foreground text-white' : 'border-border text-muted-foreground hover:border-foreground/40'
+                    }`}
+                  >
+                    Per lot
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">Market Type *</label>
-                <select data-testid="bid-market-type" value={bidForm.market_type} onChange={e => setBidForm({...bidForm, market_type: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                  <option value="domestic">Domestic</option>
-                  <option value="export">Export</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Additional Notes</label>
-              <textarea data-testid="bid-notes" value={bidForm.additional_notes} onChange={e => setBidForm({...bidForm, additional_notes: e.target.value})} rows={2} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Delivery terms, packaging, etc." />
-            </div>
 
-            {/* Commitment checkbox */}
-            <div>
-              <label className={`flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border transition-colors ${
-                bidErrors.commitment ? 'border-red-400 bg-red-50' : 'border-border bg-muted/40 hover:bg-muted'
-              }`}>
-                <input
-                  type="checkbox"
-                  data-testid="bid-commitment-checkbox"
-                  checked={commitmentChecked}
-                  onChange={e => {
-                    setCommitmentChecked(e.target.checked);
-                    if (bidErrors.commitment) setBidErrors(prev => ({ ...prev, commitment: undefined }));
-                  }}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-foreground flex-shrink-0"
-                />
-                <span className="text-xs text-foreground leading-relaxed">
-                  I confirm this is a genuine offer and I am prepared to fulfil it if accepted by the seller.
-                </span>
-              </label>
-              {bidErrors.commitment && (
-                <p className="flex items-center gap-1 text-xs text-red-600 mt-1">
-                  <XCircle size={12} />{bidErrors.commitment}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    Quantity ({bidForm.quantity_unit === 'kg' ? 'kg' : 'lots'})
+                    {bidForm.quantity_unit === 'kg' && product?.minimum_quantity_kg && (
+                      <span className="text-muted-foreground font-normal"> — min {product.minimum_quantity_kg} kg</span>
+                    )}
+                  </label>
+                  <input
+                    type="number" min="0.01" step="0.01" data-testid="bid-quantity"
+                    max={bidForm.quantity_unit === 'kg' ? (product?.remaining_quantity_kg ?? undefined) : undefined}
+                    value={bidForm.quantity_unit === 'kg' ? bidForm.quantity_kg : bidForm.quantity_lot}
+                    onChange={e => setBidForm(prev => prev.quantity_unit === 'kg'
+                      ? { ...prev, quantity_kg: e.target.value }
+                      : { ...prev, quantity_lot: e.target.value })}
+                    onBlur={() => markTouched('quantity')}
+                    className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+                      showFieldError('quantity') ? 'border-red-400 bg-red-50' : 'border-border'
+                    }`}
+                    placeholder={bidForm.quantity_unit === 'kg' && product?.minimum_quantity_kg ? `Min. ${product.minimum_quantity_kg} kg` : 'e.g. 500'}
+                  />
+                  <FieldError msg={showFieldError('quantity')} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    Price per {bidForm.quantity_unit === 'kg' ? 'kg' : 'lot'}
+                    {bidForm.quantity_unit === 'kg' && product?.base_price && (
+                      <span className="text-muted-foreground font-normal"> (base ₹{product.base_price})</span>
+                    )}
+                  </label>
+                  <input
+                    type="number" min="0.01" step="0.01" data-testid="bid-price"
+                    value={bidForm.quantity_unit === 'kg' ? bidForm.price_per_kg : bidForm.price_per_lot}
+                    onChange={e => setBidForm(prev => prev.quantity_unit === 'kg'
+                      ? { ...prev, price_per_kg: e.target.value }
+                      : { ...prev, price_per_lot: e.target.value })}
+                    onBlur={() => markTouched('price')}
+                    className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+                      showFieldError('price') ? 'border-red-400 bg-red-50' : 'border-border'
+                    }`}
+                    placeholder={bidForm.quantity_unit === 'kg' && product?.base_price ? `Base: ${product.base_price}` : 'e.g. 2500'}
+                  />
+                  <FieldError msg={showFieldError('price')} />
+                </div>
+              </div>
+
+              {/* Below-base-price soft warning — only shown once the price itself is otherwise valid */}
+              {bidForm.quantity_unit === 'kg' && product?.base_price && !bidFormErrors.price &&
+                parseFloat(bidForm.price_per_kg) < product.base_price && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  ⚠️ Your offer is below the base price. The seller may still consider it.
                 </p>
               )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Currency *</label>
+                  <select data-testid="bid-currency" value={bidForm.currency} onChange={e => setBidForm({...bidForm, currency: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="INR">INR</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Market Type *</label>
+                  <select data-testid="bid-market-type" value={bidForm.market_type} onChange={e => setBidForm({...bidForm, market_type: e.target.value})} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="domestic">Domestic</option>
+                    <option value="export">Export</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Additional Notes</label>
+                <textarea data-testid="bid-notes" value={bidForm.additional_notes} onChange={e => setBidForm({...bidForm, additional_notes: e.target.value})} rows={2} className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Delivery terms, packaging, etc." />
+              </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              data-testid="bid-submit-btn"
-              className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-foreground/90 transition-colors disabled:opacity-50"
-            >
-              {submitting ? <Loader2 size={16} className="animate-spin" /> : <Gavel size={16} />}
-              {submitting ? 'Sending Request...' : 'Request Price'}
-            </button>
+            {/* Sticky footer — commitment + submit stay visible while the fields above scroll */}
+            <div className="flex-shrink-0 border-t border-border bg-background px-6 py-4 space-y-3">
+              <div>
+                <label className={`flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border transition-colors ${
+                  showFieldError('commitment') ? 'border-red-400 bg-red-50' : 'border-border bg-muted/40 hover:bg-muted'
+                }`}>
+                  <input
+                    type="checkbox"
+                    data-testid="bid-commitment-checkbox"
+                    checked={commitmentChecked}
+                    onChange={e => {
+                      setCommitmentChecked(e.target.checked);
+                      markTouched('commitment');
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-foreground flex-shrink-0"
+                  />
+                  <span className="text-xs text-foreground leading-relaxed">
+                    I confirm this is a genuine offer and I am prepared to fulfil it if accepted by the seller.
+                  </span>
+                </label>
+                <FieldError msg={showFieldError('commitment')} />
+              </div>
+
+              {!isBidFormValid && (
+                <p className="text-[11px] text-muted-foreground text-center" data-testid="bid-missing-summary">
+                  Complete: {[
+                    bidFormErrors.quantity && 'quantity',
+                    bidFormErrors.price && 'price',
+                    bidFormErrors.guest_name && 'your name',
+                    bidFormErrors.guest_phone && 'phone',
+                    bidFormErrors.guest_email && 'email',
+                    bidFormErrors.commitment && 'confirmation checkbox',
+                  ].filter(Boolean).join(', ')}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting || !isBidFormValid}
+                data-testid="bid-submit-btn"
+                className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-foreground/90 transition-colors disabled:opacity-50"
+              >
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <Gavel size={16} />}
+                {submitting ? 'Sending Request...' : 'Request Price'}
+              </button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
