@@ -159,8 +159,19 @@ Design rules:
 - **Staleness:** if the latest entry is more than 4 days old, hide the figures
   and show only a note that rates update after each auction. A stale figure
   presented as current is worse than no figure.
-- Manual entry first. Do not scrape — the page structure will change and a
-  silently broken scraper showing stale data is the worst outcome.
+- Manual entry shipped first, then automated scraping was added on top of it
+  (`backend/market_rate_scraper.py`, `POST /api/admin/market-rates/scrape`,
+  run every 8h by `.github/workflows/scrape-market-rates.yml`). This
+  reverses the original "do not scrape" caution below, once the specific
+  failure it warned about — a silently broken scraper showing stale data as
+  current — was designed against directly: every scraped row must pass the
+  same `MarketRateCreate` validation as manual entry or it is skipped and
+  logged, never written partially; a `source` field ("manual" vs "auto")
+  means a scraped row can never overwrite a manual correction; and the
+  scrape endpoint itself returns a non-2xx (failing the scheduled Action)
+  whenever a run produces nothing usable, so a page-structure change surfaces
+  as a build failure instead of quietly serving old numbers. Manual entry via
+  AdminDashboard remains available and always takes precedence.
 
 ## Product model — needs rework
 
@@ -176,7 +187,6 @@ should not be shown.
 ## Still to build
 
 - Remove `base_price` from all public views and responses.
-- Auction rates feature (above).
 - Enquiry form: drop price, currency, lots and the commitment checkbox. Collect
   grade, quantity, delivery location, timeline, contact. Five fields.
 - Lead pipeline — every enquiry recorded with source page, grade, quantity,

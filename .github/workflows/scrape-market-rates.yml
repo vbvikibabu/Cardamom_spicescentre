@@ -1,0 +1,15 @@
+name: Scrape Spices Board Market Rates
+
+on:
+  schedule:
+    - cron: '0 */8 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger market rate scrape
+        run: |
+          curl -sS --fail-with-body --max-time 30 -X POST "${{ secrets.MARKET_RATES_BACKEND_URL }}/api/admin/market-rates/scrape" \
+            -H "X-Scrape-Secret: ${{ secrets.MARKET_RATES_SCRAPE_SECRET }}"

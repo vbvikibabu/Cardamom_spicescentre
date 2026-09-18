@@ -1087,12 +1087,13 @@ const AdminDashboard = () => {
                         <th className="py-2 pr-3">Min</th>
                         <th className="py-2 pr-3">Avg</th>
                         <th className="py-2 pr-3">Max</th>
+                        <th className="py-2 pr-3">Source</th>
                         <th className="py-2 pr-3"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {marketRates.length === 0 && (
-                        <tr><td colSpan={9} className="text-center text-muted-foreground py-8">No market rates entered yet</td></tr>
+                        <tr><td colSpan={10} className="text-center text-muted-foreground py-8">No market rates entered yet</td></tr>
                       )}
                       {marketRates.map(r => (
                         <tr key={r.id} className="border-b border-border/50">
@@ -1104,6 +1105,13 @@ const AdminDashboard = () => {
                           <td className="py-2 pr-3">{r.min_price}</td>
                           <td className="py-2 pr-3">{r.avg_price}</td>
                           <td className="py-2 pr-3">{r.max_price}</td>
+                          <td className="py-2 pr-3">
+                            {r.source === 'auto' ? (
+                              <span className="text-[9px] font-bold uppercase tracking-wide bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Auto</span>
+                            ) : (
+                              <span className="text-[9px] font-bold uppercase tracking-wide bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">Manual</span>
+                            )}
+                          </td>
                           <td className="py-2 pr-3">
                             <div className="flex items-center gap-2">
                               <button onClick={() => openMarketRateForm(r.auction_date)} className="p-1.5 border border-border rounded-lg hover:bg-muted transition-colors" title="Edit"><Pencil size={14} /></button>

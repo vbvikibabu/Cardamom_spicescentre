@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query, Header, Request, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response, RedirectResponse
 from dotenv import load_dotenv
@@ -24,6 +24,7 @@ import cloudinary.uploader
 from pywebpush import webpush, WebPushException
 import json
 import asyncio
+from market_rate_scraper import fetch_auction_page_html, parse_auction_rows
 
 # Configure logging early
 logging.basicConfig(
@@ -88,6 +89,10 @@ def get_client_ip(request: Request) -> str:
 
 GUEST_BID_RATE_LIMIT = int(os.environ.get("GUEST_BID_RATE_LIMIT", "5"))
 GUEST_BID_RATE_WINDOW_MINUTES = int(os.environ.get("GUEST_BID_RATE_WINDOW_MINUTES", "60"))
+
+# Shared secret for the GitHub Actions cron that triggers market rate scraping
+# (not an admin JWT — a scheduler calls this, not a logged-in admin).
+MARKET_RATES_SCRAPE_SECRET = os.environ.get("MARKET_RATES_SCRAPE_SECRET")
 
 # ==================== LIFESPAN ====================
 @asynccontextmanager
@@ -1145,6 +1150,7 @@ class MarketRateCreate(BaseModel):
     max_price: float = Field(..., gt=0)
     min_price: float = Field(..., gt=0)
     avg_price: float = Field(..., gt=0)
+    source: Literal["manual", "auto"] = "manual"
 
     @field_validator("auction_date")
     @classmethod
@@ -1288,6 +1294,11 @@ async def get_current_admin(current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+async def verify_scrape_secret(x_scrape_secret: str = Header(None, alias="X-Scrape-Secret")):
+    """Guards the scrape endpoint — called by a scheduler, not a logged-in admin."""
+    if not MARKET_RATES_SCRAPE_SECRET or x_scrape_secret != MARKET_RATES_SCRAPE_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid or missing scrape secret")
 
 
 # ==================== API ENDPOINTS ====================
@@ -1486,7 +1497,9 @@ async def upsert_market_rate_admin(
         {"_id": 0, "id": 1}
     )
     rate_kwargs = {"id": existing["id"]} if existing else {}
-    rate = MarketRate(**rate_data.model_dump(), **rate_kwargs, entered_by=current_admin.email)
+    # Manual entry always wins: this endpoint is only reachable via admin JWT,
+    # so every write through it is a manual entry regardless of what the body says.
+    rate = MarketRate(**{**rate_data.model_dump(), "source": "manual"}, **rate_kwargs, entered_by=current_admin.email)
 
     rate_dict = rate.model_dump()
     rate_dict["entered_at"] = rate_dict["entered_at"].isoformat()
@@ -1505,6 +1518,7 @@ async def update_market_rate_admin(
     current_admin: User = Depends(get_current_admin)
 ):
     update_dict = rate_data.model_dump()
+    update_dict["source"] = "manual"  # same invariant as the create path — admin JWT means manual
     result = await db.market_rates.update_one({"id": rate_id}, {"$set": update_dict})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Market rate not found")
@@ -1524,6 +1538,93 @@ async def delete_market_rate_admin(
         raise HTTPException(status_code=404, detail="Market rate not found")
     logger.info(f"Admin deleted market rate: {rate_id}")
     return {"message": "Market rate deleted"}
+
+_MARKET_RATE_COMPARISON_FIELDS = ("lots", "qty_arrived_kg", "qty_sold_kg", "max_price", "min_price", "avg_price")
+
+@api_router.post("/admin/market-rates/scrape")
+async def scrape_market_rates(_admin=Depends(verify_scrape_secret)):
+    """
+    Pulls the Spices Board's small-cardamom auction page and upserts whatever
+    rows validate. Called by a scheduled GitHub Action, not from the browser.
+
+    Returns {"written", "unchanged", "skipped", "failed"} on success (200).
+    Raises 502 if nothing usable came out of the run at all — either the
+    page/table couldn't be found, or every row failed to parse or validate.
+    A quiet day with no new auction still returns 200 (rows match what's
+    already stored, counted as "unchanged"), so only a genuinely broken run
+    turns the scheduled Action red.
+    """
+    try:
+        html = await asyncio.to_thread(fetch_auction_page_html)
+    except Exception as e:
+        logger.error(f"Market rate scrape: fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to fetch Spices Board page: {e}")
+
+    try:
+        raw_rows, malformed = parse_auction_rows(html)
+    except Exception as e:
+        logger.error(f"Market rate scrape: parse failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to parse auction table: {e}")
+
+    written = unchanged = skipped = 0
+    failed = malformed
+
+    for raw in raw_rows:
+        try:
+            rate_data = MarketRateCreate(**raw, source="auto")
+        except Exception as e:
+            logger.warning(f"Market rate scrape: validation failed for row {raw}: {e}")
+            failed += 1
+            continue
+
+        existing = await db.market_rates.find_one(
+            {"auction_date": rate_data.auction_date, "auctioneer": rate_data.auctioneer},
+            {"_id": 0}
+        )
+
+        if existing and existing.get("source", "manual") == "manual":
+            logger.info(
+                f"Market rate scrape: {rate_data.auction_date} / {rate_data.auctioneer} "
+                f"protected by manual entry — not overwritten"
+            )
+            skipped += 1
+            continue
+
+        if existing and existing.get("source") == "auto" and all(
+            existing.get(field) == getattr(rate_data, field) for field in _MARKET_RATE_COMPARISON_FIELDS
+        ):
+            unchanged += 1
+            continue
+
+        rate = MarketRate(
+            **rate_data.model_dump(),
+            id=existing["id"] if existing else str(uuid.uuid4()),
+            entered_by="spices-board-scraper",
+        )
+        rate_dict = rate.model_dump()
+        rate_dict["entered_at"] = rate_dict["entered_at"].isoformat()
+        await db.market_rates.update_one(
+            {"auction_date": rate.auction_date, "auctioneer": rate.auctioneer},
+            {"$set": rate_dict},
+            upsert=True
+        )
+        written += 1
+
+    logger.info(
+        f"Market rate scrape complete: written={written} unchanged={unchanged} "
+        f"skipped={skipped} failed={failed}"
+    )
+
+    if written + unchanged + skipped == 0:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "written": written, "unchanged": unchanged, "skipped": skipped, "failed": failed,
+                "message": "No usable rows — every parsed row failed validation, or the page yielded none. See server logs."
+            }
+        )
+
+    return {"written": written, "unchanged": unchanged, "skipped": skipped, "failed": failed}
 
 # Admin: approve/reject a product
 @api_router.patch("/admin/products/{product_id}/status")
