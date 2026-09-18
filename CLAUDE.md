@@ -50,12 +50,12 @@ Consequences for the code:
 The buyer states their **requirement** — grade, quantity, delivery location,
 timeline, contact. The seller then quotes. The buyer does not name a price.
 
-The legacy `/bids` feature is a sealed private-offer system (buyer submits one
-private offer, seller accepts or rejects; no visible price ladder, no minimum
-increments, no competing bidders). It is being reshaped into RFQ. User-facing
-copy uses enquiry language — "Request a Price", "My Enquiries", "Offers
-Received" — never "bid", "bidding" or "bidder". Database field names may keep
-`bid_*`.
+The legacy `/bids` feature is a sealed private-offer system: the buyer submits
+one private offer, the seller accepts or rejects; no visible price ladder, no
+minimum increments, no competing bidders. It is being reshaped into RFQ.
+User-facing copy uses enquiry language — "Request a Price", "My Enquiries",
+"Offers Received" — never "bid", "bidding" or "bidder". Database field names
+may keep `bid_*`.
 
 Known gap, not yet built: the seller can only accept or reject. There is no
 counter-offer, which ends conversations that should continue.
@@ -85,6 +85,10 @@ before any DB access) and a per-IP rate limit (`GUEST_BID_RATE_LIMIT`,
 `GUEST_BID_RATE_WINDOW_MINUTES`). Guest rows show a "Guest" pill with inline
 phone and email in the seller and admin views; the "Verified" badge is gated on
 `!is_guest`.
+
+### Auction rates — live, scraped automatically (DONE)
+
+See the Auction rates section below for the full design and its rules.
 
 ### Multi-seller and buyer accounts — retained
 
@@ -133,52 +137,65 @@ prices anywhere.
 - Never commit credentials, connection strings or API keys, and never print them
   in logs or error messages.
 
-## Auction rates (public market data) — next to build
+## Auction rates (public market data)
 
-Source: the Spices Board daily auction page for small cardamom, which publishes
-**previous-day** results per auctioneer with lots, quantity arrived, quantity
-sold, max price, min price and average price. Two auctioneers are relevant:
-Green House Cardamom Mktg. India Pvt. Ltd, and The Kerala Cardamom Processing
-and Marketing Company Limited, Thekkady.
+Source: the Spices Board archive page for small cardamom
+(`daily-price-small.html`), which publishes **previous-day** results per
+auctioneer with lots, quantity arrived, quantity sold, max price, min price and
+average price. Ten rows per page spanning several dates and many auctioneers —
+never hardcode an auctioneer list.
 
-Design rules:
+### Data and collection
 
 - `market_rates` collection, one document per auctioneer per auction date.
-  Admin-entered, under two minutes per day. Admin CRUD behind admin auth; one
-  public read endpoint.
+  Unique compound index on `(auction_date, auctioneer)`; writes are upserts on
+  that key.
+- `source` is `"manual"` or `"auto"`. Admin write paths force `"manual"`
+  server-side. **A scraped row never overwrites a manual one.**
+- Every row, scraped or entered, must pass `MarketRateCreate` validation
+  including the min/max/avg range check. Invalid rows are skipped and logged,
+  never written partially.
+
+### Scraping
+
+- `backend/market_rate_scraper.py`, endpoint `POST /api/admin/market-rates/scrape`
+  behind the `X-Scrape-Secret` header, run every 8 hours by
+  `.github/workflows/scrape-market-rates.yml`.
+- The endpoint returns a non-2xx when a run produces nothing usable, so a
+  page-structure change fails the scheduled Action rather than quietly serving
+  old numbers.
+- Manual entry via AdminDashboard remains available and always takes precedence.
+
+This supersedes the original "manual entry first, do not scrape" caution. That
+caution warned about one specific failure — a silently broken scraper showing
+stale data as current — and the three rules above are the direct answer to it.
+
+### Display
+
 - **Always label the actual auction date. Never "Today's Market"** — this is
   previous-day data and must not read as live.
-- Display the average, the **min-max range**, total quantity and total lots.
-  The range is the point: a spread of well over a thousand rupees on a single
-  day is grade variation, and it is the evidence that a blended average says
-  nothing about a specific grade.
-- Include the explanatory note: the range reflects grade; bold high-liter-weight
-  lots trade near the top, small light lots near the bottom; enquire for a price
-  on a specific grade and quantity.
+- **Staleness:** the public endpoint decides, not the browser. If the latest
+  entry is more than 4 days old it returns the stale flag with no rows, so a
+  stale figure can never reach the client.
 - Credit "Source: Spices Board of India".
-- **Staleness:** if the latest entry is more than 4 days old, hide the figures
-  and show only a note that rates update after each auction. A stale figure
-  presented as current is worse than no figure.
-- Manual entry shipped first, then automated scraping was added on top of it
-  (`backend/market_rate_scraper.py`, `POST /api/admin/market-rates/scrape`,
-  run every 8h by `.github/workflows/scrape-market-rates.yml`). This
-  reverses the original "do not scrape" caution below, once the specific
-  failure it warned about — a silently broken scraper showing stale data as
-  current — was designed against directly: every scraped row must pass the
-  same `MarketRateCreate` validation as manual entry or it is skipped and
-  logged, never written partially; a `source` field ("manual" vs "auto")
-  means a scraped row can never overwrite a manual correction; and the
-  scrape endpoint itself returns a non-2xx (failing the scheduled Action)
-  whenever a run produces nothing usable, so a page-structure change surfaces
-  as a build failure instead of quietly serving old numbers. Manual entry via
-  AdminDashboard remains available and always takes precedence.
+- Presentation is a compact data table, not an infographic. One row per auction
+  date, newest first, aggregated across auctioneers: Date, Low, Avg, High, Sold.
+  Avg is the quantity-weighted average. Auctioneer names stay in the data but
+  are not displayed — they mean nothing to a buyer and the row count varies
+  daily.
+- Below the table, the grade line: size is only part of it — lighter lots, poor
+  colour and splits pull a lot toward the low end. Then the spread stated as a
+  figure, with a compact enquiry CTA inline.
+- The spread is the argument. A blended average says nothing about a specific
+  grade, and the day's min-to-max gap is the evidence.
 
 ## Product model — needs rework
 
 The Product model was built for auction lots and still carries `base_price`,
 `bid_duration_hours` and `bid_end_time`. What a cardamom buyer actually judges
-is grade spec: liter weight (g/l), screen size (mm), moisture %, colour, packing
-spec, MOQ, available quantity. The catalog should move toward those fields.
+is grade spec: liter weight (g/l), screen size (mm), moisture %, colour, split
+percentage, packing spec, MOQ, available quantity. The catalog should move
+toward those fields.
 
 The listing timer was 1-8 hours (auction-appropriate) and has been widened;
 buyer-facing countdowns create pressure on someone who is only enquiring and
@@ -187,6 +204,8 @@ should not be shown.
 ## Still to build
 
 - Remove `base_price` from all public views and responses.
+- 30-day price trend chart under the auction rates table, plus a one-off
+  backfill of history from the paginated Board archive.
 - Enquiry form: drop price, currency, lots and the commitment checkbox. Collect
   grade, quantity, delivery location, timeline, contact. Five fields.
 - Lead pipeline — every enquiry recorded with source page, grade, quantity,
@@ -215,10 +234,13 @@ should not be shown.
 - **Commit locally. Never run `git push`, `git push --force` or
   `git reset --hard`.** Pushing triggers auto-deploy to Render and Vercel and is
   the owner's call.
-- **Python is not runnable in this environment** — `python` hits a Microsoft
-  Store alias stub. After any backend change, tell the owner to run
-  `py -m py_compile backend/server.py` before deploying. Never report a large
-  structural backend change as verified when it has not been compiled.
-- Check the Vercel preview deployment before merging — `main` is live to buyers
-  arriving from Google.
+- **Do not build mock backends, start dev servers, or verify in a browser by
+  default.** The owner checks the deployed site directly. If a change is complex
+  enough that verification is genuinely worthwhile, ask first and wait for a yes
+  — do not assume.
+- **Compile checks are always fine and need no asking.** Use `py -m py_compile`
+  for backend changes (note: `python` hits a Microsoft Store alias stub on this
+  machine — `py` is the working command) and a Babel parse for frontend changes.
+  Never report a large structural backend change as verified when it has not
+  been compiled.
 - For large structural changes, show the diff before applying.
