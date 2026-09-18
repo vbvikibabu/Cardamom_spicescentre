@@ -6,16 +6,6 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const formatINR = (n) => Math.round(n).toLocaleString('en-IN');
 
-// Display-only shortening — the full name is always kept in the data.
-// Known long names get a specific short form; anything else just truncates.
-const AUCTIONEER_SHORT_NAMES = {
-  'The Kerala Cardamom Processing and Marketing Company Limited, Thekkady': 'Kerala Cardamom, Thekkady',
-};
-const shortAuctioneerName = (name) => {
-  if (AUCTIONEER_SHORT_NAMES[name]) return AUCTIONEER_SHORT_NAMES[name];
-  return name.length > 32 ? `${name.slice(0, 29).trimEnd()}…` : name;
-};
-
 const getProductImage = (product) => {
   if (!product) return null;
   if (product.media_paths?.length > 0) {
@@ -72,26 +62,35 @@ export default function Home() {
     }
   };
 
-  // Aggregated from the raw per-auctioneer rows the backend returns for the
-  // latest non-stale auction date — staleness itself is decided server-side.
-  const marketRateStats = (() => {
+  // The backend returns raw per-auctioneer rows across the most recent few
+  // auction dates (staleness itself is decided server-side, on the single
+  // latest date). Group those by date and aggregate across auctioneers —
+  // auctioneer identity doesn't matter to a buyer, only the date does.
+  const marketRateDays = (() => {
     const rows = marketRates.rows;
-    if (!rows || rows.length === 0) return null;
-    const totalQtySold = rows.reduce((s, r) => s + (r.qty_sold_kg || 0), 0);
-    const weightedAvg = totalQtySold > 0
-      ? rows.reduce((s, r) => s + r.avg_price * (r.qty_sold_kg || 0), 0) / totalQtySold
-      : rows.reduce((s, r) => s + r.avg_price, 0) / rows.length;
-    const minPrice = Math.min(...rows.map(r => r.min_price));
-    const maxPrice = Math.max(...rows.map(r => r.max_price));
-    return {
-      weightedAvg,
-      minPrice,
-      maxPrice,
-      totalQtySold,
-      totalQtyArrived: rows.reduce((s, r) => s + (r.qty_arrived_kg || 0), 0),
-      totalLots: rows.reduce((s, r) => s + (r.lots || 0), 0),
-    };
+    if (!rows || rows.length === 0) return [];
+    const byDate = {};
+    rows.forEach(r => {
+      (byDate[r.auction_date] = byDate[r.auction_date] || []).push(r);
+    });
+    return Object.entries(byDate)
+      .map(([date, dateRows]) => {
+        const qtySold = dateRows.reduce((s, r) => s + (r.qty_sold_kg || 0), 0);
+        const avg = qtySold > 0
+          ? dateRows.reduce((s, r) => s + r.avg_price * (r.qty_sold_kg || 0), 0) / qtySold
+          : dateRows.reduce((s, r) => s + r.avg_price, 0) / dateRows.length;
+        return {
+          date,
+          low: Math.min(...dateRows.map(r => r.min_price)),
+          high: Math.max(...dateRows.map(r => r.max_price)),
+          avg,
+          qtySold,
+        };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 6);
   })();
+  const latestMarketDay = marketRateDays[0] || null;
 
   return (
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
@@ -225,8 +224,8 @@ export default function Home() {
             <div className="bg-white rounded-xl p-5 border border-gray-100 text-center text-sm text-gray-500">
               Rates update after each auction — check back after the next trading day.
             </div>
-          ) : marketRateStats && (
-            <div className="max-w-[680px] text-[13px] text-gray-600">
+          ) : latestMarketDay && (
+            <div className="max-w-[680px] mx-auto text-[13px] text-gray-600">
               <div className="flex items-baseline justify-between">
                 <h2 className="font-serif text-2xl text-[#1a3a1a]">Auction rates</h2>
                 <span className="text-gray-400">
@@ -235,42 +234,39 @@ export default function Home() {
               </div>
               <p className="text-gray-400 mb-4">Small cardamom · Spices Board of India</p>
 
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-200 text-gray-400">
-                    <th className="text-left font-normal py-1.5">Auctioneer</th>
-                    <th className="text-right font-normal py-1.5">Low</th>
-                    <th className="text-right font-normal py-1.5">Avg</th>
-                    <th className="text-right font-normal py-1.5">High</th>
-                    <th className="text-right font-normal py-1.5">Sold</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {marketRates.rows.map(r => (
-                    <tr key={r.id} className="border-b border-gray-100">
-                      <td className="py-1.5 pr-2 text-[#1a3a1a]">{shortAuctioneerName(r.auctioneer)}</td>
-                      <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(r.min_price)}</td>
-                      <td className="py-1.5 text-right tabular-nums text-[#1a3a1a]">{formatINR(r.avg_price)}</td>
-                      <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(r.max_price)}</td>
-                      <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(r.qty_sold_kg)}</td>
+              <div className="bg-white rounded-xl p-5">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-400">
+                      <th className="text-left font-normal py-1.5">Date</th>
+                      <th className="text-right font-normal py-1.5">Low ₹/kg</th>
+                      <th className="text-right font-normal py-1.5">Avg ₹/kg</th>
+                      <th className="text-right font-normal py-1.5">High ₹/kg</th>
+                      <th className="text-right font-normal py-1.5">Sold (kg)</th>
                     </tr>
-                  ))}
-                  <tr className="border-t border-gray-300 font-medium">
-                    <td className="py-1.5 pr-2 text-[#1a3a1a]">Day total</td>
-                    <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(marketRateStats.minPrice)}</td>
-                    <td className="py-1.5 text-right tabular-nums text-[#1a3a1a]">{formatINR(marketRateStats.weightedAvg)}</td>
-                    <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(marketRateStats.maxPrice)}</td>
-                    <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(marketRateStats.totalQtySold)}</td>
-                  </tr>
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {marketRateDays.map(d => (
+                      <tr key={d.date} className="border-b border-gray-100 last:border-b-0">
+                        <td className="py-1.5 pr-2 text-[#1a3a1a]">
+                          {new Date(d.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </td>
+                        <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(d.low)}</td>
+                        <td className="py-1.5 text-right tabular-nums text-[#1a3a1a] font-semibold">{formatINR(d.avg)}</td>
+                        <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(d.high)}</td>
+                        <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(d.qtySold)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               <p className="text-gray-400 mt-3">
-                Small, light lots 6-7mm sit near ₹{formatINR(marketRateStats.minPrice)} · bold, high liter weight 8mm+ near ₹{formatINR(marketRateStats.maxPrice)}.
+                Small, light lots 6-7mm sit near ₹{formatINR(latestMarketDay.low)} · bold, high liter weight 8mm+ near ₹{formatINR(latestMarketDay.high)}.
               </p>
               <div className="flex items-center justify-between gap-3 mt-1">
                 <p className="text-gray-600">
-                  ₹{formatINR(marketRateStats.maxPrice - marketRateStats.minPrice)} between the day's lowest and highest lot. That spread is grade.
+                  ₹{formatINR(latestMarketDay.high - latestMarketDay.low)} between the day's lowest and highest lot. That spread is grade.
                 </p>
                 <Link
                   to="/products"

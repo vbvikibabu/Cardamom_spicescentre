@@ -2061,9 +2061,16 @@ async def get_product(product_id: str):
 
 # Public: latest Spices Board auction rates (previous-day data, entered manually by admin)
 MARKET_RATE_STALE_AFTER_DAYS = 4
+MARKET_RATE_RECENT_DAYS = 6  # how many distinct auction dates the public endpoint returns
 
 @api_router.get("/market-rates/latest", response_model=MarketRatesLatestResponse)
 async def get_latest_market_rates():
+    """
+    Returns raw per-auctioneer rows for the most recent MARKET_RATE_RECENT_DAYS
+    distinct auction dates (staleness is still judged only on the single most
+    recent date). The frontend groups these by date itself — this endpoint
+    stays a thin data source, same as before, just over a wider date window.
+    """
     latest = await db.market_rates.find({}, {"_id": 0, "auction_date": 1}) \
         .sort("auction_date", -1).limit(1).to_list(1)
     if not latest:
@@ -2074,7 +2081,10 @@ async def get_latest_market_rates():
     if days_since > MARKET_RATE_STALE_AFTER_DAYS:
         return MarketRatesLatestResponse(auction_date=latest_date, stale=True)
 
-    rows = await db.market_rates.find({"auction_date": latest_date}, {"_id": 0}).to_list(50)
+    recent_dates = await db.market_rates.distinct("auction_date")
+    recent_dates = sorted(recent_dates, reverse=True)[:MARKET_RATE_RECENT_DAYS]
+
+    rows = await db.market_rates.find({"auction_date": {"$in": recent_dates}}, {"_id": 0}).to_list(500)
     for r in rows:
         _coerce_market_rate_datetimes(r)
     return MarketRatesLatestResponse(
