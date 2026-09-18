@@ -261,12 +261,10 @@ export default function Home() {
                 </table>
               </div>
 
-              <p className="text-gray-400 mt-3">
-                Small, light lots 6-7mm sit near ₹{formatINR(latestMarketDay.low)} · bold, high liter weight 8mm+ near ₹{formatINR(latestMarketDay.high)}.
-              </p>
-              <div className="flex items-center justify-between gap-3 mt-1">
+              <div className="flex items-center justify-between gap-3 mt-3">
                 <p className="text-gray-600">
-                  ₹{formatINR(latestMarketDay.high - latestMarketDay.low)} between the day's lowest and highest lot. That spread is grade.
+                  Size is only part of it. Lighter lots, poor colour and splits pull a lot toward the low end
+                  of each day's range — the spread between low and high is grade.
                 </p>
                 <Link
                   to="/products"
