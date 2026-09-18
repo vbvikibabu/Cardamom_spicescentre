@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -99,18 +99,44 @@ export default function Home() {
   // A sparse chart looks broken, so it's hidden below a minimum point count
   // rather than rendered thin. History is already sorted oldest-first by the API.
   const showTrendChart = marketRateHistory.length >= 10;
+
+  // Different auctioneers report on different days, so the raw daily series
+  // jumps by which auctioneers happened to report that day, not by market
+  // movement. A trailing 3-day rolling average smooths that composition noise
+  // out. The first two points use a shorter window since there's no earlier
+  // history yet — that's the standard, expected edge behaviour for a rolling
+  // average, not a bug.
+  const trendData = marketRateHistory.map((point, i) => {
+    const window = marketRateHistory.slice(Math.max(0, i - 2), i + 1);
+    const rollingAvg = window.reduce((s, p) => s + p.weighted_avg_price, 0) / window.length;
+    return { auction_date: point.auction_date, rollingAvg };
+  });
+
   const trendChange = showTrendChart
-    ? marketRateHistory[marketRateHistory.length - 1].weighted_avg_price - marketRateHistory[0].weighted_avg_price
+    ? trendData[trendData.length - 1].rollingAvg - trendData[0].rollingAvg
     : 0;
   const trendLabel = `${trendChange >= 0 ? '+' : '-'}₹${formatINR(Math.abs(trendChange))}`;
-  // 4-5 evenly spaced x-axis labels instead of one per point.
+
+  // 4 evenly spaced x-axis labels instead of one per point.
   const trendXTicks = (() => {
     const n = marketRateHistory.length;
     if (n === 0) return [];
-    const idxs = n <= 5
+    const idxs = n <= 4
       ? marketRateHistory.map((_, i) => i)
-      : [0, Math.round((n - 1) * 0.25), Math.round((n - 1) * 0.5), Math.round((n - 1) * 0.75), n - 1];
+      : [0, Math.round((n - 1) / 3), Math.round((n - 1) * 2 / 3), n - 1];
     return [...new Set(idxs)].map(i => marketRateHistory[i].auction_date);
+  })();
+
+  // Widen the range ~10% on each side so small day-to-day moves don't read
+  // as dramatic swings against a tightly-cropped axis.
+  const trendYDomain = (() => {
+    if (trendData.length === 0) return ['auto', 'auto'];
+    const values = trendData.map(p => p.rollingAvg);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    const pad = range > 0 ? range * 0.1 : Math.max(min * 0.1, 1);
+    return [min - pad, max + pad];
   })();
 
   return (
@@ -255,10 +281,10 @@ export default function Home() {
               </div>
               <p className="text-gray-400 mb-4">Small cardamom · Spices Board of India</p>
 
-              <div className={showTrendChart ? 'flex flex-col min-[900px]:flex-row gap-6' : ''}>
+              <div className={showTrendChart ? 'flex flex-col min-[900px]:flex-row gap-6 items-stretch' : ''}>
                 {/* Left ~55%: the table */}
-                <div className={showTrendChart ? 'min-[900px]:w-[55%]' : ''}>
-                  <div className="bg-white rounded-xl p-5">
+                <div className={showTrendChart ? 'min-[900px]:w-[55%] flex' : ''}>
+                  <div className="bg-white rounded-xl p-5 w-full">
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="border-b border-gray-200 text-gray-400">
@@ -288,43 +314,53 @@ export default function Home() {
 
                 {/* Right ~45%: 30-day trend, hidden when too sparse to read as a trend */}
                 {showTrendChart && (
-                  <div className="min-[900px]:w-[45%] mt-6 min-[900px]:mt-0">
-                    <div className="bg-white rounded-xl p-5">
+                  <div className="min-[900px]:w-[45%] mt-6 min-[900px]:mt-0 flex">
+                    <div className="bg-white rounded-xl p-5 w-full flex flex-col">
                       <div className="flex items-baseline justify-between mb-2">
                         <span className="text-gray-400">30-day trend</span>
                         <span className={trendChange >= 0 ? 'text-[#2d5a27] font-semibold' : 'text-red-600 font-semibold'}>
                           {trendLabel}
                         </span>
                       </div>
-                      <ResponsiveContainer width="100%" height={140}>
-                        <LineChart data={marketRateHistory} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                          <XAxis
-                            dataKey="auction_date"
-                            ticks={trendXTicks}
-                            tickFormatter={d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                            tick={{ fontSize: 11, fill: '#9ca3af' }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <YAxis
-                            tickFormatter={v => formatINR(v)}
-                            tick={{ fontSize: 11, fill: '#9ca3af' }}
-                            axisLine={false}
-                            tickLine={false}
-                            width={40}
-                            tickCount={4}
-                            domain={['auto', 'auto']}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="weighted_avg_price"
-                            stroke="#7a9b6a"
-                            strokeWidth={1.5}
-                            dot={false}
-                            isAnimationActive={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      <div className="flex-1 min-h-[140px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                            <defs>
+                              <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#7a9b6a" stopOpacity={0.25} />
+                                <stop offset="100%" stopColor="#7a9b6a" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid stroke="#eee" />
+                            <XAxis
+                              dataKey="auction_date"
+                              ticks={trendXTicks}
+                              tickFormatter={d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                              tick={{ fontSize: 11, fill: '#9ca3af' }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              tickFormatter={v => formatINR(v)}
+                              tick={{ fontSize: 11, fill: '#9ca3af' }}
+                              axisLine={false}
+                              tickLine={false}
+                              width={40}
+                              tickCount={3}
+                              domain={trendYDomain}
+                            />
+                            <Area
+                              type="linear"
+                              dataKey="rollingAvg"
+                              stroke="#7a9b6a"
+                              strokeWidth={1.5}
+                              fill="url(#trendFill)"
+                              dot={false}
+                              isAnimationActive={false}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
                 )}
