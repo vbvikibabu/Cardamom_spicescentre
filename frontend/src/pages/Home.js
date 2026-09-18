@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -41,6 +42,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [products, setProducts]           = useState([]);
   const [marketRates, setMarketRates]     = useState({ auction_date: null, stale: false, rows: [] });
+  const [marketRateHistory, setMarketRateHistory] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -50,13 +52,15 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const [prodRes, marketRatesRes] = await Promise.all([
+      const [prodRes, marketRatesRes, historyRes] = await Promise.all([
         axios.get(`${API_URL}/api/products`),
-        axios.get(`${API_URL}/api/market-rates/latest`)
+        axios.get(`${API_URL}/api/market-rates/latest`),
+        axios.get(`${API_URL}/api/market-rates/history?days=30`)
       ]);
       const prods = prodRes.data || [];
       setProducts(prods.slice(0, 4));
       setMarketRates(marketRatesRes.data);
+      setMarketRateHistory(historyRes.data || []);
     } catch (err) {
       console.error(err);
     }
@@ -91,6 +95,23 @@ export default function Home() {
       .slice(0, 6);
   })();
   const latestMarketDay = marketRateDays[0] || null;
+
+  // A sparse chart looks broken, so it's hidden below a minimum point count
+  // rather than rendered thin. History is already sorted oldest-first by the API.
+  const showTrendChart = marketRateHistory.length >= 10;
+  const trendChange = showTrendChart
+    ? marketRateHistory[marketRateHistory.length - 1].weighted_avg_price - marketRateHistory[0].weighted_avg_price
+    : 0;
+  const trendLabel = `${trendChange >= 0 ? '+' : '-'}₹${formatINR(Math.abs(trendChange))}`;
+  // 4-5 evenly spaced x-axis labels instead of one per point.
+  const trendXTicks = (() => {
+    const n = marketRateHistory.length;
+    if (n === 0) return [];
+    const idxs = n <= 5
+      ? marketRateHistory.map((_, i) => i)
+      : [0, Math.round((n - 1) * 0.25), Math.round((n - 1) * 0.5), Math.round((n - 1) * 0.75), n - 1];
+    return [...new Set(idxs)].map(i => marketRateHistory[i].auction_date);
+  })();
 
   return (
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
@@ -225,7 +246,7 @@ export default function Home() {
               Rates update after each auction — check back after the next trading day.
             </div>
           ) : latestMarketDay && (
-            <div className="max-w-[680px] mx-auto text-[13px] text-gray-600">
+            <div className={`text-[13px] text-gray-600 ${showTrendChart ? '' : 'max-w-[680px]'}`}>
               <div className="flex items-baseline justify-between">
                 <h2 className="font-serif text-2xl text-[#1a3a1a]">Auction rates</h2>
                 <span className="text-gray-400">
@@ -234,31 +255,79 @@ export default function Home() {
               </div>
               <p className="text-gray-400 mb-4">Small cardamom · Spices Board of India</p>
 
-              <div className="bg-white rounded-xl p-5">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-gray-400">
-                      <th className="text-left font-normal py-1.5">Date</th>
-                      <th className="text-right font-normal py-1.5">Low ₹/kg</th>
-                      <th className="text-right font-normal py-1.5">Avg ₹/kg</th>
-                      <th className="text-right font-normal py-1.5">High ₹/kg</th>
-                      <th className="text-right font-normal py-1.5">Sold (kg)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {marketRateDays.map(d => (
-                      <tr key={d.date} className="border-b border-gray-100 last:border-b-0">
-                        <td className="py-1.5 pr-2 text-[#1a3a1a]">
-                          {new Date(d.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                        </td>
-                        <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(d.low)}</td>
-                        <td className="py-1.5 text-right tabular-nums text-[#1a3a1a] font-semibold">{formatINR(d.avg)}</td>
-                        <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(d.high)}</td>
-                        <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(d.qtySold)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className={showTrendChart ? 'flex flex-col min-[900px]:flex-row gap-6' : ''}>
+                {/* Left ~55%: the table */}
+                <div className={showTrendChart ? 'min-[900px]:w-[55%]' : ''}>
+                  <div className="bg-white rounded-xl p-5">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-400">
+                          <th className="text-left font-normal py-1.5">Date</th>
+                          <th className="text-right font-normal py-1.5">Low ₹/kg</th>
+                          <th className="text-right font-normal py-1.5">Avg ₹/kg</th>
+                          <th className="text-right font-normal py-1.5">High ₹/kg</th>
+                          <th className="text-right font-normal py-1.5">Sold (kg)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {marketRateDays.map(d => (
+                          <tr key={d.date} className="border-b border-gray-100 last:border-b-0">
+                            <td className="py-1.5 pr-2 text-[#1a3a1a]">
+                              {new Date(d.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                            </td>
+                            <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(d.low)}</td>
+                            <td className="py-1.5 text-right tabular-nums text-[#1a3a1a] font-semibold">{formatINR(d.avg)}</td>
+                            <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(d.high)}</td>
+                            <td className="py-1.5 text-right tabular-nums text-gray-400">{formatINR(d.qtySold)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Right ~45%: 30-day trend, hidden when too sparse to read as a trend */}
+                {showTrendChart && (
+                  <div className="min-[900px]:w-[45%] mt-6 min-[900px]:mt-0">
+                    <div className="bg-white rounded-xl p-5">
+                      <div className="flex items-baseline justify-between mb-2">
+                        <span className="text-gray-400">30-day trend</span>
+                        <span className={trendChange >= 0 ? 'text-[#2d5a27] font-semibold' : 'text-red-600 font-semibold'}>
+                          {trendLabel}
+                        </span>
+                      </div>
+                      <ResponsiveContainer width="100%" height={140}>
+                        <LineChart data={marketRateHistory} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                          <XAxis
+                            dataKey="auction_date"
+                            ticks={trendXTicks}
+                            tickFormatter={d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                            tick={{ fontSize: 11, fill: '#9ca3af' }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            tickFormatter={v => formatINR(v)}
+                            tick={{ fontSize: 11, fill: '#9ca3af' }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={40}
+                            tickCount={4}
+                            domain={['auto', 'auto']}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="weighted_avg_price"
+                            stroke="#7a9b6a"
+                            strokeWidth={1.5}
+                            dot={false}
+                            isAnimationActive={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between gap-3 mt-3">
