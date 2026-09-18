@@ -1188,6 +1188,10 @@ class MarketRatesLatestResponse(BaseModel):
     stale: bool = False
     rows: List[MarketRate] = Field(default_factory=list)
 
+class MarketRateHistoryPoint(BaseModel):
+    auction_date: str
+    weighted_avg_price: float
+
 
 # ==================== HELPERS ====================
 def _coerce_product_datetimes(p: dict):
@@ -2098,6 +2102,37 @@ async def get_latest_market_rates():
         stale=False,
         rows=[MarketRate(**r) for r in rows]
     )
+
+@api_router.get("/market-rates/history", response_model=List[MarketRateHistoryPoint])
+async def get_market_rate_history(days: int = Query(30, ge=1, le=365)):
+    """
+    Public, unauthenticated, no staleness gate — this is historical data by
+    definition, not a claim about a current price. One point per auction
+    date within the window, the quantity-weighted average across that date's
+    auctioneers, oldest first.
+    """
+    cutoff_date = (datetime.now(timezone.utc).date() - timedelta(days=days)).strftime("%Y-%m-%d")
+    rows = await db.market_rates.find(
+        {"auction_date": {"$gte": cutoff_date}},
+        {"_id": 0, "auction_date": 1, "avg_price": 1, "qty_sold_kg": 1}
+    ).to_list(10000)
+
+    by_date: Dict[str, List[dict]] = {}
+    for r in rows:
+        by_date.setdefault(r["auction_date"], []).append(r)
+
+    points = []
+    for date, date_rows in by_date.items():
+        qty_sold = sum(r.get("qty_sold_kg") or 0 for r in date_rows)
+        weighted_avg = (
+            sum(r["avg_price"] * (r.get("qty_sold_kg") or 0) for r in date_rows) / qty_sold
+            if qty_sold > 0
+            else sum(r["avg_price"] for r in date_rows) / len(date_rows)
+        )
+        points.append(MarketRateHistoryPoint(auction_date=date, weighted_avg_price=weighted_avg))
+
+    points.sort(key=lambda p: p.auction_date)
+    return points
 
 # Buyer: place bid (also accepts an unauthenticated guest enquiry)
 @api_router.post("/bids", response_model=Bid)
