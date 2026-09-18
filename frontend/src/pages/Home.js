@@ -317,7 +317,7 @@ export default function Home() {
                   <div className="min-[900px]:w-[45%] mt-6 min-[900px]:mt-0 flex">
                     <div className="bg-white rounded-xl p-5 w-full flex flex-col">
                       <div className="flex items-baseline justify-between mb-2">
-                        <span className="text-gray-400">30-day trend</span>
+                        <span className="text-gray-400">30-day trend (3-day avg)</span>
                         <span className={trendChange >= 0 ? 'text-[#2d5a27] font-semibold' : 'text-red-600 font-semibold'}>
                           {trendLabel}
                         </span>
@@ -350,7 +350,7 @@ export default function Home() {
                               domain={trendYDomain}
                             />
                             <Tooltip
-                              formatter={v => [`₹${formatINR(v)}`, 'Avg']}
+                              formatter={v => [`₹${formatINR(v)}`, '3-day avg']}
                               labelFormatter={d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                               contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: 'none' }}
                               labelStyle={{ color: '#9ca3af', marginBottom: 2 }}
