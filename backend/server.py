@@ -8,7 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator, model_validator
 import re
 from typing import List, Optional, Literal, Dict, Set
 import uuid
@@ -172,6 +172,7 @@ async def lifespan(app: FastAPI):
         await db.bids.create_index("product_id")
         await db.bids.create_index("buyer_id")
         await db.bids.create_index([("guest_ip", 1), ("created_at", -1)])
+        await db.market_rates.create_index([("auction_date", 1), ("auctioneer", 1)], unique=True)
         logger.info("Database indexes ensured")
     except Exception as e:
         logger.warning(f"Index creation warning (may already exist): {e}")
@@ -1134,6 +1135,53 @@ class PushSubscription(BaseModel):
     endpoint: str
     keys: dict
 
+# ==================== MARKET RATE MODELS (Spices Board auction data) ====================
+class MarketRateCreate(BaseModel):
+    auction_date: str  # "YYYY-MM-DD"
+    auctioneer: str = Field(..., min_length=1, max_length=200)
+    lots: int = Field(..., ge=0)
+    qty_arrived_kg: float = Field(..., ge=0)
+    qty_sold_kg: float = Field(..., ge=0)
+    max_price: float = Field(..., gt=0)
+    min_price: float = Field(..., gt=0)
+    avg_price: float = Field(..., gt=0)
+
+    @field_validator("auction_date")
+    @classmethod
+    def _validate_auction_date(cls, v: str) -> str:
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("auction_date must be in YYYY-MM-DD format")
+        return v
+
+    @field_validator("auctioneer")
+    @classmethod
+    def _clean_auctioneer(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("auctioneer name required")
+        return v
+
+    @model_validator(mode="after")
+    def _check_price_range(self):
+        if self.min_price > self.max_price:
+            raise ValueError("min_price cannot exceed max_price")
+        if not (self.min_price <= self.avg_price <= self.max_price):
+            raise ValueError("avg_price must fall within min_price and max_price")
+        return self
+
+class MarketRate(MarketRateCreate):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    entered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    entered_by: Optional[str] = None
+
+class MarketRatesLatestResponse(BaseModel):
+    auction_date: Optional[str] = None
+    stale: bool = False
+    rows: List[MarketRate] = Field(default_factory=list)
+
 
 # ==================== HELPERS ====================
 def _coerce_product_datetimes(p: dict):
@@ -1141,6 +1189,11 @@ def _coerce_product_datetimes(p: dict):
     for field in ("created_at", "bid_start_time", "bid_end_time", "sold_at"):
         if isinstance(p.get(field), str):
             p[field] = datetime.fromisoformat(p[field])
+
+def _coerce_market_rate_datetimes(r: dict):
+    """Convert ISO string datetime fields on a market rate dict to datetime objects."""
+    if isinstance(r.get("entered_at"), str):
+        r["entered_at"] = datetime.fromisoformat(r["entered_at"])
 
 
 # ==================== AUTH UTILITIES ====================
@@ -1410,6 +1463,67 @@ async def delete_product_admin(
         raise HTTPException(status_code=404, detail="Product not found")
     logger.info(f"Admin deleted product: {product_id}")
     return {"message": "Product deleted"}
+
+# ==================== ADMIN: MARKET RATES (Spices Board auction data) ====================
+@api_router.get("/admin/market-rates")
+async def get_market_rates_admin(
+    limit: int = Query(30, ge=1, le=500),
+    current_admin: User = Depends(get_current_admin)
+):
+    rows = await db.market_rates.find({}, {"_id": 0}) \
+        .sort([("auction_date", -1), ("auctioneer", 1)]).to_list(limit)
+    for r in rows:
+        _coerce_market_rate_datetimes(r)
+    return [MarketRate(**r).model_dump() for r in rows]
+
+@api_router.post("/admin/market-rates", response_model=MarketRate)
+async def upsert_market_rate_admin(
+    rate_data: MarketRateCreate,
+    current_admin: User = Depends(get_current_admin)
+):
+    existing = await db.market_rates.find_one(
+        {"auction_date": rate_data.auction_date, "auctioneer": rate_data.auctioneer},
+        {"_id": 0, "id": 1}
+    )
+    rate_kwargs = {"id": existing["id"]} if existing else {}
+    rate = MarketRate(**rate_data.model_dump(), **rate_kwargs, entered_by=current_admin.email)
+
+    rate_dict = rate.model_dump()
+    rate_dict["entered_at"] = rate_dict["entered_at"].isoformat()
+    await db.market_rates.update_one(
+        {"auction_date": rate.auction_date, "auctioneer": rate.auctioneer},
+        {"$set": rate_dict},
+        upsert=True
+    )
+    logger.info(f"Admin {current_admin.email} entered market rate: {rate.auction_date} / {rate.auctioneer}")
+    return rate
+
+@api_router.put("/admin/market-rates/{rate_id}", response_model=MarketRate)
+async def update_market_rate_admin(
+    rate_id: str,
+    rate_data: MarketRateCreate,
+    current_admin: User = Depends(get_current_admin)
+):
+    update_dict = rate_data.model_dump()
+    result = await db.market_rates.update_one({"id": rate_id}, {"$set": update_dict})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Market rate not found")
+
+    updated = await db.market_rates.find_one({"id": rate_id}, {"_id": 0})
+    _coerce_market_rate_datetimes(updated)
+    logger.info(f"Admin updated market rate: {rate_id}")
+    return MarketRate(**updated)
+
+@api_router.delete("/admin/market-rates/{rate_id}")
+async def delete_market_rate_admin(
+    rate_id: str,
+    current_admin: User = Depends(get_current_admin)
+):
+    result = await db.market_rates.delete_one({"id": rate_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Market rate not found")
+    logger.info(f"Admin deleted market rate: {rate_id}")
+    return {"message": "Market rate deleted"}
 
 # Admin: approve/reject a product
 @api_router.patch("/admin/products/{product_id}/status")
@@ -1843,6 +1957,30 @@ async def get_product(product_id: str):
     _coerce_product_datetimes(product)
     await _enrich_seller_company(product)
     return ProductPublic(**product)
+
+# Public: latest Spices Board auction rates (previous-day data, entered manually by admin)
+MARKET_RATE_STALE_AFTER_DAYS = 4
+
+@api_router.get("/market-rates/latest", response_model=MarketRatesLatestResponse)
+async def get_latest_market_rates():
+    latest = await db.market_rates.find({}, {"_id": 0, "auction_date": 1}) \
+        .sort("auction_date", -1).limit(1).to_list(1)
+    if not latest:
+        return MarketRatesLatestResponse()
+
+    latest_date = latest[0]["auction_date"]
+    days_since = (datetime.now(timezone.utc).date() - datetime.strptime(latest_date, "%Y-%m-%d").date()).days
+    if days_since > MARKET_RATE_STALE_AFTER_DAYS:
+        return MarketRatesLatestResponse(auction_date=latest_date, stale=True)
+
+    rows = await db.market_rates.find({"auction_date": latest_date}, {"_id": 0}).to_list(50)
+    for r in rows:
+        _coerce_market_rate_datetimes(r)
+    return MarketRatesLatestResponse(
+        auction_date=latest_date,
+        stale=False,
+        rows=[MarketRate(**r) for r in rows]
+    )
 
 # Buyer: place bid (also accepts an unauthenticated guest enquiry)
 @api_router.post("/bids", response_model=Bid)

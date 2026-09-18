@@ -38,6 +38,7 @@ const HOW_IT_WORKS = [
 export default function Home() {
   const navigate = useNavigate();
   const [products, setProducts]           = useState([]);
+  const [marketRates, setMarketRates]     = useState({ auction_date: null, stale: false, rows: [] });
 
   useEffect(() => {
     fetchData();
@@ -47,13 +48,35 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const prodRes = await axios.get(`${API_URL}/api/products`);
+      const [prodRes, marketRatesRes] = await Promise.all([
+        axios.get(`${API_URL}/api/products`),
+        axios.get(`${API_URL}/api/market-rates/latest`)
+      ]);
       const prods = prodRes.data || [];
       setProducts(prods.slice(0, 4));
+      setMarketRates(marketRatesRes.data);
     } catch (err) {
       console.error(err);
     }
   };
+
+  // Aggregated from the raw per-auctioneer rows the backend returns for the
+  // latest non-stale auction date — staleness itself is decided server-side.
+  const marketRateStats = (() => {
+    const rows = marketRates.rows;
+    if (!rows || rows.length === 0) return null;
+    const totalQtySold = rows.reduce((s, r) => s + (r.qty_sold_kg || 0), 0);
+    const weightedAvg = totalQtySold > 0
+      ? rows.reduce((s, r) => s + r.avg_price * (r.qty_sold_kg || 0), 0) / totalQtySold
+      : rows.reduce((s, r) => s + r.avg_price, 0) / rows.length;
+    return {
+      weightedAvg,
+      minPrice: Math.min(...rows.map(r => r.min_price)),
+      maxPrice: Math.max(...rows.map(r => r.max_price)),
+      totalQtyArrived: rows.reduce((s, r) => s + (r.qty_arrived_kg || 0), 0),
+      totalLots: rows.reduce((s, r) => s + (r.lots || 0), 0),
+    };
+  })();
 
   return (
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
@@ -177,6 +200,47 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ── SECTION: AUCTION MARKET RATES ────────── */}
+      {(marketRates.stale || (marketRates.rows && marketRates.rows.length > 0)) && (
+        <section className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+          {marketRates.stale ? (
+            <div className="bg-white rounded-xl p-5 border border-gray-100 text-center text-sm text-gray-500">
+              Rates update after each auction — check back after the next trading day.
+            </div>
+          ) : marketRateStats && (
+            <>
+              <h2 className="font-serif text-2xl text-[#1a3a1a] mb-1">
+                Cardamom Auction Rates — {new Date(marketRates.auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </h2>
+              <p className="text-xs text-gray-400 mb-5">Previous auction day's results, entered from the Spices Board bulletin.</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="bg-white rounded-xl p-4 border border-gray-100">
+                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Weighted Avg</p>
+                  <p className="font-semibold text-[#1a3a1a] text-lg">₹{Math.round(marketRateStats.weightedAvg)}/kg</p>
+                </div>
+                <div className="bg-white rounded-xl p-4 border border-gray-100">
+                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Range</p>
+                  <p className="font-semibold text-[#1a3a1a] text-lg">₹{Math.round(marketRateStats.minPrice)} – ₹{Math.round(marketRateStats.maxPrice)}</p>
+                </div>
+                <div className="bg-white rounded-xl p-4 border border-gray-100">
+                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Qty Arrived</p>
+                  <p className="font-semibold text-[#1a3a1a] text-lg">{Math.round(marketRateStats.totalQtyArrived).toLocaleString('en-IN')} kg</p>
+                </div>
+                <div className="bg-white rounded-xl p-4 border border-gray-100">
+                  <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Lots</p>
+                  <p className="font-semibold text-[#1a3a1a] text-lg">{marketRateStats.totalLots}</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed mb-2">
+                The range reflects grade — bold, high-liter-weight lots trade near the top and small, light lots near the bottom.
+                Enquire for a price on your specific grade and quantity.
+              </p>
+              <p className="text-[11px] text-gray-400">Source: Spices Board of India</p>
+            </>
+          )}
         </section>
       )}
 

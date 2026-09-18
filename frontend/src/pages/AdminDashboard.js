@@ -10,6 +10,14 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'];
 const ACCEPT_STRING = '.jpg,.jpeg,.png,.webp,.mp4,.mov';
 
+// Pre-fill defaults only — the auctioneer field stays a free text input so a
+// changed or new auctioneer never needs a code change.
+const KNOWN_AUCTIONEERS = [
+  'Green House Cardamom Mktg. India Pvt. Ltd',
+  'The Kerala Cardamom Processing and Marketing Company Limited, Thekkady',
+];
+const BLANK_MARKET_RATE_ROW = { id: null, auctioneer: '', lots: '', qty_arrived_kg: '', qty_sold_kg: '', max_price: '', min_price: '', avg_price: '' };
+
 const AdminDashboard = () => {
   const { user, token } = useAuth();
   const [users, setUsers] = useState([]);
@@ -37,22 +45,30 @@ const AdminDashboard = () => {
   // Bid response state
   const [bidNotes, setBidNotes] = useState({});
 
+  // Market rates (Spices Board auction data) state
+  const [marketRates, setMarketRates] = useState([]);
+  const [showMarketRateForm, setShowMarketRateForm] = useState(false);
+  const [marketRateForm, setMarketRateForm] = useState({ auction_date: '', rows: [] });
+  const [savingMarketRates, setSavingMarketRates] = useState(false);
+
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
-      const [usersRes, productsRes, bidsRes, bidsSumRes] = await Promise.all([
+      const [usersRes, productsRes, bidsRes, bidsSumRes, marketRatesRes] = await Promise.all([
         axios.get(`${API_URL}/api/admin/users`, authHeaders),
         axios.get(`${API_URL}/api/admin/products`, authHeaders),
         axios.get(`${API_URL}/api/bids`, authHeaders),
-        axios.get(`${API_URL}/api/admin/bids/summary`, authHeaders)
+        axios.get(`${API_URL}/api/admin/bids/summary`, authHeaders),
+        axios.get(`${API_URL}/api/admin/market-rates`, authHeaders)
       ]);
       setUsers(usersRes.data);
       setProducts(productsRes.data);
       setBids(bidsRes.data);
       setBidsSummary(bidsSumRes.data);
+      setMarketRates(marketRatesRes.data);
     } catch (error) {
       toast.error('Failed to load data');
     } finally {
@@ -213,6 +229,86 @@ const AdminDashboard = () => {
     } catch { toast.error('Failed to delete product'); }
   };
 
+  // ─── Market Rate Actions ───
+  const getErrorMessage = (err, fallback) => {
+    const detail = err.response?.data?.detail;
+    if (Array.isArray(detail)) return detail.map(d => d.msg || JSON.stringify(d)).join('; ');
+    return detail || fallback;
+  };
+
+  const rowFromExisting = (r) => ({
+    id: r.id, auctioneer: r.auctioneer, lots: r.lots, qty_arrived_kg: r.qty_arrived_kg,
+    qty_sold_kg: r.qty_sold_kg, max_price: r.max_price, min_price: r.min_price, avg_price: r.avg_price
+  });
+
+  const openMarketRateForm = (date = null) => {
+    const existingForDate = date ? marketRates.filter(r => r.auction_date === date) : [];
+    const rows = KNOWN_AUCTIONEERS.map(name => {
+      const match = existingForDate.find(r => r.auctioneer === name);
+      return match ? rowFromExisting(match) : { ...BLANK_MARKET_RATE_ROW, auctioneer: name };
+    });
+    existingForDate.filter(r => !KNOWN_AUCTIONEERS.includes(r.auctioneer)).forEach(r => rows.push(rowFromExisting(r)));
+    setMarketRateForm({ auction_date: date || '', rows });
+    setShowMarketRateForm(true);
+  };
+
+  const updateMarketRateRow = (idx, field, value) => {
+    setMarketRateForm(prev => ({ ...prev, rows: prev.rows.map((r, i) => i === idx ? { ...r, [field]: value } : r) }));
+  };
+
+  const addMarketRateRow = () => {
+    setMarketRateForm(prev => ({ ...prev, rows: [...prev.rows, { ...BLANK_MARKET_RATE_ROW }] }));
+  };
+
+  const removeMarketRateRow = (idx) => {
+    setMarketRateForm(prev => ({ ...prev, rows: prev.rows.filter((_, i) => i !== idx) }));
+  };
+
+  const saveMarketRates = async (e) => {
+    e.preventDefault();
+    if (!marketRateForm.auction_date) {
+      toast.error('Please select the auction date.');
+      return;
+    }
+    const filledRows = marketRateForm.rows.filter(r => r.auctioneer.trim() && r.lots !== '');
+    if (filledRows.length === 0) {
+      toast.error('Enter at least one auctioneer row.');
+      return;
+    }
+    setSavingMarketRates(true);
+    try {
+      for (const row of filledRows) {
+        const payload = {
+          auction_date: marketRateForm.auction_date,
+          auctioneer: row.auctioneer.trim(),
+          lots: Number(row.lots),
+          qty_arrived_kg: Number(row.qty_arrived_kg),
+          qty_sold_kg: Number(row.qty_sold_kg),
+          max_price: Number(row.max_price),
+          min_price: Number(row.min_price),
+          avg_price: Number(row.avg_price),
+        };
+        await axios.post(`${API_URL}/api/admin/market-rates`, payload, authHeaders);
+      }
+      toast.success('Market rates saved!');
+      setShowMarketRateForm(false);
+      fetchData();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to save market rates'));
+    } finally {
+      setSavingMarketRates(false);
+    }
+  };
+
+  const deleteMarketRate = async (id) => {
+    if (!window.confirm('Delete this market rate entry?')) return;
+    try {
+      await axios.delete(`${API_URL}/api/admin/market-rates/${id}`, authHeaders);
+      toast.success('Market rate deleted!');
+      fetchData();
+    } catch (err) { toast.error(getErrorMessage(err, 'Failed to delete market rate')); }
+  };
+
   // ─── Product Approval Actions ───
   const approveProduct = async (productId, approvalStatus) => {
     try {
@@ -268,6 +364,7 @@ const AdminDashboard = () => {
     { key: 'pending-products', label: `Pending (${products.filter(p => p.approval_status === 'pending').length})` },
     { key: 'bids', label: 'Offers' },
     { key: 'products', label: 'Products' },
+    { key: 'market-rates', label: 'Market Rates' },
   ];
 
   return (
@@ -900,6 +997,123 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* ═══ MARKET RATES TAB ═══ */}
+            {activeTab === 'market-rates' && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <p className="text-sm text-muted-foreground">{marketRates.length} entries</p>
+                  <button onClick={() => openMarketRateForm()} className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors">
+                    <Plus size={16} /> Enter Day's Rates
+                  </button>
+                </div>
+
+                {showMarketRateForm && (
+                  <form onSubmit={saveMarketRates} className="border border-primary rounded-xl p-6 mb-6 bg-primary/5 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-foreground">Spices Board Auction Rates</h3>
+                      <button type="button" onClick={() => setShowMarketRateForm(false)} className="text-muted-foreground hover:text-foreground"><X size={20} /></button>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground mb-1">Auction Date *</label>
+                      <input type="date" required value={marketRateForm.auction_date} onChange={e => setMarketRateForm({...marketRateForm, auction_date: e.target.value})} className="w-full md:w-64 px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" />
+                      <p className="text-xs text-muted-foreground mt-1">The date the Spices Board published — leave an auctioneer row blank if it didn't report that day.</p>
+                    </div>
+
+                    {marketRateForm.rows.map((row, idx) => (
+                      <div key={idx} className="border border-border rounded-lg p-4 bg-white space-y-3">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-foreground mb-1">Auctioneer</label>
+                            <input type="text" value={row.auctioneer} onChange={e => updateMarketRateRow(idx, 'auctioneer', e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Auctioneer name" />
+                          </div>
+                          {marketRateForm.rows.length > 1 && (
+                            <button type="button" onClick={() => removeMarketRateRow(idx)} className="mt-6 p-2 text-muted-foreground hover:text-red-500" title="Remove row"><X size={16} /></button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-foreground mb-1">Lots</label>
+                            <input type="number" min="0" value={row.lots} onChange={e => updateMarketRateRow(idx, 'lots', e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-foreground mb-1">Qty Arrived (kg)</label>
+                            <input type="number" min="0" step="0.01" value={row.qty_arrived_kg} onChange={e => updateMarketRateRow(idx, 'qty_arrived_kg', e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-foreground mb-1">Qty Sold (kg)</label>
+                            <input type="number" min="0" step="0.01" value={row.qty_sold_kg} onChange={e => updateMarketRateRow(idx, 'qty_sold_kg', e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-foreground mb-1">Min Price (₹/kg)</label>
+                            <input type="number" min="0" step="0.01" value={row.min_price} onChange={e => updateMarketRateRow(idx, 'min_price', e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-foreground mb-1">Avg Price (₹/kg)</label>
+                            <input type="number" min="0" step="0.01" value={row.avg_price} onChange={e => updateMarketRateRow(idx, 'avg_price', e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-foreground mb-1">Max Price (₹/kg)</label>
+                            <input type="number" min="0" step="0.01" value={row.max_price} onChange={e => updateMarketRateRow(idx, 'max_price', e.target.value)} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button type="button" onClick={addMarketRateRow} className="text-sm text-primary font-semibold hover:underline">+ Add auctioneer row</button>
+
+                    <div>
+                      <button type="submit" disabled={savingMarketRates} className="bg-primary text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2">
+                        {savingMarketRates ? (
+                          <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> Saving...</>
+                        ) : 'Save Rates'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-muted-foreground border-b border-border">
+                        <th className="py-2 pr-3">Date</th>
+                        <th className="py-2 pr-3">Auctioneer</th>
+                        <th className="py-2 pr-3">Lots</th>
+                        <th className="py-2 pr-3">Arrived (kg)</th>
+                        <th className="py-2 pr-3">Sold (kg)</th>
+                        <th className="py-2 pr-3">Min</th>
+                        <th className="py-2 pr-3">Avg</th>
+                        <th className="py-2 pr-3">Max</th>
+                        <th className="py-2 pr-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {marketRates.length === 0 && (
+                        <tr><td colSpan={9} className="text-center text-muted-foreground py-8">No market rates entered yet</td></tr>
+                      )}
+                      {marketRates.map(r => (
+                        <tr key={r.id} className="border-b border-border/50">
+                          <td className="py-2 pr-3 whitespace-nowrap">{new Date(r.auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                          <td className="py-2 pr-3">{r.auctioneer}</td>
+                          <td className="py-2 pr-3">{r.lots}</td>
+                          <td className="py-2 pr-3">{r.qty_arrived_kg}</td>
+                          <td className="py-2 pr-3">{r.qty_sold_kg}</td>
+                          <td className="py-2 pr-3">{r.min_price}</td>
+                          <td className="py-2 pr-3">{r.avg_price}</td>
+                          <td className="py-2 pr-3">{r.max_price}</td>
+                          <td className="py-2 pr-3">
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => openMarketRateForm(r.auction_date)} className="p-1.5 border border-border rounded-lg hover:bg-muted transition-colors" title="Edit"><Pencil size={14} /></button>
+                              <button onClick={() => deleteMarketRate(r.id)} className="p-1.5 border border-red-200 rounded-lg hover:bg-red-50 transition-colors" title="Delete"><Trash2 size={14} className="text-red-500" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
