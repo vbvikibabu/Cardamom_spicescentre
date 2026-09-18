@@ -1545,38 +1545,17 @@ async def delete_market_rate_admin(
 
 _MARKET_RATE_COMPARISON_FIELDS = ("lots", "qty_arrived_kg", "qty_sold_kg", "max_price", "min_price", "avg_price")
 
-@api_router.post("/admin/market-rates/scrape")
-async def scrape_market_rates(_admin=Depends(verify_scrape_secret)):
+async def _upsert_market_rate_rows(raw_rows: List[Dict]) -> Dict[str, int]:
     """
-    Pulls the Spices Board's small-cardamom auction page and upserts whatever
-    rows validate. Called by a scheduled GitHub Action, not from the browser.
-
-    Returns {"written", "unchanged", "skipped", "repaired", "failed"} on
-    success (200). "repaired" counts rows whose avg_price matched the known
-    double-decimal shape (e.g. "3169.59.00") and was fixed in place — those
-    rows are also reflected in "written"/"unchanged" as usual; "repaired" is
-    just visibility into how often that specific repair fires, so a change
-    in the Board's formatting shows up rather than passing silently.
-    Raises 502 if nothing usable came out of the run at all — either the
-    page/table couldn't be found, or every row failed to parse or validate.
-    A quiet day with no new auction still returns 200 (rows match what's
-    already stored, counted as "unchanged"), so only a genuinely broken run
-    turns the scheduled Action red.
+    Shared by the scheduled scrape and the one-off backfill: validates each
+    parsed row through MarketRateCreate (including the min/max/avg range
+    check) and upserts it with source="auto", honoring the manual-wins rule
+    and skipping a no-op write when an existing auto row already matches.
+    Never writes a row that failed validation. Returns written/unchanged/
+    skipped/failed counts — the caller adds its own parse-time malformed
+    count into "failed".
     """
-    try:
-        html = await asyncio.to_thread(fetch_auction_page_html)
-    except Exception as e:
-        logger.error(f"Market rate scrape: fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"Failed to fetch Spices Board page: {e}")
-
-    try:
-        raw_rows, malformed, repaired = parse_auction_rows(html)
-    except Exception as e:
-        logger.error(f"Market rate scrape: parse failed: {e}")
-        raise HTTPException(status_code=502, detail=f"Failed to parse auction table: {e}")
-
-    written = unchanged = skipped = 0
-    failed = malformed
+    written = unchanged = skipped = failed = 0
 
     for raw in raw_rows:
         try:
@@ -1619,6 +1598,42 @@ async def scrape_market_rates(_admin=Depends(verify_scrape_secret)):
         )
         written += 1
 
+    return {"written": written, "unchanged": unchanged, "skipped": skipped, "failed": failed}
+
+@api_router.post("/admin/market-rates/scrape")
+async def scrape_market_rates(_admin=Depends(verify_scrape_secret)):
+    """
+    Pulls the Spices Board's small-cardamom auction page and upserts whatever
+    rows validate. Called by a scheduled GitHub Action, not from the browser.
+
+    Returns {"written", "unchanged", "skipped", "repaired", "failed"} on
+    success (200). "repaired" counts rows whose avg_price matched the known
+    double-decimal shape (e.g. "3169.59.00") and was fixed in place — those
+    rows are also reflected in "written"/"unchanged" as usual; "repaired" is
+    just visibility into how often that specific repair fires, so a change
+    in the Board's formatting shows up rather than passing silently.
+    Raises 502 if nothing usable came out of the run at all — either the
+    page/table couldn't be found, or every row failed to parse or validate.
+    A quiet day with no new auction still returns 200 (rows match what's
+    already stored, counted as "unchanged"), so only a genuinely broken run
+    turns the scheduled Action red.
+    """
+    try:
+        html = await asyncio.to_thread(fetch_auction_page_html)
+    except Exception as e:
+        logger.error(f"Market rate scrape: fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to fetch Spices Board page: {e}")
+
+    try:
+        raw_rows, malformed, repaired = parse_auction_rows(html)
+    except Exception as e:
+        logger.error(f"Market rate scrape: parse failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to parse auction table: {e}")
+
+    counts = await _upsert_market_rate_rows(raw_rows)
+    written, unchanged, skipped = counts["written"], counts["unchanged"], counts["skipped"]
+    failed = counts["failed"] + malformed
+
     logger.info(
         f"Market rate scrape complete: written={written} unchanged={unchanged} "
         f"skipped={skipped} repaired={repaired} failed={failed}"
@@ -1635,6 +1650,67 @@ async def scrape_market_rates(_admin=Depends(verify_scrape_secret)):
         )
 
     return {"written": written, "unchanged": unchanged, "skipped": skipped, "repaired": repaired, "failed": failed}
+
+MARKET_RATE_BACKFILL_MAX_PAGES = 50
+MARKET_RATE_BACKFILL_DELAY_SECONDS = 2
+
+@api_router.post("/admin/market-rates/backfill")
+async def backfill_market_rates(
+    pages: int = Query(..., ge=1, le=MARKET_RATE_BACKFILL_MAX_PAGES),
+    _admin=Depends(verify_scrape_secret)
+):
+    """
+    One-off historical backfill from the Spices Board archive (?page=N, 10
+    rows/page), fetched sequentially with a delay between requests to avoid
+    hammering the source. Reuses the exact same parse_auction_rows and
+    _upsert_market_rate_rows path as the scheduled scrape, so every rule
+    applies identically: manual rows are never overwritten, the known
+    malformed avg_price pattern is repaired, invalid rows are skipped and
+    logged, and nothing partial is ever written.
+
+    A page whose fetch or parse fails outright is logged and skipped — one
+    bad page doesn't abort the rest of the backfill — and contributes
+    nothing to the counts, same as an empty page would. The overall 502
+    gate below still catches the case where the whole run yielded nothing.
+    """
+    written = unchanged = skipped = repaired_total = failed = 0
+
+    for page in range(1, pages + 1):
+        try:
+            html = await asyncio.to_thread(fetch_auction_page_html, page)
+            raw_rows, malformed, page_repaired = parse_auction_rows(html)
+        except Exception as e:
+            logger.error(f"Market rate backfill: page {page} failed, skipping: {e}")
+            if page < pages:
+                await asyncio.sleep(MARKET_RATE_BACKFILL_DELAY_SECONDS)
+            continue
+
+        counts = await _upsert_market_rate_rows(raw_rows)
+        written += counts["written"]
+        unchanged += counts["unchanged"]
+        skipped += counts["skipped"]
+        failed += counts["failed"] + malformed
+        repaired_total += page_repaired
+
+        if page < pages:
+            await asyncio.sleep(MARKET_RATE_BACKFILL_DELAY_SECONDS)
+
+    logger.info(
+        f"Market rate backfill complete ({pages} pages): written={written} unchanged={unchanged} "
+        f"skipped={skipped} repaired={repaired_total} failed={failed}"
+    )
+
+    if written + unchanged + skipped == 0:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "written": written, "unchanged": unchanged, "skipped": skipped,
+                "repaired": repaired_total, "failed": failed,
+                "message": "No usable rows across any page — see server logs."
+            }
+        )
+
+    return {"written": written, "unchanged": unchanged, "skipped": skipped, "repaired": repaired_total, "failed": failed}
 
 # Admin: approve/reject a product
 @api_router.patch("/admin/products/{product_id}/status")

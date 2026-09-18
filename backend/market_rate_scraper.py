@@ -24,10 +24,16 @@ USER_AGENT = "CardamomSpicesCentreMarketRateBot/1.0 (+https://cardamomspicescent
 REQUEST_TIMEOUT_SECONDS = 15
 
 
-def fetch_auction_page_html() -> str:
-    """One blocking GET for the current (page 1 / most recent) auction results."""
+def fetch_auction_page_html(page: int = 1) -> str:
+    """
+    One blocking GET. page=1 is the base URL (today's most recent results,
+    used by the scheduled scrape); page>1 appends the archive's own ?page=N
+    for the one-off historical backfill — same table on every page, just
+    further back (10 rows per page).
+    """
+    url = SPICES_BOARD_SMALL_CARDAMOM_URL if page <= 1 else f"{SPICES_BOARD_SMALL_CARDAMOM_URL}?page={page}"
     response = requests.get(
-        SPICES_BOARD_SMALL_CARDAMOM_URL,
+        url,
         headers={"User-Agent": USER_AGENT},
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
