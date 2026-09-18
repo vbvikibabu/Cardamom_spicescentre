@@ -1547,7 +1547,12 @@ async def scrape_market_rates(_admin=Depends(verify_scrape_secret)):
     Pulls the Spices Board's small-cardamom auction page and upserts whatever
     rows validate. Called by a scheduled GitHub Action, not from the browser.
 
-    Returns {"written", "unchanged", "skipped", "failed"} on success (200).
+    Returns {"written", "unchanged", "skipped", "repaired", "failed"} on
+    success (200). "repaired" counts rows whose avg_price matched the known
+    double-decimal shape (e.g. "3169.59.00") and was fixed in place — those
+    rows are also reflected in "written"/"unchanged" as usual; "repaired" is
+    just visibility into how often that specific repair fires, so a change
+    in the Board's formatting shows up rather than passing silently.
     Raises 502 if nothing usable came out of the run at all — either the
     page/table couldn't be found, or every row failed to parse or validate.
     A quiet day with no new auction still returns 200 (rows match what's
@@ -1561,7 +1566,7 @@ async def scrape_market_rates(_admin=Depends(verify_scrape_secret)):
         raise HTTPException(status_code=502, detail=f"Failed to fetch Spices Board page: {e}")
 
     try:
-        raw_rows, malformed = parse_auction_rows(html)
+        raw_rows, malformed, repaired = parse_auction_rows(html)
     except Exception as e:
         logger.error(f"Market rate scrape: parse failed: {e}")
         raise HTTPException(status_code=502, detail=f"Failed to parse auction table: {e}")
@@ -1612,19 +1617,20 @@ async def scrape_market_rates(_admin=Depends(verify_scrape_secret)):
 
     logger.info(
         f"Market rate scrape complete: written={written} unchanged={unchanged} "
-        f"skipped={skipped} failed={failed}"
+        f"skipped={skipped} repaired={repaired} failed={failed}"
     )
 
     if written + unchanged + skipped == 0:
         raise HTTPException(
             status_code=502,
             detail={
-                "written": written, "unchanged": unchanged, "skipped": skipped, "failed": failed,
+                "written": written, "unchanged": unchanged, "skipped": skipped,
+                "repaired": repaired, "failed": failed,
                 "message": "No usable rows — every parsed row failed validation, or the page yielded none. See server logs."
             }
         )
 
-    return {"written": written, "unchanged": unchanged, "skipped": skipped, "failed": failed}
+    return {"written": written, "unchanged": unchanged, "skipped": skipped, "repaired": repaired, "failed": failed}
 
 # Admin: approve/reject a product
 @api_router.patch("/admin/products/{product_id}/status")

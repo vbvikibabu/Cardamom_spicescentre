@@ -44,9 +44,34 @@ def _parse_number(raw: str) -> float:
     return float(raw.strip().replace(",", ""))
 
 
-def parse_auction_rows(html: str) -> Tuple[List[Dict], int]:
+def _repair_double_decimal(raw: str) -> float:
     """
-    Returns (rows, malformed_row_count).
+    Repairs one specific known malformed shape seen from the source: a value
+    with exactly two decimal points where the final segment is exactly "00"
+    (e.g. "3169.59.00" -> 3169.59) — a trailing ".00" apparently duplicated
+    onto an already-complete number. Raises ValueError for anything else, so
+    this is never a general "strip trailing characters" rule — it would
+    otherwise corrupt a well-formed value like "3080.89".
+    """
+    cleaned = raw.strip().replace(",", "")
+    parts = cleaned.split(".")
+    if len(parts) == 3 and parts[2] == "00" and parts[0] and parts[1]:
+        return float(f"{parts[0]}.{parts[1]}")
+    raise ValueError(f"'{raw}' does not match the known double-decimal repair pattern")
+
+
+def _parse_avg_price(raw: str) -> Tuple[float, bool]:
+    """Returns (value, was_repaired). Tries a normal parse first; only falls
+    back to the double-decimal repair if that fails."""
+    try:
+        return _parse_number(raw), False
+    except ValueError:
+        return _repair_double_decimal(raw), True
+
+
+def parse_auction_rows(html: str) -> Tuple[List[Dict], int, int]:
+    """
+    Returns (rows, malformed_row_count, repaired_row_count).
 
     Each dict in `rows` has keys matching MarketRateCreate's fields exactly
     (auction_date, auctioneer, lots, qty_arrived_kg, qty_sold_kg, max_price,
@@ -63,9 +88,10 @@ def parse_auction_rows(html: str) -> Tuple[List[Dict], int]:
     failed run rather than silently returning nothing.
 
     A body row with the wrong number of cells, or any field that fails to
-    convert (seen in practice: a malformed "3169.59.00" double-decimal price
-    straight from the source), is dropped and logged here, never raised —
-    one bad row must not abort the rest of the page.
+    convert, is dropped and logged here, never raised — one bad row must not
+    abort the rest of the page. The one known exception is avg_price's
+    double-decimal shape (e.g. "3169.59.00"), which is repaired in place
+    (see `_repair_double_decimal`) and logged as a repair, not a drop.
     """
     soup = BeautifulSoup(html, "html.parser")
 
@@ -86,6 +112,7 @@ def parse_auction_rows(html: str) -> Tuple[List[Dict], int]:
     body_rows = target_table.find_all("tr")[1:]  # skip header row
     rows: List[Dict] = []
     malformed = 0
+    repaired = 0
 
     for tr in body_rows:
         cells = tr.find_all("td")
@@ -97,6 +124,14 @@ def parse_auction_rows(html: str) -> Tuple[List[Dict], int]:
             )
             continue
         try:
+            avg_price_raw = cells[8].get_text()
+            avg_price, was_repaired = _parse_avg_price(avg_price_raw)
+            if was_repaired:
+                repaired += 1
+                logger.warning(
+                    f"Market rate scrape: repaired malformed avg_price "
+                    f"'{avg_price_raw.strip()}' -> {avg_price} in row: {tr.get_text(' ', strip=True)}"
+                )
             rows.append({
                 "auction_date": _parse_date(cells[1].get_text()),
                 "auctioneer": cells[2].get_text(strip=True),
@@ -105,7 +140,7 @@ def parse_auction_rows(html: str) -> Tuple[List[Dict], int]:
                 "qty_sold_kg": _parse_number(cells[5].get_text()),
                 "max_price": _parse_number(cells[6].get_text()),
                 "min_price": _parse_number(cells[7].get_text()),
-                "avg_price": _parse_number(cells[8].get_text()),
+                "avg_price": avg_price,
             })
         except (ValueError, IndexError) as e:
             malformed += 1
@@ -115,4 +150,4 @@ def parse_auction_rows(html: str) -> Tuple[List[Dict], int]:
             )
             continue
 
-    return rows, malformed
+    return rows, malformed, repaired
