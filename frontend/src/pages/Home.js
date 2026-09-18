@@ -117,10 +117,7 @@ export default function Home() {
                 )}
                 <div className="p-4">
                   <span className="text-[11px] bg-[#f5f0e8] text-gray-500 px-2 py-0.5 rounded-full">{products[0].size}</span>
-                  <h3 className="font-semibold text-[#1a3a1a] mt-2 mb-1 line-clamp-1">{products[0].name}</h3>
-                  <p className="text-[#2d5a27] font-bold text-lg mb-1">
-                    ₹{products[0].base_price?.toLocaleString('en-IN')}/kg
-                  </p>
+                  <h3 className="font-semibold text-[#1a3a1a] mt-2 mb-3 line-clamp-1">{products[0].name}</h3>
                   <button
                     onClick={e => { e.stopPropagation(); navigate(`/products/${products[0].id}`); }}
                     className="w-full bg-[#2d5a27] text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-[#1a3a1a] transition-colors"
@@ -203,10 +200,7 @@ export default function Home() {
                 </div>
                 <div className="p-3">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">{product.size}</p>
-                  <p className="font-semibold text-[#1a3a1a] text-sm line-clamp-1 mb-1">{product.name}</p>
-                  <p className="text-[#2d5a27] font-bold text-sm">
-                    ₹{product.base_price?.toLocaleString('en-IN')}/kg
-                  </p>
+                  <p className="font-semibold text-[#1a3a1a] text-sm line-clamp-1 mb-0.5">{product.name}</p>
                   {product.minimum_quantity_kg && (
                     <p className="text-[11px] text-gray-400">Min: {product.minimum_quantity_kg} kg</p>
                   )}

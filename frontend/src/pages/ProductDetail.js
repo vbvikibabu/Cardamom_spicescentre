@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, ArrowLeft, ChevronLeft, ChevronRight, Film, Check, Gavel, Timer, AlertCircle, BadgeCheck, Tag, Scale, Loader2, XCircle } from 'lucide-react';
+import { Leaf, ArrowLeft, ChevronLeft, ChevronRight, Film, Check, Gavel, Timer, AlertCircle, BadgeCheck, Scale, Loader2, XCircle } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -350,31 +350,18 @@ const ProductDetail = () => {
               </div>
             )}
 
-            {/* Pricing info box */}
-            {(product.base_price || product.minimum_quantity_kg) && (
+            {/* Listing details box */}
+            {product.minimum_quantity_kg && (
               <div className="p-4 border border-border rounded-xl mb-5 bg-muted/40">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-3">Listing Details</p>
                 <div className="flex flex-wrap gap-6">
-                  {product.base_price && (
-                    <div className="flex items-center gap-2">
-                      <Tag size={16} className="text-primary" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Base Price</p>
-                        <p className="text-sm font-bold text-foreground">
-                          {product.base_price_currency === 'USD' ? '$' : '₹'}{product.base_price.toLocaleString('en-IN')}<span className="text-xs font-normal text-muted-foreground">/kg</span>
-                        </p>
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <Scale size={16} className="text-primary" />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Min. Quantity</p>
+                      <p className="text-sm font-bold text-foreground">{product.minimum_quantity_kg} <span className="text-xs font-normal text-muted-foreground">kg</span></p>
                     </div>
-                  )}
-                  {product.minimum_quantity_kg && (
-                    <div className="flex items-center gap-2">
-                      <Scale size={16} className="text-primary" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Min. Quantity</p>
-                        <p className="text-sm font-bold text-foreground">{product.minimum_quantity_kg} <span className="text-xs font-normal text-muted-foreground">kg</span></p>
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
@@ -469,24 +456,15 @@ const ProductDetail = () => {
             <div className="flex-1 overflow-y-auto px-6 pt-3 pb-4 space-y-4">
               {/* Reference info bar */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 bg-muted rounded-lg text-xs">
-                {product?.base_price && (
-                  <>
-                    <span className="text-muted-foreground">Base Price:</span>
-                    <span className="font-bold text-foreground">
-                      {product.base_price_currency === 'USD' ? '$' : '₹'}{product.base_price.toLocaleString('en-IN')}/kg
-                    </span>
-                  </>
-                )}
                 {product?.minimum_quantity_kg && (
                   <>
-                    {product?.base_price && <span className="text-border">|</span>}
                     <span className="text-muted-foreground">Min. Qty:</span>
                     <span className="font-bold text-foreground">{product.minimum_quantity_kg} kg</span>
                   </>
                 )}
                 {product?.remaining_quantity_kg !== undefined && product?.remaining_quantity_kg !== null && (
                   <>
-                    <span className="text-border">|</span>
+                    {product?.minimum_quantity_kg && <span className="text-border">|</span>}
                     <span className="text-muted-foreground">Max available:</span>
                     <span className="font-bold text-green-700">{product.remaining_quantity_kg.toLocaleString('en-IN')} kg</span>
                   </>
@@ -616,9 +594,6 @@ const ProductDetail = () => {
                 <div>
                   <label className="block text-xs font-medium text-foreground mb-1">
                     Price per {bidForm.quantity_unit === 'kg' ? 'kg' : 'lot'}
-                    {bidForm.quantity_unit === 'kg' && product?.base_price && (
-                      <span className="text-muted-foreground font-normal"> (base ₹{product.base_price})</span>
-                    )}
                   </label>
                   <input
                     type="number" min="0.01" step="0.01" data-testid="bid-price"
@@ -630,19 +605,11 @@ const ProductDetail = () => {
                     className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
                       showFieldError('price') ? 'border-red-400 bg-red-50' : 'border-border'
                     }`}
-                    placeholder={bidForm.quantity_unit === 'kg' && product?.base_price ? `Base: ${product.base_price}` : 'e.g. 2500'}
+                    placeholder="e.g. 2500"
                   />
                   <FieldError msg={showFieldError('price')} />
                 </div>
               </div>
-
-              {/* Below-base-price soft warning — only shown once the price itself is otherwise valid */}
-              {bidForm.quantity_unit === 'kg' && product?.base_price && !bidFormErrors.price &&
-                parseFloat(bidForm.price_per_kg) < product.base_price && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  ⚠️ Your offer is below the base price. The seller may still consider it.
-                </p>
-              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

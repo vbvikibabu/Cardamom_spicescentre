@@ -999,8 +999,6 @@ class ProductPublic(BaseModel):
     seller_company: Optional[str] = None
     approval_status: Literal["pending", "approved", "rejected"] = "pending"
     created_at: datetime
-    base_price: Optional[float] = None
-    base_price_currency: Literal["INR", "USD"] = "INR"
     minimum_quantity_kg: Optional[float] = None
     total_quantity_kg: Optional[float] = None
     remaining_quantity_kg: Optional[float] = None

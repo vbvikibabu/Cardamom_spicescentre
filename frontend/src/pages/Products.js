@@ -296,13 +296,6 @@ const Products = () => {
                           </p>
                         )}
 
-                        {/* Price — always visible, green on mobile */}
-                        {product.base_price && (
-                          <p className="text-[12px] md:text-sm font-bold text-green-700 md:text-foreground mb-1 md:mb-0">
-                            {product.base_price_currency === 'USD' ? '$' : '₹'}{product.base_price.toLocaleString('en-IN')}/kg
-                          </p>
-                        )}
-
                         {/* Min qty — desktop only (show just number) */}
                         {product.minimum_quantity_kg && (
                           <p className="hidden md:block text-[10px] text-muted-foreground mb-2">
