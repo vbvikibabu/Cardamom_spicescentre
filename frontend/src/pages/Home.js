@@ -144,81 +144,67 @@ export default function Home() {
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 md:px-8 pt-24 md:pt-28 pb-10">
-        <div className="flex flex-col md:flex-row gap-8 md:gap-12 items-center">
+      <section className="bg-[#f5f0e8]">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 relative pb-14 min-[900px]:pb-16 pt-24 md:pt-28">
+          <div className="flex flex-col min-[900px]:flex-row min-[900px]:h-[480px]">
 
-          {/* Left — copy & CTAs */}
-          <div className="flex-1 min-w-0">
-            {/* Headline */}
-            <h1 className="font-serif text-4xl md:text-5xl xl:text-6xl text-[#1a3a1a] leading-[1.15] mb-4">
-              Export-Quality<br />
-              <span className="text-[#2d5a27]">Green Cardamom</span><br />
-              Direct From the Source
-            </h1>
+            {/* Left — 58%, copy & CTAs */}
+            <div className="min-[900px]:w-[58%] flex flex-col justify-center py-8 min-[900px]:py-0 min-[900px]:pl-6 lg:pl-10">
+              <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[#2d5a27] mb-3">
+                Sourced at Bodinayakanur &amp; Idukki
+              </span>
+              <h1 className="font-serif text-[44px] leading-[1.1] text-[#1a3a1a] mb-4">
+                Green cardamom, graded to your spec
+              </h1>
+              <p className="text-[15px] text-gray-600 max-w-[400px] leading-relaxed mb-7">
+                Bulk supply for wholesalers and manufacturers. Packed to order, quoted against the day's market.
+              </p>
 
-            <p className="text-gray-600 text-base md:text-lg mb-7 max-w-md leading-relaxed">
-              Sourced direct from Bodinayakanur &amp; Idukki.<br />
-              Bulk B2B supply and retail cardamom garlands.
-            </p>
+              {/* CTA buttons */}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => navigate('/products')}
+                  className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#1a3a1a] transition-colors text-sm"
+                >
+                  Bulk B2B (India)
+                </button>
+                <button
+                  onClick={() => navigate('/products')}
+                  className="border-2 border-[#2d5a27] text-[#2d5a27] px-6 py-3 rounded-xl font-semibold hover:bg-[#2d5a27] hover:text-white transition-colors text-sm"
+                >
+                  Cardamom Garlands
+                </button>
+              </div>
+            </div>
 
-            {/* CTA buttons */}
-            <div className="flex flex-wrap gap-3 mb-8">
-              <button
-                onClick={() => navigate('/products')}
-                className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#1a3a1a] transition-colors flex items-center gap-2 text-sm"
-              >
-                Bulk B2B (India)
-              </button>
-              <button
-                onClick={() => navigate('/products')}
-                className="border-2 border-[#2d5a27] text-[#2d5a27] px-6 py-3 rounded-xl font-semibold hover:bg-[#2d5a27] hover:text-white transition-colors text-sm"
-              >
-                Cardamom Garlands
-              </button>
+            {/* Right — 38%: portrait hero image, inset panel */}
+            <div className="min-[900px]:w-[38%] mt-8 min-[900px]:mt-0 min-[900px]:relative">
+              <div className="h-72 min-[900px]:h-auto min-[900px]:absolute min-[900px]:inset-[28px] rounded-2xl overflow-hidden">
+                <img
+                  src="/hero.jpg"
+                  alt="Graded green cardamom held in hand at the sorting floor"
+                  className="w-full h-full object-cover object-center"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Right — featured product / placeholder */}
-          <div className="w-full md:w-80 flex-shrink-0">
-            {products[0] ? (
-              <div
-                className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => navigate(`/products/${products[0].id}`)}
-              >
-                {getProductImage(products[0]) ? (
-                  <img
-                    src={getProductImage(products[0])}
-                    alt={products[0].name}
-                    className="w-full h-44 object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-44 bg-[#c8d8b8] flex items-center justify-center text-5xl">🌿</div>
-                )}
-                <div className="p-4">
-                  <span className="text-[11px] bg-[#f5f0e8] text-gray-500 px-2 py-0.5 rounded-full">{products[0].size}</span>
-                  <h3 className="font-semibold text-[#1a3a1a] mt-2 mb-3 line-clamp-1">{products[0].name}</h3>
-                  <button
-                    onClick={e => { e.stopPropagation(); navigate(`/products/${products[0].id}`); }}
-                    className="w-full bg-[#2d5a27] text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-[#1a3a1a] transition-colors"
-                  >
-                    Request a Price →
-                  </button>
-                </div>
+          {/* Rate card — overlaps the hero's bottom edge on desktop, sits below the image on mobile */}
+          {latestMarketDay && (
+            <div className="relative min-[900px]:absolute min-[900px]:left-6 lg:left-10 min-[900px]:-bottom-8 mt-6 min-[900px]:mt-0 inline-flex items-center gap-4 bg-white rounded-xl border border-gray-100 shadow-lg px-5 py-4">
+              <div>
+                <p className="text-[11px] text-gray-400 uppercase tracking-wide">
+                  Auction avg · {new Date(latestMarketDay.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                </p>
+                <p className="font-serif text-xl text-[#1a3a1a] mt-0.5">₹{formatINR(latestMarketDay.avg)}/kg</p>
               </div>
-            ) : (
-              <div className="bg-[#1a3a1a] rounded-2xl p-6 text-center shadow-lg">
-                <p className="text-5xl mb-3">🌿</p>
-                <p className="text-white font-serif text-lg mb-2">Premium Cardamom</p>
-                <p className="text-green-300 text-sm mb-4">Direct from South India's finest plantations</p>
-                <button
-                  onClick={() => navigate('/products')}
-                  className="w-full border border-white/60 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-white/10 transition-colors"
-                >
-                  Browse Products
-                </button>
+              <div className="w-px h-10 bg-gray-200 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-gray-600 tabular-nums">₹{formatINR(latestMarketDay.low)} – ₹{formatINR(latestMarketDay.high)}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">Spices Board of India</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </section>
 
