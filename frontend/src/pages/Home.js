@@ -222,24 +222,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── TRUST STRIP ──────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 md:px-8">
-        <div className="border-y border-gray-200 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-gray-600">
-            <span>GST Registered</span>
-            <span className="text-gray-300">·</span>
-            <span>IEC Holder</span>
-            <span className="text-gray-300">·</span>
-            <span>Udyam MSME</span>
-            <span className="text-gray-300">·</span>
-            <span>Export-grade cardamom for bulk buyers</span>
-          </div>
-          <p className="text-center text-xs text-gray-400 mt-2">
-            GSTIN 33ASJPV7316H1ZG · IEC ASJPV7316H · Udyam UDYAM-TN-12-0191653
-          </p>
-        </div>
-      </section>
-
       {/* ── SECTION 2: LIVE LISTINGS ─────────────── */}
       {products.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 md:px-8 py-8">

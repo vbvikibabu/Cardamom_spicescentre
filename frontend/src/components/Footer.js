@@ -102,8 +102,11 @@ const Footer = () => {
 
         {/* Bottom */}
         <div className="mt-16 pt-8 border-t border-background/20">
-          <p className="text-center text-background/70 text-sm mb-1">
-            Spice One Merchants · Trading as Cardamom Spices Centre
+          <p className="text-center text-background/70 text-sm">
+            Spice One Merchants
+          </p>
+          <p className="text-center text-background/50 text-xs mb-3">
+            Trading as Cardamom Spices Centre
           </p>
           <p className="text-center text-background/50 text-xs mb-4">
             GSTIN 33ASJPV7316H1ZG · IEC ASJPV7316H · Udyam UDYAM-TN-12-0191653
