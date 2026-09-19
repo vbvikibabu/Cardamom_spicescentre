@@ -167,13 +167,13 @@ export default function Home() {
                 onClick={() => navigate('/products')}
                 className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#1a3a1a] transition-colors flex items-center gap-2 text-sm"
               >
-                🌿 Bulk B2B (India)
+                Bulk B2B (India)
               </button>
               <button
                 onClick={() => navigate('/products')}
                 className="border-2 border-[#2d5a27] text-[#2d5a27] px-6 py-3 rounded-xl font-semibold hover:bg-[#2d5a27] hover:text-white transition-colors text-sm"
               >
-                💐 Cardamom Garlands
+                Cardamom Garlands
               </button>
             </div>
           </div>
@@ -222,11 +222,29 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── TRUST STRIP ──────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-4 md:px-8">
+        <div className="border-y border-gray-200 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-gray-600">
+            <span>GST Registered</span>
+            <span className="text-gray-300">·</span>
+            <span>IEC Holder</span>
+            <span className="text-gray-300">·</span>
+            <span>Udyam MSME</span>
+            <span className="text-gray-300">·</span>
+            <span>Export-grade cardamom for bulk buyers</span>
+          </div>
+          <p className="text-center text-xs text-gray-400 mt-2">
+            GSTIN 33ASJPV7316H1ZG · IEC ASJPV7316H · Udyam UDYAM-TN-12-0191653
+          </p>
+        </div>
+      </section>
+
       {/* ── SECTION 2: LIVE LISTINGS ─────────────── */}
       {products.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 md:px-8 py-8">
           <div className="flex justify-between items-center mb-5">
-            <h2 className="font-serif text-2xl text-[#1a3a1a]">🌿 Live Listings</h2>
+            <h2 className="font-serif text-2xl text-[#1a3a1a]">Available Grades</h2>
             <Link to="/products" className="text-[#2d5a27] text-sm font-semibold hover:underline">
               Browse All →
             </Link>
