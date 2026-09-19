@@ -144,35 +144,38 @@ export default function Home() {
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
-      <section className="relative bg-[#f5f0e8] overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 pt-24 md:pt-28 pb-8 min-[900px]:pb-0">
-          <div className="min-[900px]:w-[58%] min-[900px]:min-h-[400px] flex flex-col justify-center min-[900px]:pl-6 lg:pl-10">
-            <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[#2d5a27] mb-3">
-              Sourced at Bodinayakanur &amp; Idukki
-            </span>
-            <h1 className="font-serif text-[36px] leading-[1.15] text-[#1a3a1a] mb-4 max-w-[420px]">
-              Green cardamom,<br />graded to your spec
-            </h1>
-            <p className="text-[15px] text-gray-600 max-w-[400px] leading-relaxed mb-6">
-              Bulk supply for wholesalers and manufacturers. Packed to order, quoted against the day's market.
-            </p>
+      <section className="bg-[#f5f0e8] pt-24 md:pt-28">
+        <div className="max-w-7xl mx-auto px-4 md:px-8">
+          <div className="grid grid-cols-1 min-[900px]:grid-cols-[55%_45%] gap-8 min-[900px]:h-[520px]">
 
-            <button
-              onClick={() => navigate('/products')}
-              className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#1a3a1a] transition-colors text-sm w-fit"
-            >
-              Request a price
-            </button>
+            {/* Text column — same grid, same container as "Available Grades" below, so the left edge always matches */}
+            <div className="flex flex-col justify-center gap-3 py-8 min-[900px]:py-0">
+              <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[#2d5a27]">
+                Sourced at Bodinayakanur &amp; Idukki
+              </span>
+              <h1 className="font-serif text-[36px] leading-[1.15] text-[#1a3a1a] max-w-[420px]">
+                Green cardamom,<br />graded to your spec
+              </h1>
+              <p className="text-[15px] text-gray-600 max-w-[400px] leading-relaxed">
+                Bulk supply for wholesalers and manufacturers. Packed to order, quoted against the day's market.
+              </p>
+              <button
+                onClick={() => navigate('/products')}
+                className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#1a3a1a] transition-colors text-sm w-fit mt-1"
+              >
+                Request a price
+              </button>
+            </div>
+
+            {/* Image column — fills its grid cell exactly, no margin/padding of its own */}
+            <div className="h-64 min-[900px]:h-full overflow-hidden">
+              <img
+                src="/hero.jpg"
+                alt="Graded green cardamom held in hand at the sorting floor"
+                className="w-full h-full object-cover object-top"
+              />
+            </div>
           </div>
-        </div>
-
-        {/* Full-bleed portrait image — flush to the viewport edge and to the top/bottom of the hero, no inset */}
-        <div className="h-72 min-[900px]:h-auto min-[900px]:absolute min-[900px]:inset-y-0 min-[900px]:right-0 min-[900px]:w-[42%]">
-          <img
-            src="/hero.jpg"
-            alt="Graded green cardamom held in hand at the sorting floor"
-            className="w-full h-full object-cover object-center"
-          />
         </div>
       </section>
 
