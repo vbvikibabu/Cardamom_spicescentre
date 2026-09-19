@@ -145,19 +145,22 @@ export default function Home() {
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
       <section className="bg-[#f5f0e8] pt-24 md:pt-28">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="grid grid-cols-1 min-[900px]:grid-cols-[55%_45%] gap-8 min-[900px]:h-[520px]">
+        <div className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_45vw]">
 
-            {/* Text column — same grid, same container as "Available Grades" below, so the left edge always matches */}
-            <div className="flex flex-col justify-center gap-3 py-8 min-[900px]:py-0">
+          {/* Text column — height is dictated by the image (grid stretch); padding replicates the
+              site container's own left inset so this lines up with "Available Grades" below even
+              though this row itself isn't wrapped in max-w-7xl (the image needs to reach the real
+              viewport edge, which a max-w-7xl wrapper would prevent). */}
+          <div className="flex flex-col px-4 md:px-8 min-[900px]:px-0 min-[900px]:pl-[max(2rem,calc((100vw-1280px)/2+2rem))] min-[900px]:pr-10 py-10 min-[900px]:py-12">
+            <div className="flex flex-col gap-3">
               <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[#2d5a27]">
                 Sourced at Bodinayakanur &amp; Idukki
               </span>
               <h1 className="font-serif text-[36px] leading-[1.15] text-[#1a3a1a] max-w-[420px]">
-                Green cardamom,<br />graded to your spec
+                Green cardamom,<br />matched to your use
               </h1>
-              <p className="text-[15px] text-gray-600 max-w-[400px] leading-relaxed">
-                Bulk supply for wholesalers and manufacturers. Packed to order, quoted against the day's market.
+              <p className="text-[15px] text-gray-600 max-w-[440px] leading-relaxed">
+                Tell us what it's for and we'll tell you what to buy — hotel kitchens, masala grinding, retail packing, gifting or export supply.
               </p>
               <button
                 onClick={() => navigate('/products')}
@@ -167,14 +170,32 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Image column — fills its grid cell exactly, no margin/padding of its own */}
-            <div className="h-64 min-[900px]:h-full overflow-hidden">
-              <img
-                src="/hero.jpg"
-                alt="Graded green cardamom held in hand at the sorting floor"
-                className="w-full h-full object-cover object-top"
-              />
+            <div className="border-t border-gray-200 my-6 max-w-[440px]" />
+
+            {/* Fills whatever height remains beneath the tight group above, spacing the three facts evenly */}
+            <div className="flex-1 flex flex-col justify-between gap-6 max-w-[440px] min-h-[140px]">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">The Right Grade</p>
+                <p className="text-sm text-gray-700">We match the grade to what you're using it for</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Quantity</p>
+                <p className="text-sm text-gray-700">From 1kg to bulk. We courier a sample of the grade that suits your use.</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Packing</p>
+                <p className="text-sm text-gray-700">Cartons, bags or loose, to your requirement</p>
+              </div>
             </div>
+          </div>
+
+          {/* Image column — natural aspect ratio drives the row height; flush to the viewport's right edge */}
+          <div className="mt-8 min-[900px]:mt-0">
+            <img
+              src="/hero.jpg"
+              alt="Graded green cardamom held in hand at the sorting floor"
+              className="w-full h-auto object-cover object-top block"
+            />
           </div>
         </div>
       </section>
