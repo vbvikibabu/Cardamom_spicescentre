@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Search, MessageSquare, Handshake } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -25,16 +26,16 @@ const getProductImage = (product) => {
 
 const HOW_IT_WORKS = [
   {
-    step: '01', icon: '👤', title: 'Register & Verify',
-    desc: 'Create your account as buyer or seller. Admin verifies within 24 hours.',
+    step: '01', icon: Search, title: 'Browse Grades',
+    desc: "Explore our grades and see the day's Spices Board auction rates for context.",
   },
   {
-    step: '02', icon: '🔨', title: 'Request a Price',
-    desc: 'Browse live listings and send an enquiry, or list your cardamom for buyers.',
+    step: '02', icon: MessageSquare, title: 'Send an Enquiry',
+    desc: 'Share your grade, quantity and delivery location. No account needed.',
   },
   {
-    step: '03', icon: '🤝', title: 'Close the Deal',
-    desc: "Seller reviews and accepts the best offer. Connect directly and complete your trade.",
+    step: '03', icon: Handshake, title: 'Get Your Quote',
+    desc: 'Receive a price and close the deal directly over WhatsApp or phone.',
   },
 ];
 
@@ -399,7 +400,7 @@ export default function Home() {
             <div key={i} className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-3xl font-black text-[#2d5a27] opacity-20 leading-none select-none">{item.step}</span>
-                <span className="text-2xl">{item.icon}</span>
+                <item.icon size={26} strokeWidth={1.75} className="text-[#2d5a27]" />
               </div>
               <h3 className="font-semibold text-[#1a3a1a] mb-2">{item.title}</h3>
               <p className="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
