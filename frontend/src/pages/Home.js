@@ -145,7 +145,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
-      <section className="bg-[#f5f0e8] pt-32">
+      <section className="bg-[#f5f0e8] pt-44">
         <div className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_45vw] min-[900px]:h-[540px]">
 
           {/* Text column — padding replicates the site container's own left inset so this lines up
@@ -160,7 +160,7 @@ export default function Home() {
                 Green cardamom,<br />matched to your use
               </h1>
               <p className="text-[15px] text-gray-600 max-w-[560px] leading-relaxed">
-                Hand-picked in the Cardamom Hills of Idukki and graded at the Bodinayakanur auctions. Tell us what it's for — hotel kitchens, masala grinding, retail packing, gifting or export supply — and we'll suggest the right grade.
+                Hand-picked in the Cardamom Hills of Idukki and graded to size. Tell us what it's for — hotel kitchens, masala grinding, retail packing, gifting or export supply — and we'll suggest the right grade.
               </p>
               <button
                 onClick={() => navigate('/contact')}
@@ -185,7 +185,7 @@ export default function Home() {
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">Packing &amp; Labelling</p>
-                <p className="text-sm text-gray-700">Packed and labelled under your brand</p>
+                <p className="text-sm text-gray-700">Cartons or bags, packed and labelled to your requirement</p>
               </div>
             </div>
 
