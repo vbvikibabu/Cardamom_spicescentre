@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, XCircle, Loader2 } from 'lucide-react';
+import { Mail, Phone, MapPin, MessageCircle, Send, XCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useForm } from 'react-hook-form';
@@ -10,134 +9,209 @@ import { z } from 'zod';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+const USE_OPTIONS = [
+  'Hotel or restaurant kitchen',
+  'Masala grinding',
+  'Retail packing',
+  'Gifting',
+  'Export supply',
+  'Home use',
+  'Not sure — advise me',
+];
+
+const GRADE_OPTIONS = [
+  '6–7mm',
+  '7–8mm',
+  '8mm & above',
+  'Splits',
+  'Not sure — advise me',
+];
+
+const CONTACT_ROWS = [
+  { icon: Phone, label: 'Phone', value: '+91-8838226519', href: 'tel:+918838226519' },
+  { icon: MessageCircle, label: 'WhatsApp', value: '+91-8838226519', href: 'https://wa.me/918838226519' },
+  { icon: Mail, label: 'Email', value: 'cardamomspicescentre@gmail.com', href: 'mailto:cardamomspicescentre@gmail.com' },
+];
+
 const schema = z.object({
-  name: z.string().min(3, 'Name must be at least 3 characters'),
-  email: z.string().email('Enter a valid email address'),
+  name: z.string().min(2, 'Name is required'),
+  phone: z.string().min(7, 'Enter a valid phone number'),
+  email: z.union([z.literal(''), z.string().email('Enter a valid email address')]).optional(),
   company: z.string().optional(),
-  country: z.string().optional(),
-  message: z.string().min(20, 'Message must be at least 20 characters').max(1000, 'Message cannot exceed 1000 characters'),
+  use: z.enum(USE_OPTIONS),
+  grade: z.enum(GRADE_OPTIONS),
+  quantity_kg: z.coerce.number({ invalid_type_error: 'Enter a quantity' }).positive('Quantity must be greater than zero'),
+  delivery_location: z.string().min(2, 'Delivery city or pincode is required'),
+  message: z.string().optional(),
+  website: z.string().optional(),
 });
 
 const FieldError = ({ msg }) => msg ? (
   <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={12} /> {msg}</p>
 ) : null;
 
-const inputCls = (err) =>
-  `w-full font-sans text-foreground border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 transition-colors ${
-    err ? 'border-red-400 focus:ring-red-300 bg-red-50' : 'border-border focus:ring-primary'
+const fieldCls = (err) =>
+  `w-full font-sans text-[#1a3a1a] bg-white border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 transition-colors ${
+    err ? 'border-red-400 focus:ring-red-300 bg-red-50' : 'border-gray-200 focus:ring-[#2d5a27]'
   }`;
 
 const Contact = () => {
-  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { name: '', email: '', company: '', country: '', message: '' },
+    defaultValues: {
+      name: '', phone: '', email: '', company: '',
+      use: 'Not sure — advise me', grade: 'Not sure — advise me',
+      quantity_kg: '', delivery_location: '', message: '', website: '',
+    },
     mode: 'onBlur',
   });
 
-  const message = watch('message', '');
-
   const onSubmit = async (data) => {
     try {
-      await axios.post(`${API}/contact`, data);
-      toast.success('Thank you for your inquiry! We will get back to you soon.');
+      // Pydantic's EmailStr rejects '' outright — omit the key entirely when left blank
+      // so the backend's Optional[EmailStr] = None default applies instead.
+      await axios.post(`${API}/contact`, { ...data, email: data.email || undefined });
+      toast.success("Thanks — we've got your enquiry and will get back to you shortly.");
       reset();
     } catch (error) {
-      console.error('Error submitting form:', error);
-      toast.error('Failed to submit inquiry. Please try again.');
+      if (error.response?.status === 429) {
+        toast.error('Too many enquiries from this network. Please try again later.');
+      } else {
+        toast.error('Failed to submit enquiry. Please try again or reach us on WhatsApp.');
+      }
     }
   };
 
   return (
-    <div data-testid="contact-page" className="pt-32">
-      {/* Hero */}
-      <section className="py-24 bg-muted" data-testid="contact-hero">
+    <div data-testid="contact-page" className="pt-32 bg-[#f5f0e8] min-h-screen">
+      {/* Heading */}
+      <section className="py-10 md:py-14" data-testid="contact-hero">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-            className="text-center max-w-3xl mx-auto">
-            <p className="font-sans text-xs tracking-[0.2em] uppercase font-bold text-accent mb-6">Get in Touch</p>
-            <h1 className="font-serif text-5xl md:text-7xl tracking-tight leading-tight mb-6 text-foreground">
-              Let's Start a Conversation
-            </h1>
-            <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-              Whether you're interested in bulk orders, custom quotes, or have questions about our green cardamom products, we're here to help.
-            </p>
-          </motion.div>
+          <h1 className="font-serif text-4xl md:text-5xl tracking-tight text-[#1a3a1a] mb-3">
+            Request a price
+          </h1>
+          <p className="text-base md:text-lg text-gray-600 max-w-2xl">
+            Tell us what it's for and we'll suggest the right grade and quote you.
+          </p>
         </div>
       </section>
 
-      <section className="py-24" data-testid="contact-form-section">
+      <section className="pb-24" data-testid="contact-form-section">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-            {/* Contact Information */}
+            {/* Left: contact info + image */}
             <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
-              <h2 className="font-serif text-4xl md:text-5xl tracking-tight mb-8 text-foreground">Contact Information</h2>
-              <div className="space-y-8 mb-12">
-                {[
-                  { icon: MapPin, label: 'Location', lines: ['India', 'Premium Green Cardamom Supplier'] },
-                  { icon: Mail, label: 'Email', lines: ['cardamomspicescentre@gmail.com'] },
-                  { icon: Phone, label: 'Phone', lines: ['+91-8838226519'] },
-                ].map(({ icon: Icon, label, lines }) => (
+              <div className="space-y-6 mb-8">
+                {CONTACT_ROWS.map(({ icon: Icon, label, value, href }) => (
                   <div key={label} className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#2d5a27]/10 flex items-center justify-center text-[#2d5a27]">
                       <Icon size={20} />
                     </div>
                     <div>
-                      <h3 className="font-sans text-sm tracking-wide uppercase font-bold mb-2 text-foreground">{label}</h3>
-                      {lines.map((l, i) => <p key={i} className="text-muted-foreground">{l}</p>)}
+                      <h3 className="font-sans text-xs tracking-wide uppercase font-bold mb-1 text-gray-500">{label}</h3>
+                      <a
+                        href={href}
+                        target={href.startsWith('http') ? '_blank' : undefined}
+                        rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                        className="text-[#1a3a1a] hover:text-[#2d5a27] transition-colors"
+                      >
+                        {value}
+                      </a>
                     </div>
                   </div>
                 ))}
               </div>
-              <img src="https://images.pexels.com/photos/4820660/pexels-photo-4820660.jpeg"
-                alt="Cardamom export packaging" className="w-full h-80 object-cover rounded-lg shadow-sm" />
+
+              <div className="flex items-center gap-2 mb-8 text-[#2d5a27]">
+                <MapPin size={18} className="flex-shrink-0" />
+                <p className="text-sm font-semibold">Sourcing: Bodinayakanur &amp; Idukki</p>
+              </div>
+
+              <img
+                src="/contact.jpg"
+                alt="Green cardamom sacks at our sourcing floor"
+                className="w-full h-auto rounded-2xl shadow-sm"
+              />
             </motion.div>
 
-            {/* Contact Form */}
+            {/* Enquiry form */}
             <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
-              <form onSubmit={handleSubmit(onSubmit)} data-testid="contact-form" className="space-y-8" noValidate>
-                <div>
-                  <label className="block font-sans text-sm tracking-wide uppercase font-bold mb-3 text-foreground">Full Name *</label>
-                  <input {...register('name')} data-testid="contact-form-name" type="text"
-                    className={inputCls(errors.name)} placeholder="John Doe" />
-                  <FieldError msg={errors.name?.message} />
-                </div>
-
-                <div>
-                  <label className="block font-sans text-sm tracking-wide uppercase font-bold mb-3 text-foreground">Email Address *</label>
-                  <input {...register('email')} data-testid="contact-form-email" type="email"
-                    className={inputCls(errors.email)} placeholder="john@company.com" />
-                  <FieldError msg={errors.email?.message} />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <form onSubmit={handleSubmit(onSubmit)} data-testid="contact-form" className="space-y-6" noValidate>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block font-sans text-sm tracking-wide uppercase font-bold mb-3 text-foreground">Company</label>
+                    <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">Name *</label>
+                    <input {...register('name')} data-testid="contact-form-name" type="text"
+                      className={fieldCls(errors.name)} placeholder="Your name" />
+                    <FieldError msg={errors.name?.message} />
+                  </div>
+                  <div>
+                    <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">Phone *</label>
+                    <input {...register('phone')} data-testid="contact-form-phone" type="tel"
+                      className={fieldCls(errors.phone)} placeholder="+91-XXXXXXXXXX" />
+                    <FieldError msg={errors.phone?.message} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">Email</label>
+                    <input {...register('email')} data-testid="contact-form-email" type="email"
+                      className={fieldCls(errors.email)} placeholder="you@company.com" />
+                    <FieldError msg={errors.email?.message} />
+                  </div>
+                  <div>
+                    <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">Company</label>
                     <input {...register('company')} data-testid="contact-form-company" type="text"
-                      className={inputCls(errors.company)} placeholder="Company Name" />
+                      className={fieldCls(errors.company)} placeholder="Company name" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">What is it for?</label>
+                    <select {...register('use')} data-testid="contact-form-use" className={fieldCls(errors.use)}>
+                      {USE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
                   </div>
                   <div>
-                    <label className="block font-sans text-sm tracking-wide uppercase font-bold mb-3 text-foreground">Country</label>
-                    <input {...register('country')} data-testid="contact-form-country" type="text"
-                      className={inputCls(errors.country)} placeholder="Your Country" />
+                    <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">Grade</label>
+                    <select {...register('grade')} data-testid="contact-form-grade" className={fieldCls(errors.grade)}>
+                      {GRADE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">Quantity (kg) *</label>
+                    <input {...register('quantity_kg')} data-testid="contact-form-quantity" type="number" min="0" step="any"
+                      className={fieldCls(errors.quantity_kg)} placeholder="e.g. 500" />
+                    <FieldError msg={errors.quantity_kg?.message} />
+                  </div>
+                  <div>
+                    <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">Delivery city or pincode *</label>
+                    <input {...register('delivery_location')} data-testid="contact-form-delivery" type="text"
+                      className={fieldCls(errors.delivery_location)} placeholder="e.g. Madurai or 625014" />
+                    <FieldError msg={errors.delivery_location?.message} />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="block font-sans text-sm tracking-wide uppercase font-bold text-foreground">Message *</label>
-                    <span className={`text-xs ${message.length > 900 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                      {message.length}/1000
-                    </span>
-                  </div>
-                  <textarea {...register('message')} data-testid="contact-form-message" rows={6}
-                    className={`${inputCls(errors.message)} resize-none`}
-                    placeholder="Tell us about your requirements..." />
-                  <FieldError msg={errors.message?.message} />
+                  <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">Message</label>
+                  <textarea {...register('message')} data-testid="contact-form-message" rows={4}
+                    className={`${fieldCls(errors.message)} resize-none`}
+                    placeholder="Anything else we should know?" />
+                </div>
+
+                {/* Honeypot — invisible to real visitors, left for bots that autofill every field */}
+                <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+                  <label htmlFor="contact-website">Website</label>
+                  <input {...register('website')} type="text" id="contact-website" tabIndex={-1} autoComplete="off" />
                 </div>
 
                 <button type="submit" data-testid="contact-form-submit" disabled={isSubmitting}
-                  className="btn-primary w-full md:w-auto inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-full font-sans text-sm tracking-wide uppercase font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                  {isSubmitting ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><Send size={16} /> Send Message</>}
+                  className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-[#2d5a27] text-white px-8 py-4 rounded-xl font-sans text-sm tracking-wide uppercase font-semibold hover:bg-[#1a3a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  {isSubmitting ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><Send size={16} /> Request a price</>}
                 </button>
               </form>
             </motion.div>

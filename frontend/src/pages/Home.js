@@ -163,7 +163,7 @@ export default function Home() {
                 Tell us what it's for and we'll tell you what to buy — hotel kitchens, masala grinding, retail packing, gifting or export supply.
               </p>
               <button
-                onClick={() => navigate('/products')}
+                onClick={() => navigate('/contact')}
                 className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#1a3a1a] transition-colors text-sm w-fit mt-1"
               >
                 Request a price
@@ -392,7 +392,7 @@ export default function Home() {
         </div>
         <div className="text-center mt-8">
           <button
-            onClick={() => navigate('/products')}
+            onClick={() => navigate('/contact')}
             className="bg-[#2d5a27] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#1a3a1a] transition-colors text-sm"
           >
             Request a price →

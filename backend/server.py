@@ -177,6 +177,7 @@ async def lifespan(app: FastAPI):
         await db.bids.create_index("product_id")
         await db.bids.create_index("buyer_id")
         await db.bids.create_index([("guest_ip", 1), ("created_at", -1)])
+        await db.contact_inquiries.create_index([("client_ip", 1), ("created_at", -1)])
         await db.market_rates.create_index([("auction_date", 1), ("auctioneer", 1)], unique=True)
         logger.info("Database indexes ensured")
     except Exception as e:
@@ -1123,18 +1124,29 @@ class ContactInquiry(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    email: EmailStr
+    phone: str
+    email: Optional[EmailStr] = None
     company: Optional[str] = None
-    country: Optional[str] = None
-    message: str
+    use: str
+    grade: str
+    quantity_kg: float
+    delivery_location: str
+    message: Optional[str] = None
+    client_ip: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ContactInquiryCreate(BaseModel):
     name: str
-    email: EmailStr
+    phone: str
+    email: Optional[EmailStr] = None
     company: Optional[str] = None
-    country: Optional[str] = None
-    message: str
+    use: str
+    grade: str
+    quantity_kg: float
+    delivery_location: str
+    message: Optional[str] = None
+    # ── Honeypot — must stay empty. Real users never see or fill this field. ──
+    website: Optional[str] = None
 
 class PushSubscription(BaseModel):
     endpoint: str
@@ -2477,31 +2489,37 @@ async def get_vapid_key():
 
 # ==================== CONTACT ====================
 async def _email_contact_inquiry(inquiry: ContactInquiry) -> None:
-    """Send branded contact enquiry email to admin, with Reply-To set to the enquirer."""
+    """Send branded enquiry email to admin, with Reply-To set to the enquirer when they gave an email."""
+    qty_display = f"{inquiry.quantity_kg:g} kg"
     body = f"""
-    <h2 style="color:#2d5a27;margin-top:0;">New Contact Enquiry</h2>
-    <p>A new business enquiry has been submitted through the website contact form.</p>
+    <h2 style="color:#2d5a27;margin-top:0;">New Enquiry</h2>
+    <p>A new enquiry has been submitted through the website.</p>
     <table style="width:100%;border-collapse:collapse;margin:20px 0;">
-      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;width:140px;">Name</td><td style="padding:8px 12px;background:#f8f8f4;">{inquiry.name}</td></tr>
-      <tr><td style="padding:8px 12px;font-weight:bold;">Email</td><td style="padding:8px 12px;"><a href="mailto:{inquiry.email}" style="color:#2d5a27;">{inquiry.email}</a></td></tr>
-      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;">Company</td><td style="padding:8px 12px;background:#f8f8f4;">{inquiry.company or 'N/A'}</td></tr>
-      <tr><td style="padding:8px 12px;font-weight:bold;">Country</td><td style="padding:8px 12px;">{inquiry.country or 'N/A'}</td></tr>
-      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;vertical-align:top;">Message</td><td style="padding:8px 12px;background:#f8f8f4;">{inquiry.message}</td></tr>
+      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;width:160px;">Name</td><td style="padding:8px 12px;background:#f8f8f4;">{inquiry.name}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:bold;">Phone</td><td style="padding:8px 12px;"><a href="tel:{inquiry.phone}" style="color:#2d5a27;">{inquiry.phone}</a></td></tr>
+      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;">Email</td><td style="padding:8px 12px;background:#f8f8f4;">{inquiry.email or 'N/A'}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:bold;">Company</td><td style="padding:8px 12px;">{inquiry.company or 'N/A'}</td></tr>
+      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;">What for</td><td style="padding:8px 12px;background:#f8f8f4;">{inquiry.use}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:bold;">Grade</td><td style="padding:8px 12px;">{inquiry.grade}</td></tr>
+      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;">Quantity</td><td style="padding:8px 12px;background:#f8f8f4;">{qty_display}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:bold;">Delivery to</td><td style="padding:8px 12px;">{inquiry.delivery_location}</td></tr>
+      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;vertical-align:top;">Message</td><td style="padding:8px 12px;background:#f8f8f4;">{inquiry.message or 'N/A'}</td></tr>
     </table>
-    <p>Reply directly to this email to respond to <strong>{inquiry.name}</strong>.</p>"""
+    <p>Reply directly to this email, or call/WhatsApp <strong>{inquiry.phone}</strong>, to respond to <strong>{inquiry.name}</strong>.</p>"""
 
-    logger.info(f"NEW CONTACT INQUIRY: {inquiry.name} ({inquiry.email}) - {inquiry.message[:100]}")
+    logger.info(f"NEW ENQUIRY: {inquiry.name} ({inquiry.phone}) - {inquiry.use}, {qty_display}")
 
     if not _SMTP_USERNAME or not _SMTP_PASSWORD:
-        logger.info("SMTP not configured — contact inquiry logged to DB only")
+        logger.info("SMTP not configured — enquiry logged to DB only")
         return
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"New Enquiry from {inquiry.name} — Cardamom Spices Centre"
         msg["From"] = _SMTP_FROM or _SMTP_USERNAME
         msg["To"] = _ADMIN_EMAIL or "cardamomspicescentre@gmail.com"
-        msg["Reply-To"] = inquiry.email
-        msg.attach(MIMEText(_html_wrap("New Contact Enquiry", body), "html"))
+        if inquiry.email:
+            msg["Reply-To"] = inquiry.email
+        msg.attach(MIMEText(_html_wrap("New Enquiry", body), "html"))
         await aiosmtplib.send(
             msg,
             hostname=_SMTP_HOST,
@@ -2510,19 +2528,33 @@ async def _email_contact_inquiry(inquiry: ContactInquiry) -> None:
             password=_SMTP_PASSWORD,
             start_tls=True,
         )
-        logger.info(f"Contact inquiry email sent for {inquiry.email}")
+        logger.info(f"Contact inquiry email sent for {inquiry.name}")
     except Exception as e:
         logger.warning(f"Contact inquiry email failed: {e}")
 
 
 @api_router.post("/contact", response_model=ContactInquiry)
-async def create_contact_inquiry(input: ContactInquiryCreate):
-    inquiry_obj = ContactInquiry(**input.model_dump())
+async def create_contact_inquiry(input: ContactInquiryCreate, request: Request):
+    # Honeypot — checked before any DB access, same as guest enquiries on /bids.
+    if input.website:
+        logger.warning(f"Contact enquiry honeypot triggered from {get_client_ip(request)}")
+        raise HTTPException(status_code=400, detail="Invalid submission")
+
+    client_ip = get_client_ip(request)
+    window_start = (datetime.now(timezone.utc) - timedelta(minutes=GUEST_BID_RATE_WINDOW_MINUTES)).isoformat()
+    recent_count = await db.contact_inquiries.count_documents({
+        "client_ip": client_ip,
+        "created_at": {"$gte": window_start}
+    })
+    if recent_count >= GUEST_BID_RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many enquiries from this network. Please try again later.")
+
+    inquiry_obj = ContactInquiry(**input.model_dump(), client_ip=client_ip)
     doc = inquiry_obj.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.contact_inquiries.insert_one(doc)
     asyncio.create_task(_email_contact_inquiry(inquiry_obj))
-    logger.info(f"Contact inquiry from {inquiry_obj.name} ({inquiry_obj.email})")
+    logger.info(f"Contact inquiry from {inquiry_obj.name} ({inquiry_obj.phone})")
     return inquiry_obj
 
 
