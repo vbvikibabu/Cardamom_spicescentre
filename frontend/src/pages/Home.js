@@ -155,10 +155,10 @@ export default function Home() {
               <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[#2d5a27]">
                 Sourced at Bodinayakanur &amp; Idukki
               </span>
-              <h1 className="font-serif text-[36px] leading-[1.15] text-[#1a3a1a] max-w-[420px]">
+              <h1 className="font-serif text-[36px] leading-[1.15] text-[#1a3a1a] max-w-[480px]">
                 Green cardamom,<br />matched to your use
               </h1>
-              <p className="text-[15px] text-gray-600 max-w-[440px] leading-relaxed">
+              <p className="text-[15px] text-gray-600 max-w-[560px] leading-relaxed">
                 Tell us what it's for and we'll tell you what to buy — hotel kitchens, masala grinding, retail packing, gifting or export supply.
               </p>
               <button
@@ -169,32 +169,33 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="border-t border-gray-200 my-6 max-w-[440px]" />
+            <div className="border-t border-gray-200 my-5 max-w-[560px]" />
 
-            {/* Natural, tight spacing — not stretched to fill, so it can't produce huge dead gaps
-                if the image ends up much taller than this content on a given screen. */}
-            <div className="flex flex-col gap-5 max-w-[440px]">
+            {/* Three-up row rather than a stack — uses the column's actual width instead of
+                floating a narrow strip of text in a much wider track. */}
+            <div className="grid grid-cols-3 gap-6 max-w-[560px]">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">The Right Grade</p>
-                <p className="text-sm text-gray-700">We match the grade to what you're using it for</p>
+                <p className="text-sm text-gray-700">Matched to your use</p>
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Quantity</p>
-                <p className="text-sm text-gray-700">From 1kg to bulk. We courier a sample of the grade that suits your use.</p>
+                <p className="text-sm text-gray-700">1kg to bulk, sample couriered</p>
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Packing</p>
-                <p className="text-sm text-gray-700">Cartons, bags or loose, to your requirement</p>
+                <p className="text-sm text-gray-700">Cartons, bags or loose</p>
               </div>
             </div>
           </div>
 
-          {/* Image column — bounded to the row height; object-contain shows the whole photo, never crops it */}
+          {/* Image column — fills the row completely (object-cover) so there's no letterboxed
+              dead space; position weighted toward the hand/cardamom, not a literal center-crop. */}
           <div className="h-72 min-[900px]:h-full mt-8 min-[900px]:mt-0 overflow-hidden">
             <img
               src="/hero.jpg"
               alt="Graded green cardamom held in hand at the sorting floor"
-              className="w-full h-full object-contain object-center block"
+              className="w-full h-full object-cover object-[50%_32%] block"
             />
           </div>
         </div>
