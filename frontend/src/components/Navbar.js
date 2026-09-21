@@ -43,7 +43,7 @@ const Navbar = () => {
     <>
       <nav
         data-testid="main-navbar"
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 border-b border-[var(--gold)] ${
           isScrolled ? 'navbar-glass shadow-sm' : 'bg-transparent'
         }`}
       >

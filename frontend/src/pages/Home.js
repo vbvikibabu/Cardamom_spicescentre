@@ -154,13 +154,13 @@ export default function Home() {
           <div className="flex flex-col justify-start px-4 md:px-8 min-[900px]:px-0 min-[900px]:pl-[max(2rem,calc((100vw-1280px)/2+2rem))] min-[900px]:pr-10 py-10 min-[900px]:py-0">
             <div className="flex flex-col gap-3">
               <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--gold)]">
-                Sourced at Bodinayakanur &amp; Idukki
+                THE QUEEN OF SPICES
               </span>
               <h1 className="font-serif text-[36px] leading-[1.15] text-[#1a3a1a] max-w-[480px]">
                 Green cardamom,<br />matched to your use
               </h1>
               <p className="text-[15px] text-gray-600 max-w-[560px] leading-relaxed">
-                Tell us what it's for and we'll tell you what to buy — hotel kitchens, masala grinding, retail packing, gifting or export supply.
+                Hand-picked in the Cardamom Hills of Idukki and graded at the Bodinayakanur auctions. Tell us what it's for — hotel kitchens, masala grinding, retail packing, gifting or export supply — and we'll suggest the right grade.
               </p>
               <button
                 onClick={() => navigate('/contact')}
@@ -176,18 +176,24 @@ export default function Home() {
                 floating a narrow strip of text in a much wider track. */}
             <div className="grid grid-cols-3 gap-6 max-w-[560px]">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">The Right Grade</p>
-                <p className="text-sm text-gray-700">Matched to your use</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">Delivery</p>
+                <p className="text-sm text-gray-700">Couriered anywhere in India</p>
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">Quantity</p>
                 <p className="text-sm text-gray-700">1kg to bulk. Samples sent based on your need.</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">Packing</p>
-                <p className="text-sm text-gray-700">Cartons, bags or loose</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">Packing &amp; Labelling</p>
+                <p className="text-sm text-gray-700">Packed and labelled under your brand</p>
               </div>
             </div>
+
+            <div className="border-t border-[var(--gold)] my-5 max-w-[560px]" />
+
+            <p className="text-sm text-gray-500 max-w-[560px] leading-relaxed">
+              Indian cardamom — native to the Western Ghats and traded worldwide as Alleppey Green — is prized for its high oil content, which gives it a stronger, sweeter aroma and a deeper green than cardamom grown elsewhere.
+            </p>
           </div>
 
           {/* Image column — fills the row completely (object-cover) so there's no letterboxed
