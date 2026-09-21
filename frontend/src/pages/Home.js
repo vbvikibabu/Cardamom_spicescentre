@@ -29,7 +29,7 @@ const getProductImage = (product) => {
 const HOW_IT_WORKS = [
   {
     step: '01', icon: Search, title: 'Browse Grades',
-    desc: "Explore our grades and see the day's Spices Board auction rates for context.",
+    desc: "Explore our grades and see the latest Spices Board auction rates.",
   },
   {
     step: '02', icon: MessageSquare, title: 'Send an Enquiry',
@@ -392,10 +392,10 @@ export default function Home() {
         </div>
         <div className="text-center mt-8">
           <button
-            onClick={() => navigate('/register')}
+            onClick={() => navigate('/products')}
             className="bg-[#2d5a27] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#1a3a1a] transition-colors text-sm"
           >
-            Join as Trader →
+            Request a price →
           </button>
         </div>
       </section>
