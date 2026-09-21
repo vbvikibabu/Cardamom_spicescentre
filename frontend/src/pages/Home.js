@@ -145,13 +145,12 @@ export default function Home() {
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
       <section className="bg-[#f5f0e8] pt-24 md:pt-28">
-        <div className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_45vw]">
+        <div className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_45vw] min-[900px]:h-[540px]">
 
-          {/* Text column — height is dictated by the image (grid stretch); padding replicates the
-              site container's own left inset so this lines up with "Available Grades" below even
-              though this row itself isn't wrapped in max-w-7xl (the image needs to reach the real
-              viewport edge, which a max-w-7xl wrapper would prevent). */}
-          <div className="flex flex-col px-4 md:px-8 min-[900px]:px-0 min-[900px]:pl-[max(2rem,calc((100vw-1280px)/2+2rem))] min-[900px]:pr-10 py-10 min-[900px]:py-12">
+          {/* Text column — padding replicates the site container's own left inset so this lines up
+              with "Available Grades" below, even though this row isn't wrapped in max-w-7xl (the
+              image needs to reach the real viewport edge, which a max-w-7xl wrapper would prevent). */}
+          <div className="flex flex-col justify-center px-4 md:px-8 min-[900px]:px-0 min-[900px]:pl-[max(2rem,calc((100vw-1280px)/2+2rem))] min-[900px]:pr-10 py-10 min-[900px]:py-0">
             <div className="flex flex-col gap-3">
               <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[#2d5a27]">
                 Sourced at Bodinayakanur &amp; Idukki
@@ -172,8 +171,9 @@ export default function Home() {
 
             <div className="border-t border-gray-200 my-6 max-w-[440px]" />
 
-            {/* Fills whatever height remains beneath the tight group above, spacing the three facts evenly */}
-            <div className="flex-1 flex flex-col justify-between gap-6 max-w-[440px] min-h-[140px]">
+            {/* Natural, tight spacing — not stretched to fill, so it can't produce huge dead gaps
+                if the image ends up much taller than this content on a given screen. */}
+            <div className="flex flex-col gap-5 max-w-[440px]">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">The Right Grade</p>
                 <p className="text-sm text-gray-700">We match the grade to what you're using it for</p>
@@ -189,12 +189,12 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Image column — natural aspect ratio drives the row height; flush to the viewport's right edge */}
-          <div className="mt-8 min-[900px]:mt-0">
+          {/* Image column — bounded to the row height; object-top keeps the hand and cardamom in frame */}
+          <div className="h-72 min-[900px]:h-full mt-8 min-[900px]:mt-0 overflow-hidden">
             <img
               src="/hero.jpg"
               alt="Graded green cardamom held in hand at the sorting floor"
-              className="w-full h-auto object-cover object-top block"
+              className="w-full h-full object-cover object-top block"
             />
           </div>
         </div>
