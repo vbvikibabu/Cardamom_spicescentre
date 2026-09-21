@@ -145,13 +145,13 @@ export default function Home() {
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
-      <section className="bg-[#f5f0e8] pt-36 md:pt-40">
+      <section className="bg-[#f5f0e8] pt-32">
         <div className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_45vw] min-[900px]:h-[540px]">
 
           {/* Text column — padding replicates the site container's own left inset so this lines up
               with "Available Grades" below, even though this row isn't wrapped in max-w-7xl (the
               image needs to reach the real viewport edge, which a max-w-7xl wrapper would prevent). */}
-          <div className="flex flex-col justify-center px-4 md:px-8 min-[900px]:px-0 min-[900px]:pl-[max(2rem,calc((100vw-1280px)/2+2rem))] min-[900px]:pr-10 py-10 min-[900px]:py-0">
+          <div className="flex flex-col justify-start px-4 md:px-8 min-[900px]:px-0 min-[900px]:pl-[max(2rem,calc((100vw-1280px)/2+2rem))] min-[900px]:pr-10 py-10 min-[900px]:py-0">
             <div className="flex flex-col gap-3">
               <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--gold)]">
                 Sourced at Bodinayakanur &amp; Idukki
