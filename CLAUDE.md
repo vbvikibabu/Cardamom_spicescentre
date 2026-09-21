@@ -159,7 +159,7 @@ never hardcode an auctioneer list.
 ### Scraping
 
 - `backend/market_rate_scraper.py`, endpoint `POST /api/admin/market-rates/scrape`
-  behind the `X-Scrape-Secret` header, run every 8 hours by
+  behind the `X-Scrape-Secret` header, run every 6 hours by
   `.github/workflows/scrape-market-rates.yml`.
 - The endpoint returns a non-2xx when a run produces nothing usable, so a
   page-structure change fails the scheduled Action rather than quietly serving
