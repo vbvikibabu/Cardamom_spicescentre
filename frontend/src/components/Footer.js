@@ -101,7 +101,11 @@ const Footer = () => {
         </div>
 
         {/* Bottom */}
-        <div className="mt-16 pt-8 border-t border-background/20">
+        <div className="mt-16 pt-8 border-t border-background/20 text-center">
+          <img src="/logo/logo-full.png" alt="Spice One Merchants" className="h-20 w-20 mx-auto mb-4" />
+          <p className="font-serif italic text-background/70 text-sm mb-6">
+            Purity in every pod, quality in every deal.
+          </p>
           <p className="text-center text-background/70 text-sm mb-3">
             Spice One Merchants
           </p>

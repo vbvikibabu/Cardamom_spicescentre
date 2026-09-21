@@ -50,11 +50,12 @@ const Navbar = () => {
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
-            <Link to="/" data-testid="nav-logo" className="flex flex-col">
-              <div className="flex items-center gap-2">
+            <Link to="/" data-testid="nav-logo" className="flex items-center gap-3">
+              <img src="/logo/logo-mark.png" alt="" className="w-11 h-11 flex-shrink-0" />
+              <div className="flex flex-col">
                 <span className="font-serif text-2xl md:text-3xl font-bold text-foreground tracking-tight">Cardamom Spices Centre</span>
+                <span className="text-xs text-muted-foreground font-semibold">by Spice One Merchants</span>
               </div>
-              <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Export-Quality Green Cardamom · Bodinayakanur &amp; Idukki</span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -64,10 +65,10 @@ const Navbar = () => {
                   key={link.path}
                   to={link.path}
                   data-testid={`nav-link-${link.name.toLowerCase()}`}
-                  className={`font-sans text-sm tracking-wide uppercase font-medium transition-colors ${
+                  className={`font-sans text-sm tracking-wide uppercase font-medium transition-colors pb-1 border-b-2 ${
                     location.pathname === link.path
-                      ? 'text-primary'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'text-primary border-[var(--gold)]'
+                      : 'text-muted-foreground hover:text-foreground border-transparent'
                   }`}
                 >
                   {link.name}

@@ -18,6 +18,11 @@ code {
 
 @layer base {
     :root {
+        /* Spice One Merchants brand gold, from the logo mark. Sparing use only —
+           eyebrow text, dividers, small labels, active-nav underline. Never
+           buttons or body text; dark green stays the primary brand colour. */
+        --gold: #CD9406;
+
         --background: 0 0% 100%;
         --foreground: 0 0% 3.9%;
         --card: 0 0% 100%;

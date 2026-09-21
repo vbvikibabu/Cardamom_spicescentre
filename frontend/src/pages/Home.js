@@ -153,7 +153,7 @@ export default function Home() {
               image needs to reach the real viewport edge, which a max-w-7xl wrapper would prevent). */}
           <div className="flex flex-col justify-center px-4 md:px-8 min-[900px]:px-0 min-[900px]:pl-[max(2rem,calc((100vw-1280px)/2+2rem))] min-[900px]:pr-10 py-10 min-[900px]:py-0">
             <div className="flex flex-col gap-3">
-              <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[#2d5a27]">
+              <span className="text-xs font-semibold tracking-[0.15em] uppercase text-[var(--gold)]">
                 Sourced at Bodinayakanur &amp; Idukki
               </span>
               <h1 className="font-serif text-[36px] leading-[1.15] text-[#1a3a1a] max-w-[480px]">
@@ -170,21 +170,21 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="border-t border-gray-200 my-5 max-w-[560px]" />
+            <div className="border-t border-[var(--gold)] my-5 max-w-[560px]" />
 
             {/* Three-up row rather than a stack — uses the column's actual width instead of
                 floating a narrow strip of text in a much wider track. */}
             <div className="grid grid-cols-3 gap-6 max-w-[560px]">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">The Right Grade</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">The Right Grade</p>
                 <p className="text-sm text-gray-700">Matched to your use</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Quantity</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">Quantity</p>
                 <p className="text-sm text-gray-700">1kg to bulk, sample couriered</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Packing</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">Packing</p>
                 <p className="text-sm text-gray-700">Cartons, bags or loose</p>
               </div>
             </div>
