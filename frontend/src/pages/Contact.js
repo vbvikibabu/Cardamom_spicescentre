@@ -98,9 +98,10 @@ const Contact = () => {
 
       <section className="pb-24" data-testid="contact-form-section">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+          <div className="grid grid-cols-1 min-[900px]:grid-cols-2 gap-16 items-stretch">
             {/* Left: contact info + image */}
-            <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
+            <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}
+              className="flex flex-col">
               <div className="space-y-6 mb-8">
                 {CONTACT_ROWS.map(({ icon: Icon, label, value, href }) => (
                   <div key={label} className="flex items-start gap-4">
@@ -127,11 +128,16 @@ const Contact = () => {
                 <p className="text-sm font-semibold">Sourcing: Bodinayakanur &amp; Idukki</p>
               </div>
 
-              <img
-                src="/contact.jpg"
-                alt="Green cardamom sacks at our sourcing floor"
-                className="w-full h-auto rounded-2xl shadow-sm"
-              />
+              {/* Fills whatever height remains up to the form's height (never the image's own
+                  natural height) — that's what keeps the bottom of the photo level with the
+                  bottom of the form instead of trailing off into empty space. */}
+              <div className="h-[360px] min-[900px]:h-auto min-[900px]:flex-1 min-[900px]:min-h-0 rounded-2xl shadow-sm overflow-hidden">
+                <img
+                  src="/contact.jpg"
+                  alt="Green cardamom sacks at our sourcing floor"
+                  className="w-full h-full object-cover object-bottom block"
+                />
+              </div>
             </motion.div>
 
             {/* Enquiry form */}
@@ -191,7 +197,7 @@ const Contact = () => {
                   <div>
                     <label className="block font-sans text-sm font-semibold mb-2 text-[#1a3a1a]">Delivery city or pincode *</label>
                     <input {...register('delivery_location')} data-testid="contact-form-delivery" type="text"
-                      className={fieldCls(errors.delivery_location)} placeholder="e.g. Madurai or 625014" />
+                      className={fieldCls(errors.delivery_location)} placeholder="e.g. Chennai or 600001" />
                     <FieldError msg={errors.delivery_location?.message} />
                   </div>
                 </div>
@@ -210,7 +216,7 @@ const Contact = () => {
                 </div>
 
                 <button type="submit" data-testid="contact-form-submit" disabled={isSubmitting}
-                  className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-[#2d5a27] text-white px-8 py-4 rounded-xl font-sans text-sm tracking-wide uppercase font-semibold hover:bg-[#1a3a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-[#2d5a27] text-white px-8 py-4 rounded-xl font-sans text-sm tracking-wide font-semibold hover:bg-[#1a3a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {isSubmitting ? <><Loader2 size={16} className="animate-spin" /> Sending...</> : <><Send size={16} /> Request a price</>}
                 </button>
               </form>
