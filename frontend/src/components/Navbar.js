@@ -51,10 +51,10 @@ const Navbar = () => {
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <Link to="/" data-testid="nav-logo" className="flex items-center gap-3">
-              <img src="/logo/logo-mark.png" alt="" className="w-11 h-11 flex-shrink-0" />
+              <img src="/logo/logo-mark.png" alt="" className="w-[60px] h-[60px] flex-shrink-0" />
               <div className="flex flex-col">
-                <span className="font-serif text-2xl md:text-3xl font-bold text-foreground tracking-tight">Cardamom Spices Centre</span>
-                <span className="text-xs text-muted-foreground font-semibold">by Spice One Merchants</span>
+                <span className="font-serif text-3xl md:text-4xl font-bold text-foreground tracking-tight">Cardamom Spices Centre</span>
+                <span className="text-xs text-[var(--gold)] font-semibold uppercase tracking-[0.15em]">Wholesale &amp; Retail Cardamom</span>
               </div>
             </Link>
 

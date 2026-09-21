@@ -3,8 +3,8 @@ import { Mail, Phone, MapPin } from 'lucide-react';
 
 const Footer = () => {
   return (
-    <footer data-testid="main-footer" className="bg-foreground text-background py-24">
-      <div className="max-w-7xl mx-auto px-6 md:px-12">
+    <footer data-testid="main-footer" className="bg-foreground text-background">
+      <div className="max-w-7xl mx-auto px-6 md:px-12 py-24">
         {/* Large Get in Touch */}
         <div className="mb-16">
           <h2 className="font-serif text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-none">
@@ -99,25 +99,32 @@ const Footer = () => {
             </ul>
           </div>
         </div>
+      </div>
 
-        {/* Bottom */}
-        <div className="mt-16 pt-8 border-t border-background/20 text-center">
-          <img src="/logo/logo-full.png" alt="Spice One Merchants" className="h-20 w-20 mx-auto mb-4" />
-          <p className="font-serif italic text-background/70 text-sm mb-6">
-            Purity in every pod, quality in every deal.
-          </p>
-          <p className="text-center text-background/70 text-sm mb-3">
-            Spice One Merchants
-          </p>
-          <p className="text-center text-background/50 text-xs mb-4">
-            GSTIN 33ASJPV7316H1ZG · IEC ASJPV7316H · Udyam UDYAM-TN-12-0191653
-          </p>
-          <p className="text-center text-background/60 text-sm mb-2">
-            &copy; {new Date().getFullYear()} Cardamom Spices Centre. All rights reserved.
-          </p>
-          <p className="text-center text-background/50 text-xs">
-            All supplies with valid GST invoice
-          </p>
+      {/* Letterhead-style legal/contact band — full-bleed dark green, modelled
+          on the printed letterhead footer, not the near-black bg above it. */}
+      <div className="bg-[#2d5a27] border-t-2 border-[var(--gold)]">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 flex flex-col md:flex-row items-center md:items-start justify-between gap-8 text-center md:text-left">
+          <div className="flex flex-col md:flex-row items-center gap-5">
+            <img src="/logo/logo-full.png" alt="Spice One Merchants" className="w-[90px] h-[90px] flex-shrink-0" />
+            <div className="text-[#f5f0e8] text-sm leading-relaxed">
+              <p className="font-semibold">Spice One Merchants · Trading as Cardamom Spices Centre</p>
+              <p className="text-[#f5f0e8]/70 text-xs mt-1">
+                GSTIN 33ASJPV7316H1ZG · IEC ASJPV7316H · Udyam UDYAM-TN-12-0191653
+              </p>
+              <p className="mt-2">
+                <a href="tel:+918838226519" className="hover:underline">+91-8838226519</a>
+                <span className="mx-2 text-[#f5f0e8]/50">·</span>
+                <a href="mailto:cardamomspicescentre@gmail.com" className="hover:underline break-all">cardamomspicescentre@gmail.com</a>
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col items-center md:items-end">
+            <p className="font-serif italic text-[#f5f0e8] text-base">
+              Purity in every pod, quality in every deal.
+            </p>
+            <div className="h-px w-24 bg-[var(--gold)] mt-3" />
+          </div>
         </div>
       </div>
     </footer>
