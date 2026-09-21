@@ -8,6 +8,12 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const formatINR = (n) => Math.round(n).toLocaleString('en-IN');
 
+const TREND_DISPLAY_DAYS = 30;
+// Extra lead-in fetched (not displayed) so the oldest point actually shown
+// can get a real 3-day rolling window too, instead of the headline delta
+// comparing a smoothed last day against an unsmoothed first day.
+const TREND_PAD_DAYS = 10;
+
 const getProductImage = (product) => {
   if (!product) return null;
   if (product.media_paths?.length > 0) {
@@ -43,7 +49,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [products, setProducts]           = useState([]);
   const [marketRates, setMarketRates]     = useState({ auction_date: null, stale: false, rows: [] });
-  const [marketRateHistory, setMarketRateHistory] = useState([]);
+  const [marketRateHistoryRaw, setMarketRateHistoryRaw] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -56,12 +62,12 @@ export default function Home() {
       const [prodRes, marketRatesRes, historyRes] = await Promise.all([
         axios.get(`${API_URL}/api/products`),
         axios.get(`${API_URL}/api/market-rates/latest`),
-        axios.get(`${API_URL}/api/market-rates/history?days=30`)
+        axios.get(`${API_URL}/api/market-rates/history?days=${TREND_DISPLAY_DAYS + TREND_PAD_DAYS}`)
       ]);
       const prods = prodRes.data || [];
       setProducts(prods.slice(0, 4));
       setMarketRates(marketRatesRes.data);
-      setMarketRateHistory(historyRes.data || []);
+      setMarketRateHistoryRaw(historyRes.data || []);
     } catch (err) {
       console.error(err);
     }
@@ -97,35 +103,54 @@ export default function Home() {
   })();
   const latestMarketDay = marketRateDays[0] || null;
 
-  // A sparse chart looks broken, so it's hidden below a minimum point count
-  // rather than rendered thin. History is already sorted oldest-first by the API.
-  const showTrendChart = marketRateHistory.length >= 10;
-
   // Different auctioneers report on different days, so the raw daily series
   // jumps by which auctioneers happened to report that day, not by market
   // movement. A trailing 3-day rolling average smooths that composition noise
-  // out. The first two points use a shorter window since there's no earlier
-  // history yet — that's the standard, expected edge behaviour for a rolling
-  // average, not a bug.
-  const trendData = marketRateHistory.map((point, i) => {
-    const window = marketRateHistory.slice(Math.max(0, i - 2), i + 1);
-    const rollingAvg = window.reduce((s, p) => s + p.weighted_avg_price, 0) / window.length;
-    return { auction_date: point.auction_date, rollingAvg };
-  });
+  // out. Computed over the padded series (fetched above) and only trimmed to
+  // the display window afterward, so the oldest point shown still gets a
+  // real 3-day window instead of falling back to a 1-day one — otherwise the
+  // headline delta below would be comparing a smoothed last day against an
+  // unsmoothed first day, which doesn't mean what it looks like it means.
+  const trendCutoffDate = new Date(Date.now() - TREND_DISPLAY_DAYS * 86400000).toISOString().slice(0, 10);
+  const trendData = marketRateHistoryRaw
+    .map((point, i) => {
+      const window = marketRateHistoryRaw.slice(Math.max(0, i - 2), i + 1);
+      const rollingAvg = window.reduce((s, p) => s + p.weighted_avg_price, 0) / window.length;
+      return { auction_date: point.auction_date, rollingAvg };
+    })
+    .filter(p => p.auction_date >= trendCutoffDate);
 
+  // A sparse chart looks broken, so it's hidden below a minimum point count.
+  const showTrendChart = trendData.length >= 10;
+
+  // Both ends are genuine 3-day averages now (see padding note above), so
+  // this compares like with like instead of smoothed-vs-raw.
   const trendChange = showTrendChart
     ? trendData[trendData.length - 1].rollingAvg - trendData[0].rollingAvg
     : 0;
   const trendLabel = `${trendChange >= 0 ? '+' : '-'}₹${formatINR(Math.abs(trendChange))}`;
 
+  // A buyer glancing at "+₹128" next to a chart naturally reads it as a
+  // day-over-day move. It isn't — spell out the actual comparison (both as
+  // a visible caption and as a hover title) so it can't be misread that way.
+  const trendStartDateLabel = showTrendChart
+    ? new Date(trendData[0].auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+    : '';
+  const trendEndDateLabel = showTrendChart
+    ? new Date(trendData[trendData.length - 1].auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+    : '';
+  const trendTitle = showTrendChart
+    ? `3-day average price on ${trendEndDateLabel} vs 3-day average on ${trendStartDateLabel} — not a day-over-day change`
+    : '';
+
   // 4 evenly spaced x-axis labels instead of one per point.
   const trendXTicks = (() => {
-    const n = marketRateHistory.length;
+    const n = trendData.length;
     if (n === 0) return [];
     const idxs = n <= 4
-      ? marketRateHistory.map((_, i) => i)
+      ? trendData.map((_, i) => i)
       : [0, Math.round((n - 1) / 3), Math.round((n - 1) * 2 / 3), n - 1];
-    return [...new Set(idxs)].map(i => marketRateHistory[i].auction_date);
+    return [...new Set(idxs)].map(i => trendData[i].auction_date);
   })();
 
   // Widen the range ~10% on each side so small day-to-day moves don't read
@@ -296,11 +321,17 @@ export default function Home() {
                 {showTrendChart && (
                   <div className="min-[900px]:w-[45%] mt-6 min-[900px]:mt-0 flex">
                     <div className="bg-white rounded-xl p-5 w-full flex flex-col">
-                      <div className="flex items-baseline justify-between mb-2">
+                      <div className="flex items-baseline justify-between mb-1">
                         <span className="text-gray-400">30-day trend (3-day avg)</span>
-                        <span className={trendChange >= 0 ? 'text-[#2d5a27] font-semibold' : 'text-red-600 font-semibold'}>
+                        <span
+                          className={trendChange >= 0 ? 'text-[#2d5a27] font-semibold' : 'text-red-600 font-semibold'}
+                          title={trendTitle}
+                        >
                           {trendLabel}
                         </span>
+                      </div>
+                      <div className="text-right text-[11px] text-gray-400 mb-2" title={trendTitle}>
+                        {trendStartDateLabel} → {trendEndDateLabel}, not vs. yesterday
                       </div>
                       <div className="flex-1 min-h-[140px]">
                         <ResponsiveContainer width="100%" height="100%">
