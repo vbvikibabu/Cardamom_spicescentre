@@ -66,7 +66,7 @@ const BuyerDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center pt-20">
+      <div className="min-h-screen flex items-center justify-center pt-32">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
       </div>
     );
@@ -84,7 +84,7 @@ const BuyerDashboard = () => {
   const filteredBids = filter === 'all' ? bids : bids.filter(b => b.status === filter);
 
   return (
-    <div data-testid="buyer-dashboard" className="min-h-screen bg-[#f5f0e8] pt-20">
+    <div data-testid="buyer-dashboard" className="min-h-screen bg-[#f5f0e8] pt-32">
       <div className="max-w-4xl mx-auto px-4 py-6">
 
         {/* ── Header ── */}

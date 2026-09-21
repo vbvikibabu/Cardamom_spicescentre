@@ -353,7 +353,7 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center pt-20">
+      <div className="min-h-screen flex items-center justify-center pt-32">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
       </div>
     );
@@ -368,7 +368,7 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div data-testid="admin-dashboard" className="min-h-screen bg-muted pt-20 pb-20 md:pb-0">
+    <div data-testid="admin-dashboard" className="min-h-screen bg-muted pt-32 pb-20 md:pb-0">
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
         {/* Header */}
         <div className="mb-8">

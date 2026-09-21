@@ -259,7 +259,7 @@ const ProductDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center pt-20">
+      <div className="min-h-screen flex items-center justify-center pt-32">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -267,7 +267,7 @@ const ProductDetail = () => {
 
   if (!product) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center pt-20 gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center pt-32 gap-4">
         <p className="text-muted-foreground text-lg">Product not found</p>
         <Link to="/products" className="text-primary font-semibold hover:underline">Back to Products</Link>
       </div>
@@ -277,7 +277,7 @@ const ProductDetail = () => {
   const mediaPaths = product.media_paths?.length > 0 ? product.media_paths : (product.image_url ? [product.image_url] : []);
 
   return (
-    <div data-testid="product-detail-page" className="min-h-screen pt-20 bg-white">
+    <div data-testid="product-detail-page" className="min-h-screen pt-32 bg-white">
       <div className="max-w-7xl mx-auto px-6 md:px-12 pt-8">
         <Link to="/products" data-testid="back-to-products" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
           <ArrowLeft size={16} /> Back to Products

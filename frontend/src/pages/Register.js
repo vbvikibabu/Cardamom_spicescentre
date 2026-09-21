@@ -106,7 +106,7 @@ const Register = () => {
   if (isAuthenticated) return null;
 
   return (
-    <div data-testid="register-page" className="min-h-screen flex items-center justify-center bg-muted pt-20 px-4 py-12">
+    <div data-testid="register-page" className="min-h-screen flex items-center justify-center bg-muted pt-32 px-4 py-12">
       <div className="max-w-2xl w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg">
         <div className="text-center">
           <h2 className="font-serif text-4xl font-bold text-foreground mb-2">Create B2B Account</h2>

@@ -145,7 +145,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
-      <section className="bg-[#f5f0e8] pt-24 md:pt-28">
+      <section className="bg-[#f5f0e8] pt-36 md:pt-40">
         <div className="grid grid-cols-1 min-[900px]:grid-cols-[1fr_45vw] min-[900px]:h-[540px]">
 
           {/* Text column — padding replicates the site container's own left inset so this lines up
@@ -181,7 +181,7 @@ export default function Home() {
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">Quantity</p>
-                <p className="text-sm text-gray-700">1kg to bulk, sample couriered</p>
+                <p className="text-sm text-gray-700">1kg to bulk. Samples sent based on your need.</p>
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gold)] mb-1">Packing</p>

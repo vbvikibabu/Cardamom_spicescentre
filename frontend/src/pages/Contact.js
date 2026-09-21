@@ -48,7 +48,7 @@ const Contact = () => {
   };
 
   return (
-    <div data-testid="contact-page" className="pt-20">
+    <div data-testid="contact-page" className="pt-32">
       {/* Hero */}
       <section className="py-24 bg-muted" data-testid="contact-hero">
         <div className="max-w-7xl mx-auto px-6 md:px-12">

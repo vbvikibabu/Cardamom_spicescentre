@@ -48,13 +48,14 @@ const Navbar = () => {
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="flex items-center justify-between h-20">
+          <div className="flex items-center justify-between py-5">
             {/* Logo */}
-            <Link to="/" data-testid="nav-logo" className="flex items-center gap-3">
-              <img src="/logo/logo-mark.png" alt="" className="w-[60px] h-[60px] flex-shrink-0" />
+            <Link to="/" data-testid="nav-logo" className="flex items-center gap-4">
+              <img src="/logo/logo-full.png" alt="Spice One Merchants" className="w-[88px] h-[88px] flex-shrink-0" />
               <div className="flex flex-col">
-                <span className="font-serif text-3xl md:text-4xl font-bold text-foreground tracking-tight">Cardamom Spices Centre</span>
-                <span className="text-xs text-[var(--gold)] font-semibold uppercase tracking-[0.15em]">Wholesale &amp; Retail Cardamom</span>
+                <span className="font-serif text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">Cardamom Spices Centre</span>
+                <span className="text-xs text-muted-foreground font-semibold">by Spice One Merchants</span>
+                <span className="text-[11px] text-[var(--gold)] font-semibold uppercase tracking-[0.15em] mt-0.5">Wholesale &middot; Retail &middot; Export Supply</span>
               </div>
             </Link>
 

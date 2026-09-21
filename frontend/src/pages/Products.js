@@ -135,14 +135,14 @@ const Products = () => {
 
   if (loading) {
     return (
-      <div data-testid="products-loading" className="pt-20 flex items-center justify-center py-20">
+      <div data-testid="products-loading" className="pt-32 flex items-center justify-center py-20">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
       </div>
     );
   }
 
   return (
-    <div data-testid="products-page" className="pt-20 pb-20 md:pb-0">
+    <div data-testid="products-page" className="pt-32 pb-20 md:pb-0">
 
       {/* FIX 1 — Compact 2-line header (max ~70px) */}
       <div className="px-4 pt-3 pb-2" data-testid="products-hero">

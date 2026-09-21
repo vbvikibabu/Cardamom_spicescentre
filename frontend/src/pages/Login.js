@@ -98,7 +98,7 @@ const Login = () => {
   if (isAuthenticated) return null;
 
   return (
-    <div data-testid="login-page" className="min-h-screen pt-20">
+    <div data-testid="login-page" className="min-h-screen pt-32">
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent data-testid="login-modal" className="sm:max-w-md p-0 overflow-hidden rounded-2xl border-0">
           <div className="bg-primary px-6 py-5">
