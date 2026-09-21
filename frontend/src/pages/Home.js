@@ -9,10 +9,6 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 const formatINR = (n) => Math.round(n).toLocaleString('en-IN');
 
 const TREND_DISPLAY_DAYS = 30;
-// Extra lead-in fetched (not displayed) so the oldest point actually shown
-// can get a real 3-day rolling window too, instead of the headline delta
-// comparing a smoothed last day against an unsmoothed first day.
-const TREND_PAD_DAYS = 10;
 
 const getProductImage = (product) => {
   if (!product) return null;
@@ -62,7 +58,7 @@ export default function Home() {
       const [prodRes, marketRatesRes, historyRes] = await Promise.all([
         axios.get(`${API_URL}/api/products`),
         axios.get(`${API_URL}/api/market-rates/latest`),
-        axios.get(`${API_URL}/api/market-rates/history?days=${TREND_DISPLAY_DAYS + TREND_PAD_DAYS}`)
+        axios.get(`${API_URL}/api/market-rates/history?days=${TREND_DISPLAY_DAYS}`)
       ]);
       const prods = prodRes.data || [];
       setProducts(prods.slice(0, 4));
@@ -103,44 +99,24 @@ export default function Home() {
   })();
   const latestMarketDay = marketRateDays[0] || null;
 
-  // Different auctioneers report on different days, so the raw daily series
-  // jumps by which auctioneers happened to report that day, not by market
-  // movement. A trailing 3-day rolling average smooths that composition noise
-  // out. Computed over the padded series (fetched above) and only trimmed to
-  // the display window afterward, so the oldest point shown still gets a
-  // real 3-day window instead of falling back to a 1-day one — otherwise the
-  // headline delta below would be comparing a smoothed last day against an
-  // unsmoothed first day, which doesn't mean what it looks like it means.
-  const trendCutoffDate = new Date(Date.now() - TREND_DISPLAY_DAYS * 86400000).toISOString().slice(0, 10);
-  const trendData = marketRateHistoryRaw
-    .map((point, i) => {
-      const window = marketRateHistoryRaw.slice(Math.max(0, i - 2), i + 1);
-      const rollingAvg = window.reduce((s, p) => s + p.weighted_avg_price, 0) / window.length;
-      return { auction_date: point.auction_date, rollingAvg };
-    })
-    .filter(p => p.auction_date >= trendCutoffDate);
+  // Plot each auction date's own quantity-weighted average directly — this
+  // must match the table's Avg column for the same date, so no smoothing
+  // here. The backend already applies the `days` cutoff, oldest first.
+  const trendData = marketRateHistoryRaw.map(point => ({
+    auction_date: point.auction_date,
+    avgPrice: point.weighted_avg_price,
+  }));
 
   // A sparse chart looks broken, so it's hidden below a minimum point count.
   const showTrendChart = trendData.length >= 10;
 
-  // Both ends are genuine 3-day averages now (see padding note above), so
-  // this compares like with like instead of smoothed-vs-raw.
   const trendChange = showTrendChart
-    ? trendData[trendData.length - 1].rollingAvg - trendData[0].rollingAvg
+    ? trendData[trendData.length - 1].avgPrice - trendData[0].avgPrice
     : 0;
   const trendLabel = `${trendChange >= 0 ? '+' : '-'}₹${formatINR(Math.abs(trendChange))}`;
 
-  // A buyer glancing at "+₹128" next to a chart naturally reads it as a
-  // day-over-day move. It isn't — spell out the actual comparison (both as
-  // a visible caption and as a hover title) so it can't be misread that way.
   const trendStartDateLabel = showTrendChart
     ? new Date(trendData[0].auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-    : '';
-  const trendEndDateLabel = showTrendChart
-    ? new Date(trendData[trendData.length - 1].auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-    : '';
-  const trendTitle = showTrendChart
-    ? `3-day average price on ${trendEndDateLabel} vs 3-day average on ${trendStartDateLabel} — not a day-over-day change`
     : '';
 
   // 4 evenly spaced x-axis labels instead of one per point.
@@ -157,7 +133,7 @@ export default function Home() {
   // as dramatic swings against a tightly-cropped axis.
   const trendYDomain = (() => {
     if (trendData.length === 0) return ['auto', 'auto'];
-    const values = trendData.map(p => p.rollingAvg);
+    const values = trendData.map(p => p.avgPrice);
     const min = Math.min(...values);
     const max = Math.max(...values);
     const range = max - min;
@@ -281,7 +257,7 @@ export default function Home() {
               <div className="flex items-baseline justify-between">
                 <h2 className="font-serif text-2xl text-[#1a3a1a]">Auction rates</h2>
                 <span className="text-gray-400">
-                  {new Date(marketRates.auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  Last auction · {new Date(marketRates.auction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               </div>
               <p className="text-gray-400 mb-4">Small cardamom · Spices Board of India</p>
@@ -321,17 +297,14 @@ export default function Home() {
                 {showTrendChart && (
                   <div className="min-[900px]:w-[45%] mt-6 min-[900px]:mt-0 flex">
                     <div className="bg-white rounded-xl p-5 w-full flex flex-col">
-                      <div className="flex items-baseline justify-between mb-1">
-                        <span className="text-gray-400">30-day trend (3-day avg)</span>
-                        <span
-                          className={trendChange >= 0 ? 'text-[#2d5a27] font-semibold' : 'text-red-600 font-semibold'}
-                          title={trendTitle}
-                        >
-                          {trendLabel}
-                        </span>
-                      </div>
-                      <div className="text-right text-[11px] text-gray-400 mb-2" title={trendTitle}>
-                        {trendStartDateLabel} → {trendEndDateLabel}, not vs. yesterday
+                      <div className="flex items-baseline justify-between mb-2">
+                        <span className="text-gray-400">30-day trend</span>
+                        <div className="text-right">
+                          <span className={trendChange >= 0 ? 'text-[#2d5a27] font-semibold' : 'text-[#a13d3d] font-semibold'}>
+                            {trendLabel}
+                          </span>
+                          <div className="text-[11px] text-gray-400">since {trendStartDateLabel}</div>
+                        </div>
                       </div>
                       <div className="flex-1 min-h-[140px]">
                         <ResponsiveContainer width="100%" height="100%">
@@ -361,7 +334,7 @@ export default function Home() {
                               domain={trendYDomain}
                             />
                             <Tooltip
-                              formatter={v => [`₹${formatINR(v)}`, '3-day avg']}
+                              formatter={v => [`₹${formatINR(v)}`, 'Avg']}
                               labelFormatter={d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                               contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: 'none' }}
                               labelStyle={{ color: '#9ca3af', marginBottom: 2 }}
@@ -370,7 +343,7 @@ export default function Home() {
                             />
                             <Area
                               type="linear"
-                              dataKey="rollingAvg"
+                              dataKey="avgPrice"
                               stroke="#7a9b6a"
                               strokeWidth={1.5}
                               fill="url(#trendFill)"
