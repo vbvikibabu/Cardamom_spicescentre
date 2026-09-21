@@ -189,12 +189,12 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Image column — bounded to the row height; object-top keeps the hand and cardamom in frame */}
+          {/* Image column — bounded to the row height; object-contain shows the whole photo, never crops it */}
           <div className="h-72 min-[900px]:h-full mt-8 min-[900px]:mt-0 overflow-hidden">
             <img
               src="/hero.jpg"
               alt="Graded green cardamom held in hand at the sorting floor"
-              className="w-full h-full object-cover object-top block"
+              className="w-full h-full object-contain object-center block"
             />
           </div>
         </div>
