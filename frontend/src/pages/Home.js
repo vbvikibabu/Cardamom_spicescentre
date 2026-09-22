@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Search, MessageSquare, Handshake } from 'lucide-react';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -40,6 +41,95 @@ const HOW_IT_WORKS = [
     desc: 'Receive a price and close the deal directly over WhatsApp or phone.',
   },
 ];
+
+const FAQ_GROUPS = [
+  {
+    heading: 'Ordering & payment',
+    items: [
+      {
+        q: 'What are your payment terms?',
+        a: 'Orders below 50kg — full payment at confirmation. Orders of 50kg and above — 30% advance to confirm, with the balance due before dispatch once your goods are packed and ready.',
+      },
+      {
+        q: 'Is there a minimum order?',
+        a: 'No. We supply from 1kg to bulk.',
+      },
+      {
+        q: 'Can I get a sample first?',
+        a: 'Yes. We send samples based on your need, so you can check the grade before ordering.',
+      },
+      {
+        q: 'Do you provide a GST invoice?',
+        a: "Yes. We're GST-registered and every order comes with a proper GST invoice.",
+      },
+      {
+        q: "Why aren't prices listed on the website?",
+        a: 'Cardamom prices move daily with the auctions. We quote based on the grade, quantity and the current market, so you always get a price that reflects today\'s rate.',
+      },
+    ],
+  },
+  {
+    heading: 'Product',
+    items: [
+      {
+        q: 'Where does your cardamom come from?',
+        a: "From the Cardamom Hills of Idukki, Kerala — India's main cardamom-growing region.",
+      },
+      {
+        q: "What's the difference between the grades?",
+        a: 'Grades are sorted by pod size. Larger, bolder pods like 8mm and above suit retail packing and gifting. Smaller grades such as 6–7mm are well suited to everyday cooking.',
+      },
+      {
+        q: 'What are splits?',
+        a: 'Pods that have opened slightly during drying. The seeds and flavour are intact, and they cost less — which makes them ideal for grinding into masala.',
+      },
+      {
+        q: 'How do I know which grade to buy?',
+        a: "Tell us what it's for — hotel kitchen, grinding, retail or gifting — and we'll suggest the right grade.",
+      },
+      {
+        q: 'How should I store cardamom?',
+        a: 'In an airtight container, somewhere cool and dry, away from sunlight. Whole pods keep their aroma far longer than ground cardamom.',
+      },
+    ],
+  },
+  {
+    heading: 'Delivery & packing',
+    items: [
+      {
+        q: 'Where do you deliver?',
+        a: 'We courier anywhere in India.',
+      },
+      {
+        q: 'How is it packed?',
+        a: 'In cartons or bags, packed and labelled to your requirement.',
+      },
+      {
+        q: 'Do you supply hotels and restaurants?',
+        a: 'Yes. We supply kitchens with regular orders and can match a grade to your cooking.',
+      },
+      {
+        q: 'Do you supply for export?',
+        a: "We supply export-grade cardamom. Tell us your destination and requirement, and we'll advise on the best way to arrange it.",
+      },
+    ],
+  },
+];
+
+const FAQ_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ_GROUPS.flatMap(group =>
+    group.items.map(item => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.a,
+      },
+    }))
+  ),
+};
 
 export default function Home() {
   const navigate = useNavigate();
@@ -400,6 +490,31 @@ export default function Home() {
           >
             Request a price →
           </button>
+        </div>
+      </section>
+
+      {/* ── SECTION 4: FREQUENTLY ASKED ──────────── */}
+      <section className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_SCHEMA) }} />
+        <h2 className="font-serif text-2xl text-[#1a3a1a] mb-6 text-center">Frequently Asked</h2>
+        <div className="max-w-3xl mx-auto space-y-8">
+          {FAQ_GROUPS.map(group => (
+            <div key={group.heading}>
+              <h3 className="text-xs font-bold uppercase tracking-wide text-[#2d5a27] mb-2">{group.heading}</h3>
+              <Accordion type="single" collapsible className="bg-white rounded-xl border border-gray-100 shadow-sm px-5">
+                {group.items.map((item, i) => (
+                  <AccordionItem key={i} value={`${group.heading}-${i}`} className="border-b border-gray-100 last:border-b-0">
+                    <AccordionTrigger className="text-[#1a3a1a] font-semibold hover:no-underline hover:text-[#2d5a27]">
+                      {item.q}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-gray-500 text-sm leading-relaxed">
+                      {item.a}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
+          ))}
         </div>
       </section>
 
