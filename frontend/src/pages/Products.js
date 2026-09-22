@@ -296,13 +296,6 @@ const Products = () => {
                           </p>
                         )}
 
-                        {/* Min qty — desktop only (show just number) */}
-                        {product.minimum_quantity_kg && (
-                          <p className="hidden md:block text-[10px] text-muted-foreground mb-2">
-                            Min: {product.minimum_quantity_kg} kg
-                          </p>
-                        )}
-
                         {/* Availability bar — desktop only */}
                         {product.total_quantity_kg > 0 && product.listing_status === 'active' && (
                           <div className="hidden md:block mb-3">

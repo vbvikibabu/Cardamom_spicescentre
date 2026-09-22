@@ -241,9 +241,6 @@ export default function Home() {
                 <div className="p-3">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">{product.size}</p>
                   <p className="font-semibold text-[#1a3a1a] text-sm line-clamp-1 mb-0.5">{product.name}</p>
-                  {product.minimum_quantity_kg && (
-                    <p className="text-[11px] text-gray-400">Min: {product.minimum_quantity_kg} kg</p>
-                  )}
                 </div>
               </div>
             ))}

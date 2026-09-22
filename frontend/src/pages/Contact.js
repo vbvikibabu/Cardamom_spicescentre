@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useSearchParams } from 'react-router-dom';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -55,12 +56,29 @@ const fieldCls = (err) =>
     err ? 'border-red-400 focus:ring-red-300 bg-red-50' : 'border-gray-200 focus:ring-[#2d5a27]'
   }`;
 
+// Product grade is free text entered by admin/seller, not this enum — match it
+// on a best-effort basis when linked in from a product page, and fall back
+// to the advise-me default rather than reject an unrecognised value.
+const gradeFromQuery = (raw) => {
+  if (!raw) return null;
+  const exact = GRADE_OPTIONS.find(opt => opt.toLowerCase() === raw.toLowerCase());
+  if (exact) return exact;
+  const s = raw.toLowerCase();
+  if (s.includes('split')) return 'Splits';
+  if (s.includes('8') && (s.includes('above') || s.includes('bold') || s.includes('+'))) return '8mm & above';
+  if (s.includes('7') && s.includes('8')) return '7–8mm';
+  if (s.includes('6') && s.includes('7')) return '6–7mm';
+  return null;
+};
+
 const Contact = () => {
+  const [searchParams] = useSearchParams();
+  const initialGrade = gradeFromQuery(searchParams.get('grade')) || 'Not sure — advise me';
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       name: '', phone: '', email: '', company: '',
-      use: 'Not sure — advise me', grade: 'Not sure — advise me',
+      use: 'Not sure — advise me', grade: initialGrade,
       quantity_kg: '', delivery_location: '', message: '', website: '',
     },
     mode: 'onBlur',
