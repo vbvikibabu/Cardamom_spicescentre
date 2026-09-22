@@ -20,34 +20,6 @@ const isVideoPath = (path) => {
   return lower.endsWith('.mp4') || lower.endsWith('.mov');
 };
 
-// ─── Availability Bar ───────────────────────────────────────────────────────
-const AvailabilityBar = ({ total, remaining }) => {
-  if (!total || total <= 0) return null;
-  const rem = remaining ?? total;
-  const pct = Math.max(0, Math.min(100, Math.round((rem / total) * 100)));
-  const isLow = pct < 20;
-  const isMid = pct >= 20 && pct <= 50;
-  const barColor = isLow ? 'bg-red-500' : isMid ? 'bg-amber-500' : 'bg-green-500';
-  const textColor = isLow ? 'text-red-600' : isMid ? 'text-amber-600' : 'text-green-700';
-  const bgColor = isLow ? 'bg-red-50 border-red-200' : isMid ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
-  return (
-    <div className={`p-3 border rounded-xl mb-4 ${bgColor}`}>
-      <div className="flex items-center justify-between text-xs mb-2">
-        <span className="font-semibold text-foreground uppercase tracking-wide text-[10px]">Stock Availability</span>
-        <span className={`font-bold ${textColor}`}>
-          {isLow ? `⚠️ Only ${rem.toLocaleString('en-IN')} kg left!` : `${rem.toLocaleString('en-IN')} / ${total.toLocaleString('en-IN')} kg available`}
-        </span>
-      </div>
-      <div className="h-2 bg-white/60 rounded-full overflow-hidden border border-white/40">
-        <div className={`h-full ${barColor} transition-all duration-300 rounded-full`} style={{ width: `${pct}%` }} />
-      </div>
-      <p className={`text-[10px] mt-1.5 ${textColor}`}>
-        {pct}% remaining — {rem.toLocaleString('en-IN')} kg of {total.toLocaleString('en-IN')} kg
-      </p>
-    </div>
-  );
-};
-
 const ProductDetail = () => {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
@@ -143,29 +115,19 @@ const ProductDetail = () => {
 
             <h1 data-testid="product-detail-name" className="font-serif text-4xl sm:text-5xl font-bold text-foreground mb-6 leading-tight">{product.name}</h1>
 
-            {/* Seller info box */}
-            {product.seller_name && (
-              <div data-testid="product-seller-box" className="flex items-start gap-3 p-4 border border-border rounded-xl mb-5 bg-muted/40">
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <BadgeCheck size={18} className="text-primary" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">Sold by</p>
-                  <p className="text-sm font-bold text-foreground" data-testid="product-seller-name">{product.seller_name}</p>
-                  {product.seller_company && (
-                    <p className="text-xs text-muted-foreground">{product.seller_company}</p>
-                  )}
-                  <p className="text-[10px] text-green-600 font-semibold mt-1 flex items-center gap-1">
-                    <Check size={11} /> Verified Seller
-                  </p>
-                </div>
+            {/* Seller info box — the firm, not the listing seller; the actual seller stays admin-only */}
+            <div data-testid="product-seller-box" className="flex items-start gap-3 p-4 border border-border rounded-xl mb-5 bg-muted/40">
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <BadgeCheck size={18} className="text-primary" />
               </div>
-            )}
-
-            {/* Availability bar — 'expired' is a leftover timer status, not a real closure, so it still counts as listed */}
-            {(product.listing_status === 'active' || product.listing_status === 'expired') && product.total_quantity_kg > 0 && (
-              <AvailabilityBar total={product.total_quantity_kg} remaining={product.remaining_quantity_kg} />
-            )}
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">Sold by</p>
+                <p className="text-sm font-bold text-foreground" data-testid="product-seller-name">Spice One Merchants</p>
+                <p className="text-[10px] text-green-600 font-semibold mt-1 flex items-center gap-1">
+                  <Check size={11} /> Verified Seller
+                </p>
+              </div>
+            </div>
 
             {/* Sold info — no buyer name or price exposed */}
             {product.listing_status === 'sold' && (
@@ -175,9 +137,7 @@ const ProductDetail = () => {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-blue-800">This product has been sold</p>
-                  <p className="text-xs text-blue-600">
-                    Seller: {product.seller_name}{product.seller_company ? ` | ${product.seller_company}` : ''}
-                  </p>
+                  <p className="text-xs text-blue-600">Seller: Spice One Merchants</p>
                   <Link to="/products" className="text-xs text-primary font-semibold hover:underline mt-1 inline-block">
                     Check our other listings →
                   </Link>

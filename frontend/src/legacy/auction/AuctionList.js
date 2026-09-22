@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { getErrorMessage } from '../../lib/utils';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -165,7 +166,7 @@ export default function AuctionList() {
       // Restore scroll so page stays in place after form collapses
       requestAnimationFrame(() => window.scrollTo(0, scrollY));
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to register lot');
+      toast.error(getErrorMessage(err, 'Failed to register lot'));
       setEventReg(eventId, { submitting: false });
       requestAnimationFrame(() => window.scrollTo(0, scrollY));
     }

@@ -994,10 +994,10 @@ class ProductCreate(BaseModel):
     image_url: str = ""
     media_paths: List[str] = Field(default_factory=list)
     bid_duration_hours: int = Field(default=168, ge=24, le=720)
-    base_price: float
+    base_price: Optional[float] = None
     base_price_currency: Literal["INR", "USD"] = "INR"
-    minimum_quantity_kg: float
-    total_quantity_kg: float
+    minimum_quantity_kg: Optional[float] = 1
+    total_quantity_kg: Optional[float] = None
 
 # ── Public-safe product response (hides buyer/trade details) ──────
 class ProductPublic(BaseModel):
@@ -1013,9 +1013,7 @@ class ProductPublic(BaseModel):
     seller_company: Optional[str] = None
     approval_status: Literal["pending", "approved", "rejected"] = "pending"
     created_at: datetime
-    minimum_quantity_kg: Optional[float] = None
-    total_quantity_kg: Optional[float] = None
-    remaining_quantity_kg: Optional[float] = None
+    minimum_quantity_kg: Optional[float] = 1
     bid_start_time: Optional[datetime] = None
     bid_duration_hours: int = 168
     bid_end_time: Optional[datetime] = None
@@ -2007,45 +2005,51 @@ async def update_seller_bid(
         product_id = bid.get("product_id")
 
         # ── Inventory update ──────────────────────────────────────
+        # remaining_quantity_kg is only ever set when total_quantity_kg was
+        # provided at creation (seller listings). Admin listings with no
+        # declared stock have no finite quantity to deplete, so accepting a
+        # bid must never auto-mark them sold — that stays an admin decision.
         product_doc = await db.products.find_one({"id": product_id}, {"_id": 0})
         accepted_qty_kg = bid.get("quantity_kg") or 0.0
         remaining = product_doc.get("remaining_quantity_kg") if product_doc else None
+        has_inventory_tracking = remaining is not None
 
-        if remaining is not None and accepted_qty_kg:
-            new_remaining = max(0.0, remaining - accepted_qty_kg)
-        else:
-            new_remaining = 0.0  # No inventory tracking → treat as fully sold
+        update_fields: dict = {}
+        new_status = None
 
-        new_status = "sold" if new_remaining <= 0 else "active"
+        if has_inventory_tracking:
+            new_remaining = max(0.0, remaining - accepted_qty_kg) if accepted_qty_kg else remaining
+            new_status = "sold" if new_remaining <= 0 else "active"
+            update_fields["remaining_quantity_kg"] = new_remaining
+            update_fields["listing_status"] = new_status
 
-        # Auto-reject competing bids only when product is fully sold out
+            # Auto-reject competing bids only when product is fully sold out
+            if new_status == "sold":
+                await db.bids.update_many(
+                    {"product_id": product_id, "id": {"$ne": bid_id}, "status": "pending"},
+                    {"$set": {
+                        "status": "rejected",
+                        "seller_notes": "Another bid was accepted for this product.",
+                        "reviewed_by": "seller",
+                        "updated_at": now.isoformat()
+                    }}
+                )
+
         if new_status == "sold":
-            await db.bids.update_many(
-                {"product_id": product_id, "id": {"$ne": bid_id}, "status": "pending"},
-                {"$set": {
-                    "status": "rejected",
-                    "seller_notes": "Another bid was accepted for this product.",
-                    "reviewed_by": "seller",
-                    "updated_at": now.isoformat()
-                }}
-            )
-
-        sold_price = bid.get("price_per_kg") or bid.get("price_per_lot")
-        sold_currency = bid.get("currency", "INR")
-        update_fields: dict = {
-            "remaining_quantity_kg": new_remaining,
-            "listing_status": new_status,
-        }
-        if new_status == "sold":
+            sold_price = bid.get("price_per_kg") or bid.get("price_per_lot")
             update_fields.update({
                 "sold_at": now.isoformat(),
                 "sold_to_buyer_id": bid.get("buyer_id"),
                 "sold_to_buyer_name": bid.get("buyer_name"),
                 "sold_price": sold_price,
-                "sold_price_currency": sold_currency,
+                "sold_price_currency": bid.get("currency", "INR"),
             })
-        await db.products.update_one({"id": product_id}, {"$set": update_fields})
-        logger.info(f"Product {product_id}: bid accepted, {new_remaining:.1f}kg remaining, status={new_status}")
+        if update_fields:
+            await db.products.update_one({"id": product_id}, {"$set": update_fields})
+        if has_inventory_tracking:
+            logger.info(f"Product {product_id}: bid accepted, {new_remaining:.1f}kg remaining, status={new_status}")
+        else:
+            logger.info(f"Product {product_id}: bid accepted (no declared stock — listing stays active)")
 
         # Notify seller
         try:

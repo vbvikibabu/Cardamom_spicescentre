@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '../components/ui/dialog';
 import { useState } from 'react';
+import { getErrorMessage } from '../lib/utils';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -79,7 +80,7 @@ const Login = () => {
         else navigate('/dashboard');
       } else navigate('/pending-approval');
     } catch (error) {
-      const detail = error.response?.data?.detail || 'Login failed';
+      const detail = getErrorMessage(error, 'Login failed');
       if (detail.toLowerCase().includes('password') || detail.toLowerCase().includes('invalid')) {
         setError('password', { message: detail });
       } else if (detail.toLowerCase().includes('email')) {

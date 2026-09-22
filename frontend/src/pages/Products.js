@@ -65,30 +65,6 @@ const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
   );
 };
 
-// Availability bar component
-const AvailabilityBar = ({ total, remaining }) => {
-  if (!total || total <= 0) return null;
-  const rem = remaining ?? total;
-  const pct = Math.max(0, Math.min(100, Math.round((rem / total) * 100)));
-  const isLow = pct < 20;
-  const isMid = pct >= 20 && pct <= 50;
-  const barColor = isLow ? 'bg-red-500' : isMid ? 'bg-amber-500' : 'bg-green-500';
-  const textColor = isLow ? 'text-red-600' : isMid ? 'text-amber-600' : 'text-green-700';
-  return (
-    <div className="mt-2 mb-1">
-      <div className="flex items-center justify-between text-[10px] mb-1">
-        <span className="text-muted-foreground">Availability</span>
-        <span className={`font-semibold ${textColor}`}>
-          {isLow ? `Only ${rem.toLocaleString('en-IN')} kg left!` : `${rem.toLocaleString('en-IN')} / ${total.toLocaleString('en-IN')} kg`}
-        </span>
-      </div>
-      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-        <div className={`h-full ${barColor} transition-all duration-300`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-};
-
 const Products = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -288,20 +264,11 @@ const Products = () => {
                           {product.name}
                         </h3>
 
-                        {/* Seller — mobile: 1 line; desktop: full */}
-                        {product.seller_name && (
-                          <p className="text-[11px] md:text-xs text-muted-foreground truncate mb-1 md:mb-3">
-                            <span className="hidden md:inline">Sold by </span>
-                            <span className="font-medium text-foreground">{product.seller_name}</span>
-                          </p>
-                        )}
-
-                        {/* Availability bar — desktop only */}
-                        {product.total_quantity_kg > 0 && product.listing_status === 'active' && (
-                          <div className="hidden md:block mb-3">
-                            <AvailabilityBar total={product.total_quantity_kg} remaining={product.remaining_quantity_kg} />
-                          </div>
-                        )}
+                        {/* Seller — the firm, not the listing seller; the actual seller stays admin-only */}
+                        <p className="text-[11px] md:text-xs text-muted-foreground truncate mb-1 md:mb-3">
+                          <span className="hidden md:inline">Sold by </span>
+                          <span className="font-medium text-foreground">Spice One Merchants</span>
+                        </p>
 
                         {/* Description — desktop only */}
                         <p className="hidden md:block text-muted-foreground text-sm leading-relaxed mb-4 line-clamp-3">

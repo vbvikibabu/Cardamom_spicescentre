@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { getErrorMessage } from '../../lib/utils';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const WS_URL = API_URL
@@ -320,7 +321,7 @@ export default function AuctionRoom() {
       toast.success('Bid placed! 🎉');
       setBidAmount(String(amount + (currentLotData?.bid_increment || 10)));
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Bid failed');
+      toast.error(getErrorMessage(e, 'Bid failed'));
     } finally {
       setBidding(false);
     }

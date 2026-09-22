@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { CheckCircle, XCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { getErrorMessage } from '../lib/utils';
 
 const phoneRegex = /^(\+\d{7,15}|[6-9]\d{9})$/;
 
@@ -92,7 +93,7 @@ const Register = () => {
       toast.success('Registration successful! Awaiting admin approval.');
       navigate('/login');
     } catch (error) {
-      const detail = error.response?.data?.detail || '';
+      const detail = getErrorMessage(error, '');
       if (detail.toLowerCase().includes('mobile') || detail.toLowerCase().includes('phone')) {
         setError('phone', { message: detail });
       } else if (detail.toLowerCase().includes('email')) {

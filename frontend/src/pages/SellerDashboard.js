@@ -5,6 +5,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart, Timer, Archive, RotateCcw, AlertCircle, Loader2, ArrowRight, Home, ShoppingBag, User } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
+import { getErrorMessage } from '../lib/utils';
 
 const getGreeting = (firstName) => {
   const h = new Date().getHours();
@@ -79,7 +80,7 @@ const SellerDashboard = () => {
   // Product form state
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '', bid_duration_hours: 168, base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
+  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '', base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
   const [mediaFiles, setMediaFiles] = useState([]);
   const [existingMedia, setExistingMedia] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -117,8 +118,8 @@ const SellerDashboard = () => {
     const totalQty = parseFloat(form.total_quantity_kg);
     const minQty = parseFloat(form.minimum_quantity_kg);
     if (!form.total_quantity_kg || isNaN(totalQty) || totalQty <= 0) errs.total_quantity_kg = 'Enter a positive number';
-    if (!form.minimum_quantity_kg || isNaN(minQty) || minQty <= 0) errs.minimum_quantity_kg = 'Enter a positive number';
-    if (!errs.total_quantity_kg && !errs.minimum_quantity_kg && minQty >= totalQty) {
+    if (form.minimum_quantity_kg && (isNaN(minQty) || minQty <= 0)) errs.minimum_quantity_kg = 'Enter a positive number';
+    if (!errs.total_quantity_kg && form.minimum_quantity_kg && !errs.minimum_quantity_kg && minQty >= totalQty) {
       errs.minimum_quantity_kg = 'Must be less than total stock';
     }
 
@@ -167,7 +168,6 @@ const SellerDashboard = () => {
         size: product.size,
         description: product.description,
         features: product.features.join(', '),
-        bid_duration_hours: product.bid_duration_hours || 168,
         base_price: product.base_price ?? '',
         base_price_currency: product.base_price_currency || 'INR',
         minimum_quantity_kg: product.minimum_quantity_kg ?? '',
@@ -176,7 +176,7 @@ const SellerDashboard = () => {
       setExistingMedia(product.media_paths?.length > 0 ? product.media_paths : (product.image_url ? [product.image_url] : []));
     } else {
       setEditingProduct(null);
-      setProductForm({ name: '', size: '', description: '', features: '', bid_duration_hours: 168, base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
+      setProductForm({ name: '', size: '', description: '', features: '', base_price: '', base_price_currency: 'INR', minimum_quantity_kg: '', total_quantity_kg: '' });
       setExistingMedia([]);
     }
     setMediaFiles([]);
@@ -255,9 +255,9 @@ const SellerDashboard = () => {
 
     const totalQty = parseFloat(productForm.total_quantity_kg);
     const minQty = parseFloat(productForm.minimum_quantity_kg);
-    if (!productForm.total_quantity_kg || isNaN(totalQty) || totalQty <= 0) errs.total_quantity_kg = 'Total stock must be a positive number';
-    if (!productForm.minimum_quantity_kg || isNaN(minQty) || minQty <= 0) errs.minimum_quantity_kg = 'Minimum order must be a positive number';
-    if (!errs.total_quantity_kg && !errs.minimum_quantity_kg && minQty >= totalQty) {
+    if (!productForm.total_quantity_kg || isNaN(totalQty) || totalQty <= 0) errs.total_quantity_kg = 'Quantity available must be a positive number';
+    if (productForm.minimum_quantity_kg && (isNaN(minQty) || minQty <= 0)) errs.minimum_quantity_kg = 'Minimum order must be a positive number';
+    if (!errs.total_quantity_kg && productForm.minimum_quantity_kg && !errs.minimum_quantity_kg && minQty >= totalQty) {
       errs.minimum_quantity_kg = 'Minimum order must be less than total stock';
     }
 
@@ -291,12 +291,13 @@ const SellerDashboard = () => {
         features: productForm.features.split(',').map(f => f.trim()).filter(Boolean),
         image_url: imageUrl,
         media_paths: allMediaPaths,
-        bid_duration_hours: Number(productForm.bid_duration_hours) || 168,
         base_price: Number(productForm.base_price),
         base_price_currency: productForm.base_price_currency,
-        minimum_quantity_kg: Number(productForm.minimum_quantity_kg),
         total_quantity_kg: Number(productForm.total_quantity_kg),
       };
+      if (productForm.minimum_quantity_kg !== '') {
+        payload.minimum_quantity_kg = Number(productForm.minimum_quantity_kg);
+      }
 
       if (editingProduct) {
         await axios.put(`${API_URL}/api/seller/products/${editingProduct.id}`, payload, authHeaders);
@@ -309,7 +310,7 @@ const SellerDashboard = () => {
       setProductListFilter('pending_approval');
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to save product');
+      toast.error(getErrorMessage(err, 'Failed to save product'));
     } finally {
       setSaving(false);
     }
@@ -330,7 +331,7 @@ const SellerDashboard = () => {
       toast.success(res.data.message);
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to extend timer');
+      toast.error(getErrorMessage(err, 'Failed to extend timer'));
     }
   };
 
@@ -345,7 +346,7 @@ const SellerDashboard = () => {
       setBidNotes(prev => { const n = {...prev}; delete n[bidId]; return n; });
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to update offer');
+      toast.error(getErrorMessage(err, 'Failed to update offer'));
     }
   };
 
@@ -532,7 +533,7 @@ const SellerDashboard = () => {
                       <p className="text-xs font-bold text-foreground uppercase tracking-wide">Pricing & Quantity</p>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-foreground mb-1">Base Price * <span className="text-muted-foreground font-normal">(per kg)</span></label>
+                          <label className="block text-xs font-medium text-foreground mb-1">Your price to us (per kg) *</label>
                           <input
                             type="number" min="0" step="0.01"
                             data-testid="seller-base-price"
@@ -541,7 +542,10 @@ const SellerDashboard = () => {
                             className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white ${productFormErrors.base_price ? 'border-red-400' : 'border-border'}`}
                             placeholder="e.g. 2400"
                           />
-                          {productFormErrors.base_price && <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.base_price}</p>}
+                          {productFormErrors.base_price
+                            ? <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.base_price}</p>
+                            : <p className="text-[10px] text-muted-foreground mt-1">Internal only — never shown to buyers</p>
+                          }
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-foreground mb-1">Currency *</label>
@@ -561,7 +565,7 @@ const SellerDashboard = () => {
                       {/* Total qty + Min qty side by side */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-foreground mb-1">Total Stock (kg) *</label>
+                          <label className="block text-xs font-medium text-foreground mb-1">Quantity available (kg) *</label>
                           <input
                             type="number" min="1" step="0.1"
                             data-testid="seller-total-qty"
@@ -572,49 +576,26 @@ const SellerDashboard = () => {
                           />
                           {productFormErrors.total_quantity_kg
                             ? <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.total_quantity_kg}</p>
-                            : <p className="text-[10px] text-muted-foreground mt-1">Total stock available for this listing</p>
+                            : <p className="text-[10px] text-muted-foreground mt-1">Internal only — never shown to buyers</p>
                           }
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-foreground mb-1">Min. Order (kg) *</label>
+                          <label className="block text-xs font-medium text-foreground mb-1">Min. Order (kg)</label>
                           <input
                             type="number" min="1" step="0.1"
                             data-testid="seller-min-qty"
                             value={productForm.minimum_quantity_kg}
                             onChange={e => { setProductForm({...productForm, minimum_quantity_kg: e.target.value}); if (productFormErrors.minimum_quantity_kg) setProductFormErrors(prev => ({...prev, minimum_quantity_kg: undefined})); }}
                             className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white ${productFormErrors.minimum_quantity_kg ? 'border-red-400' : 'border-border'}`}
-                            placeholder="e.g. 100"
+                            placeholder="Optional"
                           />
                           {productFormErrors.minimum_quantity_kg
                             ? <p className="flex items-center gap-1 text-xs text-red-600 mt-1"><XCircle size={11} />{productFormErrors.minimum_quantity_kg}</p>
-                            : <p className="text-[10px] text-muted-foreground mt-1">Minimum quantity per enquiry</p>
+                            : <p className="text-[10px] text-muted-foreground mt-1">Optional — leave blank to supply from 1kg</p>
                           }
                         </div>
                       </div>
                     </div>
-
-                    {/* Bid Duration */}
-                    {!editingProduct && (
-                      <div>
-                        <label className="block text-xs font-medium text-foreground mb-1">
-                          <Timer size={12} className="inline mr-1" />Enquiry Window *
-                        </label>
-                        <select
-                          value={productForm.bid_duration_hours}
-                          onChange={e => setProductForm({...productForm, bid_duration_hours: Number(e.target.value)})}
-                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
-                          data-testid="seller-bid-duration"
-                        >
-                          {[1, 2, 3, 5, 7, 10, 14, 21, 30].map(d => (
-                            <option key={d} value={d * 24}>{d} day{d > 1 ? 's' : ''}</option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Enquiries close {Math.round(productForm.bid_duration_hours / 24)} day{Math.round(productForm.bid_duration_hours / 24) > 1 ? 's' : ''} after submission.
-                          You can extend up to 2 times after expiry.
-                        </p>
-                      </div>
-                    )}
 
                     {/* Media Upload */}
                     <div>

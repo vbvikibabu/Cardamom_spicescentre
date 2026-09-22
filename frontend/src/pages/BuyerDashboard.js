@@ -5,6 +5,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { Gavel, ArrowRight, Home, ShoppingBag, User } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
+import { getErrorMessage } from '../lib/utils';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -58,7 +59,7 @@ const BuyerDashboard = () => {
       });
       toast.success('Seller access added! Please log out and back in to see your Seller dashboard.');
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to upgrade account');
+      toast.error(getErrorMessage(err, 'Failed to upgrade account'));
     } finally {
       setBecomingSellerLoading(false);
     }

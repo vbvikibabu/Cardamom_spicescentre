@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { getErrorMessage } from '../lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -50,7 +51,7 @@ const LoginModal = ({ open, onOpenChange }) => {
         navigate('/pending-approval');
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Login failed');
+      toast.error(getErrorMessage(error, 'Login failed'));
     } finally {
       setLoading(false);
     }

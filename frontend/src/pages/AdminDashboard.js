@@ -4,6 +4,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, Film, Gavel, ChevronDown, ChevronUp, Tag, Scale, Clock } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
+import { getErrorMessage } from '../lib/utils';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -32,7 +33,7 @@ const AdminDashboard = () => {
   // Product form state
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '' });
+  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '', base_price: '', minimum_quantity_kg: '1' });
   const [mediaFiles, setMediaFiles] = useState([]); // { file, preview, uploading, path, type }
   const [existingMedia, setExistingMedia] = useState([]); // paths from existing product
   const [saving, setSaving] = useState(false);
@@ -93,7 +94,9 @@ const AdminDashboard = () => {
         name: product.name,
         size: product.size,
         description: product.description,
-        features: product.features.join(', ')
+        features: product.features.join(', '),
+        base_price: product.base_price != null ? String(product.base_price) : '',
+        minimum_quantity_kg: product.minimum_quantity_kg != null ? String(product.minimum_quantity_kg) : '1',
       });
       setExistingMedia(product.media_paths || []);
       // If legacy product has image_url but no media_paths, show image_url
@@ -102,7 +105,7 @@ const AdminDashboard = () => {
       }
     } else {
       setEditingProduct(null);
-      setProductForm({ name: '', size: '', description: '', features: '' });
+      setProductForm({ name: '', size: '', description: '', features: '', base_price: '', minimum_quantity_kg: '1' });
       setExistingMedia([]);
     }
     setMediaFiles([]);
@@ -201,8 +204,12 @@ const AdminDashboard = () => {
         description: productForm.description,
         features: productForm.features.split(',').map(f => f.trim()).filter(Boolean),
         image_url: imageUrl,
-        media_paths: allMediaPaths
+        media_paths: allMediaPaths,
+        minimum_quantity_kg: productForm.minimum_quantity_kg !== '' ? Number(productForm.minimum_quantity_kg) : 1,
       };
+      if (productForm.base_price !== '') {
+        payload.base_price = Number(productForm.base_price);
+      }
 
       if (editingProduct) {
         await axios.put(`${API_URL}/api/admin/products/${editingProduct.id}`, payload, authHeaders);
@@ -214,7 +221,7 @@ const AdminDashboard = () => {
       setShowProductForm(false);
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to save product');
+      toast.error(getErrorMessage(err, 'Failed to save product'));
     } finally {
       setSaving(false);
     }
@@ -230,12 +237,6 @@ const AdminDashboard = () => {
   };
 
   // ─── Market Rate Actions ───
-  const getErrorMessage = (err, fallback) => {
-    const detail = err.response?.data?.detail;
-    if (Array.isArray(detail)) return detail.map(d => d.msg || JSON.stringify(d)).join('; ');
-    return detail || fallback;
-  };
-
   const rowFromExisting = (r) => ({
     id: r.id, auctioneer: r.auctioneer, lots: r.lots, qty_arrived_kg: r.qty_arrived_kg,
     qty_sold_kg: r.qty_sold_kg, max_price: r.max_price, min_price: r.min_price, avg_price: r.avg_price
@@ -826,6 +827,16 @@ const AdminDashboard = () => {
                     <div>
                       <label className="block text-xs font-medium text-foreground mb-1">Features (comma-separated) *</label>
                       <input type="text" required data-testid="product-features-input" value={productForm.features} onChange={e => setProductForm({...productForm, features: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="Clean pods, Good aroma, Export quality" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Internal reference price (not shown to buyers)</label>
+                        <input type="number" min="0" step="0.01" data-testid="product-base-price-input" value={productForm.base_price} onChange={e => setProductForm({...productForm, base_price: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="Optional, ₹/kg" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">Minimum order (kg)</label>
+                        <input type="number" min="0" step="0.01" data-testid="product-min-qty-input" value={productForm.minimum_quantity_kg} onChange={e => setProductForm({...productForm, minimum_quantity_kg: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="1" />
+                      </div>
                     </div>
 
                     {/* ─── Media Upload ─── */}
