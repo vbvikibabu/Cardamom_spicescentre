@@ -1,5 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -75,7 +76,8 @@ function App() {
           <Footer />
           <BottomNav />
         </BrowserRouter>
-        
+
+        <Analytics />
         <Toaster />
       </div>
     </AuthProvider>
