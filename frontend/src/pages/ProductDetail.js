@@ -20,6 +20,19 @@ const isVideoPath = (path) => {
   return lower.endsWith('.mp4') || lower.endsWith('.mov');
 };
 
+// Product names commonly end in a grade like "6-7mm" or "8mm & above" — the
+// dash/spaces inside that token are valid browser line-break points, which is
+// what causes a wrap like "Green Cardamom 6–" / "7mm". Keep just that trailing
+// token unbreakable instead of the whole title.
+const GRADE_SUFFIX_RE = /(\d+(?:\.\d+)?\s*[-–—]\s*\d+(?:\.\d+)?\s*mm|\d+(?:\.\d+)?\s*mm(?:\s*(?:&|and)\s*above)?)\s*$/i;
+
+const renderTitle = (name) => {
+  const match = (name || '').match(GRADE_SUFFIX_RE);
+  if (!match) return name;
+  const before = name.slice(0, match.index);
+  return <>{before}<span style={{ whiteSpace: 'nowrap' }}>{match[0]}</span></>;
+};
+
 const ProductDetail = () => {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
@@ -113,7 +126,7 @@ const ProductDetail = () => {
               <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Leaf size={14} /> Elettaria cardamomum</span>
             </div>
 
-            <h1 data-testid="product-detail-name" className="font-serif text-4xl sm:text-5xl font-bold text-foreground mb-6 leading-tight">{product.name}</h1>
+            <h1 data-testid="product-detail-name" className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-6 leading-tight">{renderTitle(product.name)}</h1>
 
             {/* Seller info box — the firm, not the listing seller; the actual seller stays admin-only */}
             <div data-testid="product-seller-box" className="flex items-start gap-3 p-4 border border-border rounded-xl mb-5 bg-muted/40">
@@ -124,7 +137,7 @@ const ProductDetail = () => {
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">Sold by</p>
                 <p className="text-sm font-bold text-foreground" data-testid="product-seller-name">Spice One Merchants</p>
                 <p className="text-[10px] text-green-600 font-semibold mt-1 flex items-center gap-1">
-                  <Check size={11} /> Verified Seller
+                  <Check size={11} /> GST Registered
                 </p>
               </div>
             </div>
