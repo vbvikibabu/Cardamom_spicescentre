@@ -496,44 +496,55 @@ export default function Home() {
       {/* ── SECTION 4: FREQUENTLY ASKED ──────────── */}
       <section className="max-w-7xl mx-auto px-4 md:px-8 py-8">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_SCHEMA) }} />
-        <h2 className="font-serif text-2xl text-[#1a3a1a] mb-6 text-center">Frequently Asked</h2>
-        <div className="max-w-3xl mx-auto space-y-8">
-          {FAQ_GROUPS.map(group => (
-            <div key={group.heading}>
-              <h3 className="text-xs font-bold uppercase tracking-wide text-[#2d5a27] mb-2">{group.heading}</h3>
-              <Accordion type="single" collapsible className="bg-white rounded-xl border border-gray-100 shadow-sm px-5">
-                {group.items.map((item, i) => (
-                  <AccordionItem key={i} value={`${group.heading}-${i}`} className="border-b border-gray-100 last:border-b-0">
-                    <AccordionTrigger className="text-[#1a3a1a] font-semibold hover:no-underline hover:text-[#2d5a27]">
-                      {item.q}
-                    </AccordionTrigger>
-                    <AccordionContent className="text-gray-500 text-sm leading-relaxed">
-                      {item.a}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
+        <div className="grid grid-cols-1 min-[900px]:grid-cols-3 gap-x-16 gap-y-10 items-start">
+          {/* Heading and CTA render as one sticky sidebar on desktop. Below 900px this
+              wrapper switches to display:contents, dissolving out of the layout so its
+              two children become direct grid items again and take their `order` position
+              around the accordion instead of staying glued together. */}
+          <div className="contents min-[900px]:block min-[900px]:sticky min-[900px]:top-32">
+            <div className="order-1 mb-8 min-[900px]:mb-10">
+              <h2 className="font-serif text-2xl text-[#1a3a1a] mb-2 text-center min-[900px]:text-left">Frequently Asked</h2>
+              <p className="text-gray-500 text-sm text-center min-[900px]:text-left">Everything buyers usually ask before ordering</p>
             </div>
-          ))}
+            <div className="order-3">
+              <p className="text-gray-600 mb-4 text-center min-[900px]:text-left">Still have a question?</p>
+              <div className="flex items-center justify-center min-[900px]:justify-start gap-3">
+                <Link
+                  to="/contact"
+                  className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#1a3a1a] transition-colors text-sm"
+                >
+                  Request a price
+                </Link>
+                <a
+                  href="https://wa.me/918838226519"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-[#2d5a27] text-[#2d5a27] px-6 py-3 rounded-xl font-bold hover:bg-[#2d5a27]/5 transition-colors text-sm"
+                >
+                  WhatsApp us
+                </a>
+              </div>
+            </div>
+          </div>
 
-          <div className="text-center pt-2">
-            <p className="text-gray-600 mb-4">Still have a question?</p>
-            <div className="flex items-center justify-center gap-3">
-              <Link
-                to="/contact"
-                className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#1a3a1a] transition-colors text-sm"
-              >
-                Request a price
-              </Link>
-              <a
-                href="https://wa.me/918838226519"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="border border-[#2d5a27] text-[#2d5a27] px-6 py-3 rounded-xl font-bold hover:bg-[#2d5a27]/5 transition-colors text-sm"
-              >
-                WhatsApp us
-              </a>
-            </div>
+          <div className="order-2 min-[900px]:col-span-2 space-y-8">
+            {FAQ_GROUPS.map(group => (
+              <div key={group.heading}>
+                <h3 className="text-xs font-bold uppercase tracking-wide text-[#2d5a27] mb-2">{group.heading}</h3>
+                <Accordion type="single" collapsible className="bg-white rounded-xl border border-gray-100 shadow-sm px-5">
+                  {group.items.map((item, i) => (
+                    <AccordionItem key={i} value={`${group.heading}-${i}`} className="border-b border-gray-100 last:border-b-0">
+                      <AccordionTrigger className="text-[#1a3a1a] font-semibold hover:no-underline hover:text-[#2d5a27]">
+                        {item.q}
+                      </AccordionTrigger>
+                      <AccordionContent className="text-gray-500 text-sm leading-relaxed">
+                        {item.a}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
+            ))}
           </div>
         </div>
       </section>
