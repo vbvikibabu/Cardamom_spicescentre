@@ -52,6 +52,7 @@ BID_TIMER_EXTENSION_HOURS = int(os.environ.get("BID_TIMER_EXTENSION_HOURS", "2")
 AUCTION_BID_WINDOW_SECONDS = int(os.environ.get("AUCTION_BID_WINDOW_SECONDS", "30"))
 MAX_TIMER_EXTENSIONS = int(os.environ.get("MAX_TIMER_EXTENSIONS", "2"))
 AUCTION_ENABLED = os.environ.get("AUCTION_ENABLED", "false").lower() == "true"
+LISTING_EXPIRY_ENABLED = os.environ.get("LISTING_EXPIRY_ENABLED", "false").lower() == "true"
 
 security = HTTPBearer(auto_error=False)
 
@@ -131,6 +132,15 @@ async def lifespan(app: FastAPI):
         {"listing_status": {"$exists": False}},
         {"$set": {"listing_status": "active", "bid_duration_hours": 168, "extension_count": 0, "total_bids_received": 0}}
     )
+
+    # Listing expiry is now off by default (see LISTING_EXPIRY_ENABLED) — un-expire
+    # anything the old timer flipped so those listings reappear in the catalogue.
+    reactivated = await db.products.update_many(
+        {"listing_status": "expired"},
+        {"$set": {"listing_status": "active"}}
+    )
+    if reactivated.modified_count > 0:
+        logger.info(f"Reactivated {reactivated.modified_count} expired listing(s) back to active")
 
     # Migrate old bids: rename customer_* to buyer_*
     old_bids = await db.bids.count_documents({"customer_id": {"$exists": True}, "buyer_id": {"$exists": False}})
@@ -282,9 +292,10 @@ async def background_timer_check():
     """Run every 60 s: expire overdue listings, archive sold listings, send 30-min warnings."""
     while True:
         try:
-            await _check_expired_products()
+            if LISTING_EXPIRY_ENABLED:
+                await _check_expired_products()
+                await _check_timer_warnings()
             await _archive_sold_products()
-            await _check_timer_warnings()
             if AUCTION_ENABLED:
                 await _check_auction_lots()
         except Exception as e:
@@ -903,9 +914,6 @@ async def _email_buyers_new_product(product: dict, buyer_emails: list) -> None:
     name = product.get("name", "New Cardamom Listing")
     size = product.get("size", "")
     seller_company = product.get("seller_company") or product.get("seller_name", "Verified Seller")
-    currency_sym = "$" if product.get("base_price_currency") == "USD" else "₹"
-    base_price = product.get("base_price")
-    price_str = f"{currency_sym}{base_price:,.2f}/kg" if base_price else "On request"
     total_qty = product.get("total_quantity_kg")
     qty_str = f"{total_qty:,.0f} kg" if total_qty else "On request"
     duration_hrs = product.get("bid_duration_hours", 168)
@@ -919,8 +927,7 @@ async def _email_buyers_new_product(product: dict, buyer_emails: list) -> None:
       <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;width:140px;">Product</td><td style="padding:8px 12px;background:#f8f8f4;">{name}</td></tr>
       <tr><td style="padding:8px 12px;font-weight:bold;">Grade / Size</td><td style="padding:8px 12px;">{size}</td></tr>
       <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;">Seller</td><td style="padding:8px 12px;background:#f8f8f4;">{seller_company}</td></tr>
-      <tr><td style="padding:8px 12px;font-weight:bold;">Base Price</td><td style="padding:8px 12px;">{price_str}</td></tr>
-      <tr><td style="padding:8px 12px;background:#f8f8f4;font-weight:bold;">Available Qty</td><td style="padding:8px 12px;background:#f8f8f4;">{qty_str}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:bold;">Available Qty</td><td style="padding:8px 12px;">{qty_str}</td></tr>
       <tr><td style="padding:8px 12px;font-weight:bold;">Bidding Window</td><td style="padding:8px 12px;">{duration_hrs} hour{"s" if duration_hrs != 1 else ""}</td></tr>
     </table>
     <p style="color:#c0392b;font-weight:bold;">&#9200; Bidding closes in {duration_hrs} hour{"s" if duration_hrs != 1 else ""}. Don't miss out!</p>

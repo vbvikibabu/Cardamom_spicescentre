@@ -162,8 +162,8 @@ const ProductDetail = () => {
               </div>
             )}
 
-            {/* Availability bar */}
-            {product.listing_status === 'active' && product.total_quantity_kg > 0 && (
+            {/* Availability bar — 'expired' is a leftover timer status, not a real closure, so it still counts as listed */}
+            {(product.listing_status === 'active' || product.listing_status === 'expired') && product.total_quantity_kg > 0 && (
               <AvailabilityBar total={product.total_quantity_kg} remaining={product.remaining_quantity_kg} />
             )}
 
@@ -199,9 +199,9 @@ const ProductDetail = () => {
               </ul>
             </div>
 
-            {/* CTA Buttons */}
+            {/* CTA Buttons — 'expired' is a leftover auction-timer status; listings no longer close on a timer */}
             <div className="mt-auto space-y-3">
-              {product.listing_status === 'active' ? (
+              {(product.listing_status === 'active' || product.listing_status === 'expired') ? (
                 (() => {
                   const isOwnProduct = isAuthenticated && user?.id === product.seller_id;
                   const isSellerOnly = isAuthenticated && user?.role === 'seller';
