@@ -515,6 +515,26 @@ export default function Home() {
               </Accordion>
             </div>
           ))}
+
+          <div className="text-center pt-2">
+            <p className="text-gray-600 mb-4">Still have a question?</p>
+            <div className="flex items-center justify-center gap-3">
+              <Link
+                to="/contact"
+                className="bg-[#2d5a27] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#1a3a1a] transition-colors text-sm"
+              >
+                Request a price
+              </Link>
+              <a
+                href="https://wa.me/918838226519"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border border-[#2d5a27] text-[#2d5a27] px-6 py-3 rounded-xl font-bold hover:bg-[#2d5a27]/5 transition-colors text-sm"
+              >
+                WhatsApp us
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
