@@ -9,7 +9,11 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
+      - name: Wake backend (Render free tier spins down when idle)
+        run: |
+          curl -sS --max-time 90 "${{ secrets.MARKET_RATES_BACKEND_URL }}/api/" || true
+
       - name: Trigger market rate scrape
         run: |
-          curl -sS --fail-with-body --max-time 30 -X POST "${{ secrets.MARKET_RATES_BACKEND_URL }}/api/admin/market-rates/scrape" \
+          curl -sS --fail-with-body --max-time 60 -X POST "${{ secrets.MARKET_RATES_BACKEND_URL }}/api/admin/market-rates/scrape" \
             -H "X-Scrape-Secret: ${{ secrets.MARKET_RATES_SCRAPE_SECRET }}"
