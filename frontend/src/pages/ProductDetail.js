@@ -57,8 +57,8 @@ const ProductDetail = () => {
   const { user, isAuthenticated } = useAuth();
 
   useDocumentHead({
-    title: product ? `${product.size} Green Cardamom — Bulk & Wholesale | Cardamom Spices Centre` : undefined,
-    description: product ? `Bulk ${product.size} green cardamom — wholesale supply. Request a price for your required quantity and delivery location.` : undefined,
+    title: product ? `${product.size} Bodi Green Cardamom — Wholesale | Cardamom Spices Centre` : undefined,
+    description: product ? `Bulk ${product.size} green cardamom from Bodinayakanur — wholesale supply. Request a price for your quantity and delivery location.` : undefined,
     path: `/products/${id}`,
   });
 

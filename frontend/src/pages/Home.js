@@ -144,13 +144,13 @@ const ORGANIZATION_SCHEMA = {
   url: 'https://cardamomspicescentre.com/',
   logo: 'https://cardamomspicescentre.com/logo/logo-full.png',
   telephone: '+91-8838226519',
-  areaServed: ['Madurai, Tamil Nadu', 'Thevaram, Tamil Nadu', 'Bodinayakanur, Tamil Nadu', 'Idukki, Kerala'],
+  areaServed: ['India', 'Kerala', 'Idukki', 'Theni', 'Bodinayakanur', 'Thevaram', 'Madurai'],
 };
 
 export default function Home() {
   useDocumentHead({
     title: 'Green Cardamom Wholesale Supplier, Madurai | Cardamom Spices Centre',
-    description: 'Bulk and wholesale green cardamom from Madurai, Tamil Nadu — grades 6mm to 8mm+ Bold. Share your requirement and get a price over WhatsApp.',
+    description: 'Wholesale green cardamom from Bodinayakanur, Theni and Idukki — graded 6-7mm to 8mm+, supplied across India. Request a quote.',
     path: '/',
   });
   const navigate = useNavigate();
