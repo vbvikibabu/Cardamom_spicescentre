@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight, Search, X, ArrowRight } from 'lucide-react';
 import axios from 'axios';
 import { getProductImage } from '../utils/imageHelper';
+import { useDocumentHead } from '@/hooks/useDocumentHead';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -66,6 +67,11 @@ const MediaGallery = ({ mediaPaths, imageUrl, name }) => {
 };
 
 const Products = () => {
+  useDocumentHead({
+    title: 'Green Cardamom Grades — Wholesale & Bulk Supply | Cardamom Spices Centre',
+    description: 'Browse green cardamom grades — 8mm+ Bold, 7-8mm, 6-7mm — for bulk and wholesale buyers. Share your requirement to get a price.',
+    path: '/products',
+  });
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');

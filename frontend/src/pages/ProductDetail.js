@@ -6,6 +6,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { track } from '@vercel/analytics';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentHead } from '@/hooks/useDocumentHead';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -55,6 +56,12 @@ const ProductDetail = () => {
   const [currentMedia, setCurrentMedia] = useState(0);
   const { user, isAuthenticated } = useAuth();
 
+  useDocumentHead({
+    title: product ? `${product.size} Green Cardamom — Bulk & Wholesale | Cardamom Spices Centre` : undefined,
+    description: product ? `Bulk ${product.size} green cardamom — wholesale supply. Request a price for your required quantity and delivery location.` : undefined,
+    path: `/products/${id}`,
+  });
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -88,8 +95,20 @@ const ProductDetail = () => {
 
   const mediaPaths = product.media_paths?.length > 0 ? product.media_paths : (product.image_url ? [product.image_url] : []);
 
+  // No offers/price — prices are never published, per CLAUDE.md.
+  const productSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description,
+    category: product.size,
+    image: mediaPaths.filter((p) => !isVideoPath(p)).map(getMediaUrl),
+    brand: { '@type': 'Brand', name: 'Cardamom Spices Centre' },
+  };
+
   return (
     <div data-testid="product-detail-page" className="min-h-screen pt-32 bg-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
       <div className="max-w-7xl mx-auto px-6 md:px-12 pt-8">
         <Link to="/products" data-testid="back-to-products" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
           <ArrowLeft size={16} /> Back to Products

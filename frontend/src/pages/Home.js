@@ -4,6 +4,7 @@ import axios from 'axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Search, MessageSquare, Handshake } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { useDocumentHead } from '@/hooks/useDocumentHead';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -131,7 +132,27 @@ const FAQ_SCHEMA = {
   ),
 };
 
+// Legal name, brand, logo and phone are as they appear in the site footer.
+// areaServed lists the sourcing/operating regions the business names
+// elsewhere on the site (footer + CLAUDE.md) — no registered office address
+// is published anywhere on the site, so none is claimed here.
+const ORGANIZATION_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Spice One Merchants',
+  alternateName: 'Cardamom Spices Centre',
+  url: 'https://cardamomspicescentre.com/',
+  logo: 'https://cardamomspicescentre.com/logo/logo-full.png',
+  telephone: '+91-8838226519',
+  areaServed: ['Madurai, Tamil Nadu', 'Thevaram, Tamil Nadu', 'Bodinayakanur, Tamil Nadu', 'Idukki, Kerala'],
+};
+
 export default function Home() {
+  useDocumentHead({
+    title: 'Green Cardamom Wholesale Supplier, Madurai | Cardamom Spices Centre',
+    description: 'Bulk and wholesale green cardamom from Madurai, Tamil Nadu — grades 6mm to 8mm+ Bold. Share your requirement and get a price over WhatsApp.',
+    path: '/',
+  });
   const navigate = useNavigate();
   const [products, setProducts]           = useState([]);
   const [marketRates, setMarketRates]     = useState({ auction_date: null, stale: false, rows: [] });
@@ -233,6 +254,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f5f0e8] pb-20 md:pb-0">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_SCHEMA) }} />
 
       {/* ── SECTION 1: HERO ─────────────────────── */}
       <section className="bg-[#f5f0e8] pt-44">

@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSearchParams } from 'react-router-dom';
+import { useDocumentHead } from '@/hooks/useDocumentHead';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -72,6 +73,11 @@ const gradeFromQuery = (raw) => {
 };
 
 const Contact = () => {
+  useDocumentHead({
+    title: 'Request a Quote for Green Cardamom | Cardamom Spices Centre',
+    description: 'Share your grade, quantity and delivery location to get a price for bulk green cardamom. No account needed — enquire in minutes.',
+    path: '/contact',
+  });
   const [searchParams] = useSearchParams();
   const initialGrade = gradeFromQuery(searchParams.get('grade')) || 'Not sure — advise me';
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
