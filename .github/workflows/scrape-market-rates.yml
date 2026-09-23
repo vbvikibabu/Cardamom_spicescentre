@@ -11,9 +11,22 @@ jobs:
     steps:
       - name: Wake backend (Render free tier spins down when idle)
         run: |
-          curl -sS --max-time 90 "${{ secrets.MARKET_RATES_BACKEND_URL }}/api/" || true
+          MAX_ATTEMPTS=8
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            status=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "${{ secrets.MARKET_RATES_BACKEND_URL }}/api/" || echo "000")
+            echo "Wake attempt $attempt/$MAX_ATTEMPTS: HTTP $status"
+            if [ "$status" = "200" ]; then
+              echo "Backend responded 200 — awake."
+              exit 0
+            fi
+            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+              sleep 15
+            fi
+          done
+          echo "::error::Backend never returned HTTP 200 after $MAX_ATTEMPTS attempts (~2 minutes) — cold start exceeded the wake window."
+          exit 1
 
       - name: Trigger market rate scrape
         run: |
-          curl -sS --fail-with-body --max-time 60 -X POST "${{ secrets.MARKET_RATES_BACKEND_URL }}/api/admin/market-rates/scrape" \
+          curl -sS --fail-with-body --max-time 120 -X POST "${{ secrets.MARKET_RATES_BACKEND_URL }}/api/admin/market-rates/scrape" \
             -H "X-Scrape-Secret: ${{ secrets.MARKET_RATES_SCRAPE_SECRET }}"
