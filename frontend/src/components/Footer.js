@@ -98,11 +98,16 @@ const Footer = () => {
         </div>
       </div>
 
-      {/* Legal identity strip — thin gold rule, then GSTIN/IEC/Udyam in small muted text */}
+      {/* Legal identity strip — thin gold rule, then GSTIN/IEC/Udyam in small muted text.
+          Bottom padding on mobile clears the fixed BottomNav (h-16 + safe-area-inset-bottom). */}
       <div className="border-t border-[var(--gold)]">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 py-4">
-          <p className="text-center text-[#f5f0e8]/50 text-xs">
-            GSTIN 33ASJPV7316H1ZG &middot; IEC ASJPV7316H &middot; Udyam UDYAM-TN-12-0191653
+        <div className="max-w-7xl mx-auto px-6 md:px-12 pt-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:py-4">
+          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[#f5f0e8]/50 text-xs">
+            <span className="whitespace-nowrap">GSTIN 33ASJPV7316H1ZG</span>
+            <span aria-hidden="true">&middot;</span>
+            <span className="whitespace-nowrap">IEC ASJPV7316H</span>
+            <span aria-hidden="true">&middot;</span>
+            <span className="whitespace-nowrap">Udyam UDYAM-TN-12-0191653</span>
           </p>
         </div>
       </div>
