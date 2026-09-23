@@ -61,7 +61,13 @@ const FAQ_GROUPS = [
       },
       {
         q: "Why aren't prices listed on the website?",
-        a: 'Cardamom prices move daily with the auctions. We quote based on the grade, quantity and the current market, so you always get a price that reflects today\'s rate.',
+        a: "Cardamom prices move daily with the auctions. We quote based on the grade, quantity and the current market, so you always get a price that reflects today's rate. You can follow the daily Spices Board auction rates here.",
+        renderAnswer: () => (
+          <>
+            Cardamom prices move daily with the auctions. We quote based on the grade, quantity and the current market, so you always get a price that reflects today's rate. You can follow the daily Spices Board{' '}
+            <Link to="/cardamom-auction-price" className="text-primary hover:underline">auction rates</Link> here.
+          </>
+        ),
       },
     ],
   },
@@ -70,7 +76,7 @@ const FAQ_GROUPS = [
     items: [
       {
         q: 'Where does your cardamom come from?',
-        a: "From the Cardamom Hills of Idukki, Kerala — India's main cardamom-growing region.",
+        a: "From the Cardamom Hills — the Bodinayakanur, Thevaram and Theni belt in Tamil Nadu and Idukki in Kerala, India's main cardamom-growing region.",
       },
       {
         q: "What's the difference between the grades?",
@@ -87,6 +93,20 @@ const FAQ_GROUPS = [
       {
         q: 'How should I store cardamom?',
         a: 'In an airtight container, somewhere cool and dry, away from sunlight. Whole pods keep their aroma far longer than ground cardamom.',
+      },
+      {
+        q: 'Where are cardamom auctions held?',
+        a: 'Small cardamom is auctioned through Spices Board e-auctions at Bodinayakanur in Tamil Nadu and Puttady in Kerala. We show the latest results with the actual auction date.',
+        renderAnswer: () => (
+          <>
+            Small cardamom is auctioned through Spices Board e-auctions at Bodinayakanur in Tamil Nadu and Puttady in Kerala. We show the{' '}
+            <Link to="/cardamom-auction-price" className="text-primary hover:underline">latest results</Link> with the actual auction date.
+          </>
+        ),
+      },
+      {
+        q: 'Does the auction price tell me the price of a grade?',
+        a: "Not on its own. Each auction mixes lots of different sizes, colour and quality, so the average doesn't match any single grade. Tell us the grade and quantity you need and we'll quote.",
       },
     ],
   },
@@ -349,7 +369,7 @@ export default function Home() {
                         {item.q}
                       </AccordionTrigger>
                       <AccordionContent className="text-gray-500 text-sm leading-relaxed">
-                        {item.a}
+                        {item.renderAnswer ? item.renderAnswer() : item.a}
                       </AccordionContent>
                     </AccordionItem>
                   ))}
