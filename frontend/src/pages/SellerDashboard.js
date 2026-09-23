@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Package, Gavel, Clock, CheckCircle, XCircle, Plus, Pencil, Trash2, X, Upload, Film, ShoppingCart, Timer, Archive, RotateCcw, AlertCircle, Loader2, ArrowRight, Home, ShoppingBag, User } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
 import { getErrorMessage } from '../lib/utils';
+import { useDocumentHead } from '@/hooks/useDocumentHead';
 
 const getGreeting = (firstName) => {
   const h = new Date().getHours();
@@ -67,6 +68,7 @@ const MiniCountdown = ({ endTime }) => {
 };
 
 const SellerDashboard = () => {
+  useDocumentHead({ robots: 'noindex' });
   const { user, token, isApproved } = useAuth();
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);

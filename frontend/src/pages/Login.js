@@ -11,6 +11,7 @@ import {
 } from '../components/ui/dialog';
 import { useState } from 'react';
 import { getErrorMessage } from '../lib/utils';
+import { useDocumentHead } from '@/hooks/useDocumentHead';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -27,6 +28,7 @@ const inputCls = (err) =>
   }`;
 
 const Login = () => {
+  useDocumentHead({ robots: 'noindex' });
   const [open, setOpen] = useState(true);
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Gavel, ArrowRight, Home, ShoppingBag, User } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
 import { getErrorMessage } from '../lib/utils';
+import { useDocumentHead } from '@/hooks/useDocumentHead';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -27,6 +28,7 @@ const statusBadge = (status) => {
 };
 
 const BuyerDashboard = () => {
+  useDocumentHead({ robots: 'noindex' });
   const { user, token, isApproved } = useAuth();
   const navigate = useNavigate();
   const [bids, setBids] = useState([]);

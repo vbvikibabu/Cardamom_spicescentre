@@ -26,10 +26,31 @@ const upsertCanonical = (href) => {
   el.setAttribute('href', href);
 };
 
-export const useDocumentHead = ({ title, description, path }) => {
+// This is an SPA — meta tags set via JS persist across client-side
+// navigation unless the next page explicitly changes them. A page that
+// doesn't pass `robots` must actively clear any noindex tag a previous
+// page left behind, not just skip setting one.
+const setRobots = (content) => {
+  const el = document.head.querySelector('meta[name="robots"]');
+  if (content) {
+    if (el) {
+      el.setAttribute('content', content);
+    } else {
+      const meta = document.createElement('meta');
+      meta.setAttribute('name', 'robots');
+      meta.setAttribute('content', content);
+      document.head.appendChild(meta);
+    }
+  } else if (el) {
+    el.remove();
+  }
+};
+
+export const useDocumentHead = ({ title, description, path, robots }) => {
   useEffect(() => {
     if (title) document.title = title;
     if (description) upsertMeta('description', description);
     if (path) upsertCanonical(`${CANONICAL_ORIGIN}${path}`);
-  }, [title, description, path]);
+    setRobots(robots);
+  }, [title, description, path, robots]);
 };

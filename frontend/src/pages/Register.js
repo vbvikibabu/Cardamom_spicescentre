@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { CheckCircle, XCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { getErrorMessage } from '../lib/utils';
+import { useDocumentHead } from '@/hooks/useDocumentHead';
 
 const phoneRegex = /^(\+\d{7,15}|[6-9]\d{9})$/;
 
@@ -67,6 +68,7 @@ const passwordStrength = (pw) => {
 };
 
 const Register = () => {
+  useDocumentHead({ robots: 'noindex' });
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const { register: authRegister, isAuthenticated } = useAuth();
@@ -110,7 +112,7 @@ const Register = () => {
     <div data-testid="register-page" className="min-h-screen flex items-center justify-center bg-muted pt-32 px-4 py-12">
       <div className="max-w-2xl w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg">
         <div className="text-center">
-          <h2 className="font-serif text-4xl font-bold text-foreground mb-2">Create B2B Account</h2>
+          <h2 className="font-serif text-4xl font-bold text-foreground mb-2">Create an Account</h2>
           <p className="text-muted-foreground">Register for wholesale cardamom trading</p>
         </div>
 

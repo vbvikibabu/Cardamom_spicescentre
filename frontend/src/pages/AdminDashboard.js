@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, Film, Gavel, ChevronDown, ChevronUp, Tag, Scale, Clock } from 'lucide-react';
 import { getProductImage } from '../utils/imageHelper';
 import { getErrorMessage } from '../lib/utils';
+import { useDocumentHead } from '@/hooks/useDocumentHead';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -20,6 +21,7 @@ const KNOWN_AUCTIONEERS = [
 const BLANK_MARKET_RATE_ROW = { id: null, auctioneer: '', lots: '', qty_arrived_kg: '', qty_sold_kg: '', max_price: '', min_price: '', avg_price: '' };
 
 const AdminDashboard = () => {
+  useDocumentHead({ robots: 'noindex' });
   const { user, token } = useAuth();
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);

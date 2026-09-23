@@ -1,0 +1,6 @@
+{
+  "redirects": [
+    { "source": "/auctions", "destination": "/cardamom-auction-price", "statusCode": 301 },
+    { "source": "/auctions/:path*", "destination": "/cardamom-auction-price", "statusCode": 301 }
+  ]
+}
