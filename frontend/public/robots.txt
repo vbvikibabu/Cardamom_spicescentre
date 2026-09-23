@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /seller
+Disallow: /login
+Disallow: /register
+Disallow: /pending-approval
+Disallow: /api/
+
+Sitemap: https://cardamomspicescentre.com/sitemap.xml
