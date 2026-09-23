@@ -4,10 +4,25 @@ import { motion } from 'framer-motion';
 import { Leaf, ArrowLeft, ChevronLeft, ChevronRight, Film, Check, BadgeCheck } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { track } from '@vercel/analytics';
 import { useAuth } from '../context/AuthContext';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// No seller-level phone/WhatsApp field exists on ProductPublic — every enquiry
+// routes through the one business number until per-seller contact is built.
+const BUSINESS_WHATSAPP_NUMBER = '918838226519';
+
+const buildWhatsAppEnquiryUrl = (product) => {
+  const message = [
+    `Hi, I'm interested in ${product.name} — ${product.size}.`,
+    `Page: ${window.location.href}`,
+    `Quantity needed:`,
+    `Delivery location:`,
+  ].join('\n');
+  return `https://wa.me/${BUSINESS_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+};
 
 const getMediaUrl = (path) => {
   if (!path) return '';
@@ -188,13 +203,26 @@ const ProductDetail = () => {
                   }
                   return (
                     <>
-                      <Link
-                        to={`/contact?grade=${encodeURIComponent(product.size || '')}`}
-                        data-testid="product-detail-place-bid"
-                        className="w-full inline-flex items-center justify-center gap-3 bg-foreground text-white py-4 rounded-xl font-semibold text-base hover:bg-foreground/90 transition-colors"
-                      >
-                        Request a Price
-                      </Link>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <Link
+                          to={`/contact?grade=${encodeURIComponent(product.size || '')}`}
+                          data-testid="product-detail-place-bid"
+                          className="flex-1 inline-flex items-center justify-center gap-3 bg-foreground text-white py-4 rounded-xl font-semibold text-base hover:bg-foreground/90 transition-colors"
+                        >
+                          Request a Price
+                        </Link>
+                        <a
+                          href={buildWhatsAppEnquiryUrl(product)}
+                          onClick={() => track('whatsapp_enquiry', { product: product.name, grade: product.size })}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-testid="product-detail-whatsapp-enquiry"
+                          className="flex-1 inline-flex items-center justify-center gap-2 bg-[#25D366] text-white py-4 rounded-xl font-semibold text-base hover:bg-[#1ebe57] transition-colors"
+                        >
+                          <i className="fab fa-whatsapp text-lg" aria-hidden="true"></i>
+                          Enquire on WhatsApp
+                        </a>
+                      </div>
                       <p className="text-xs text-center text-muted-foreground">Enquiries are reviewed by the seller. You will be notified of the outcome.</p>
                     </>
                   );
