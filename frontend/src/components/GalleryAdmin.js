@@ -10,7 +10,8 @@ const ACCEPT_STRING = '.jpg,.jpeg,.png,.webp,.mp4,.mov';
 const INPUT = 'w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white';
 const ICON_BTN = 'w-9 h-9 inline-flex items-center justify-center rounded-lg border border-border bg-white text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed';
 
-const BLANK_FORM = { file: null, category: 'sourcing', caption: '', alt_text: '', featured: false };
+const MAX_BATCH = 10;
+const BLANK_FORM = { files: [], category: 'sourcing', caption: '', alt_text: '', featured: false };
 
 const GalleryAdmin = ({ token }) => {
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
@@ -18,6 +19,7 @@ const GalleryAdmin = ({ token }) => {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(BLANK_FORM);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState('');
   const [editing, setEditing] = useState(null); // { id, category, caption, alt_text }
 
   const load = async () => {
@@ -33,36 +35,56 @@ const GalleryAdmin = ({ token }) => {
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isVideoFile = form.file && form.file.type.startsWith('video/');
+  const multiple = form.files.length > 1;
+  const isVideoFile = form.files.length === 1 && form.files[0].type.startsWith('video/');
 
   const onFileChange = (e) => {
-    const file = e.target.files[0] || null;
-    setForm((f) => ({ ...f, file, featured: file && file.type.startsWith('video/') ? false : f.featured }));
+    let files = Array.from(e.target.files || []);
+    if (files.length > MAX_BATCH) {
+      toast.error(`Up to ${MAX_BATCH} files at a time — using the first ${MAX_BATCH}.`);
+      files = files.slice(0, MAX_BATCH);
+    }
+    // Caption, alt text and featured only make sense for a single file.
+    setForm((f) => ({
+      ...f,
+      files,
+      ...(files.length > 1 ? { caption: '', alt_text: '', featured: false } : {}),
+      ...(files.length === 1 && files[0].type.startsWith('video/') ? { featured: false } : {}),
+    }));
   };
 
   const upload = async (e) => {
     e.preventDefault();
-    if (!form.file) { toast.error('Choose a photo or video first.'); return; }
-    const body = new FormData();
-    body.append('file', form.file);
-    body.append('category', form.category);
-    body.append('caption', form.caption);
-    body.append('alt_text', form.alt_text);
-    body.append('featured', form.featured && !isVideoFile ? 'true' : 'false');
+    const formEl = e.target;
+    if (form.files.length === 0) { toast.error('Choose at least one photo or video.'); return; }
     setUploading(true);
-    try {
-      await axios.post(`${API_URL}/api/admin/gallery`, body, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
-      });
-      toast.success('Added to gallery');
-      setForm({ ...BLANK_FORM, category: form.category });
-      e.target.reset();
-      await load();
-    } catch (err) {
-      toast.error(getErrorMessage(err, 'Upload failed'));
-    } finally {
-      setUploading(false);
+    let done = 0;
+    const failed = [];
+    for (const file of form.files) {
+      setProgress(`Uploading ${done + failed.length + 1} of ${form.files.length}…`);
+      const body = new FormData();
+      body.append('file', file);
+      body.append('category', form.category);
+      body.append('caption', multiple ? '' : form.caption);
+      body.append('alt_text', multiple ? '' : form.alt_text);
+      body.append('featured', !multiple && form.featured && !isVideoFile ? 'true' : 'false');
+      try {
+        await axios.post(`${API_URL}/api/admin/gallery`, body, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+        });
+        done += 1;
+      } catch (err) {
+        failed.push(`${file.name}: ${getErrorMessage(err, 'failed')}`);
+      }
     }
+    setUploading(false);
+    setProgress('');
+    if (done) toast.success(`${done} added to gallery${multiple ? ' — use Edit to add captions' : ''}`);
+    failed.forEach((m) => toast.error(m));
+    // Reset even after a partial failure so a retry doesn't re-upload the files that succeeded.
+    setForm({ ...BLANK_FORM, category: form.category });
+    formEl.reset();
+    await load();
   };
 
   const call = async (fn, okMsg) => {
@@ -114,8 +136,8 @@ const GalleryAdmin = ({ token }) => {
         <h3 className="font-semibold text-foreground">Add photo or video</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-foreground mb-1">File * (JPG, PNG, WEBP, MP4, MOV — max 50MB)</label>
-            <input type="file" accept={ACCEPT_STRING} onChange={onFileChange} className={INPUT} data-testid="gallery-file-input" />
+            <label className="block text-xs font-medium text-foreground mb-1">Files * (JPG, PNG, WEBP, MP4, MOV — max 50MB each, up to 10 at a time)</label>
+            <input type="file" multiple accept={ACCEPT_STRING} onChange={onFileChange} className={INPUT} data-testid="gallery-file-input" />
           </div>
           <div>
             <label className="block text-xs font-medium text-foreground mb-1">Category *</label>
@@ -123,6 +145,12 @@ const GalleryAdmin = ({ token }) => {
               {GALLERY_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
             </select>
           </div>
+          {multiple && (
+            <p className="md:col-span-2 text-xs text-muted-foreground">
+              {form.files.length} files selected. They all go into the same category; add captions and alt text afterwards with the Edit button.
+            </p>
+          )}
+          {!multiple && (<>
           <div>
             <label className="block text-xs font-medium text-foreground mb-1">Caption</label>
             <input type="text" value={form.caption} onChange={(e) => setForm({ ...form, caption: e.target.value })} className={INPUT} data-testid="gallery-caption-input" />
@@ -134,18 +162,19 @@ const GalleryAdmin = ({ token }) => {
               Alt text is used by Google Images and screen readers. If left blank, the caption is used instead.
             </p>
           </div>
+          </>)}
         </div>
         <label className={`flex items-center gap-2 text-sm ${isVideoFile ? 'text-muted-foreground' : 'text-foreground'}`}>
           <input
             type="checkbox"
-            checked={form.featured && !isVideoFile}
-            disabled={isVideoFile}
+            checked={form.featured && !isVideoFile && !multiple}
+            disabled={isVideoFile || multiple}
             onChange={(e) => setForm({ ...form, featured: e.target.checked })}
           />
-          Feature this photo in the home page strip {isVideoFile && '(photos only)'}
+          Feature this photo in the home page strip {isVideoFile && '(photos only)'}{multiple && '(single uploads only — use the star afterwards)'}
         </label>
         <button type="submit" disabled={uploading} className="inline-flex items-center justify-center gap-2 bg-primary text-white px-5 py-3 rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-60 w-full md:w-auto">
-          <Upload size={16} /> {uploading ? 'Uploading…' : 'Upload'}
+          <Upload size={16} /> {uploading ? progress : (form.files.length > 1 ? `Upload ${form.files.length} files` : 'Upload')}
         </button>
       </form>
 
