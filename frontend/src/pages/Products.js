@@ -288,10 +288,14 @@ const Products = () => {
                           ) : product.listing_status === 'expired' ? (
                             <span className="text-orange-600 text-[11px] md:text-sm font-semibold">Enquiries Closed</span>
                           ) : (
-                            <span className="w-full h-8 md:h-auto bg-primary/10 md:bg-transparent text-primary text-[11px] md:text-sm font-semibold rounded-lg flex items-center justify-center md:justify-start gap-1 md:hover:underline">
-                              Enquire <ArrowRight size={11} className="md:hidden" />
-                              <span className="hidden md:inline">→ View Details & Request Price</span>
-                            </span>
+                            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                              <span className="whitespace-nowrap text-primary text-[11px] md:text-sm font-semibold inline-flex items-center gap-1 hover:underline">
+                                View details <ArrowRight size={12} />
+                              </span>
+                              <span className="ml-auto whitespace-nowrap text-muted-foreground text-[11px] md:text-sm hover:text-primary hover:underline">
+                                Enquire
+                              </span>
+                            </div>
                           )}
                         </div>
                       </div>
