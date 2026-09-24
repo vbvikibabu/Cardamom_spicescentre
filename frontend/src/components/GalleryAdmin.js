@@ -44,11 +44,11 @@ const GalleryAdmin = ({ token }) => {
       toast.error(`Up to ${MAX_BATCH} files at a time — using the first ${MAX_BATCH}.`);
       files = files.slice(0, MAX_BATCH);
     }
-    // Caption, alt text and featured only make sense for a single file.
+    // Featured only makes sense for a single photo; caption and alt text apply to every file.
     setForm((f) => ({
       ...f,
       files,
-      ...(files.length > 1 ? { caption: '', alt_text: '', featured: false } : {}),
+      ...(files.length > 1 ? { featured: false } : {}),
       ...(files.length === 1 && files[0].type.startsWith('video/') ? { featured: false } : {}),
     }));
   };
@@ -65,8 +65,8 @@ const GalleryAdmin = ({ token }) => {
       const body = new FormData();
       body.append('file', file);
       body.append('category', form.category);
-      body.append('caption', multiple ? '' : form.caption);
-      body.append('alt_text', multiple ? '' : form.alt_text);
+      body.append('caption', form.caption);
+      body.append('alt_text', form.alt_text);
       body.append('featured', !multiple && form.featured && !isVideoFile ? 'true' : 'false');
       try {
         await axios.post(`${API_URL}/api/admin/gallery`, body, {
@@ -79,7 +79,7 @@ const GalleryAdmin = ({ token }) => {
     }
     setUploading(false);
     setProgress('');
-    if (done) toast.success(`${done} added to gallery${multiple ? ' — use Edit to add captions' : ''}`);
+    if (done) toast.success(`${done} added to gallery`);
     failed.forEach((m) => toast.error(m));
     // Reset even after a partial failure so a retry doesn't re-upload the files that succeeded.
     setForm({ ...BLANK_FORM, category: form.category });
@@ -147,10 +147,9 @@ const GalleryAdmin = ({ token }) => {
           </div>
           {multiple && (
             <p className="md:col-span-2 text-xs text-muted-foreground">
-              {form.files.length} files selected. They all go into the same category; add captions and alt text afterwards with the Edit button.
+              {form.files.length} files selected. They all go into the same category and share the caption and alt text below. Use Edit on a tile to give one its own.
             </p>
           )}
-          {!multiple && (<>
           <div>
             <label className="block text-xs font-medium text-foreground mb-1">Caption</label>
             <input type="text" value={form.caption} onChange={(e) => setForm({ ...form, caption: e.target.value })} className={INPUT} data-testid="gallery-caption-input" />
@@ -162,7 +161,6 @@ const GalleryAdmin = ({ token }) => {
               Alt text is used by Google Images and screen readers. If left blank, the caption is used instead.
             </p>
           </div>
-          </>)}
         </div>
         <label className={`flex items-center gap-2 text-sm ${isVideoFile ? 'text-muted-foreground' : 'text-foreground'}`}>
           <input
