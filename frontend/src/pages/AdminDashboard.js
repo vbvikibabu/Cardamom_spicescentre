@@ -6,6 +6,7 @@ import { User, CheckCircle, XCircle, Package, Plus, Pencil, Trash2, X, Upload, F
 import { getProductImage } from '../utils/imageHelper';
 import { getErrorMessage } from '../lib/utils';
 import { useDocumentHead } from '@/hooks/useDocumentHead';
+import GalleryAdmin from '../components/GalleryAdmin';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -370,6 +371,7 @@ const AdminDashboard = () => {
     { key: 'bids', label: 'Offers' },
     { key: 'products', label: 'Products' },
     { key: 'market-rates', label: 'Market Rates' },
+    { key: 'gallery', label: 'Gallery' },
   ];
 
   return (
@@ -1020,6 +1022,9 @@ const AdminDashboard = () => {
                 </div>
               </div>
             )}
+
+            {/* ═══ GALLERY TAB ═══ */}
+            {activeTab === 'gallery' && <GalleryAdmin token={token} />}
 
             {/* ═══ MARKET RATES TAB ═══ */}
             {activeTab === 'market-rates' && (

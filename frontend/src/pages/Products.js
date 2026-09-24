@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, Package, TrendingUp, Award, ChevronLeft, ChevronRight, Search, X, ArrowRight } from 'lucide-react';
+import { Package, ChevronLeft, ChevronRight, Search, X, ArrowRight } from 'lucide-react';
 import axios from 'axios';
 import { getProductImage } from '../utils/imageHelper';
 import { useDocumentHead } from '@/hooks/useDocumentHead';
+import ProcessStrip from '@/components/ProcessStrip';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -308,38 +309,8 @@ const Products = () => {
         </div>
       </section>
 
-      {/* Why Choose Section */}
-      <section className="py-24 bg-muted" data-testid="why-choose-section">
-        <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="text-center mb-16">
-            <h2 className="font-serif text-4xl md:text-6xl tracking-tight mb-6 text-foreground">Why Choose Our Cardamom?</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {[
-              { icon: Award, title: 'Premium Quality', description: 'Hand-selected from the finest plantations' },
-              { icon: Package, title: 'Export Ready', description: 'Meeting international packaging standards' },
-              { icon: TrendingUp, title: 'Consistent Supply', description: 'Reliable year-round availability' },
-              { icon: Leaf, title: 'Sustainable', description: 'Environmentally conscious cultivation' }
-            ].map((item, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                data-testid={`why-choose-${index}`}
-                className="text-center"
-              >
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary mb-4">
-                  <item.icon size={28} />
-                </div>
-                <h3 className="font-serif text-xl font-semibold mb-2 text-foreground">{item.title}</h3>
-                <p className="text-muted-foreground text-sm">{item.description}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Process strip — featured gallery photos, managed from Admin → Gallery */}
+      <ProcessStrip className="bg-muted" />
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { Search, MessageSquare, Handshake } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { useDocumentHead } from '@/hooks/useDocumentHead';
 import MarketRatesPanel from '@/components/MarketRatesPanel';
+import ProcessStrip from '@/components/ProcessStrip';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -298,6 +299,9 @@ export default function Home() {
 
       {/* ── SECTION: AUCTION MARKET RATES ────────── */}
       <MarketRatesPanel linkToFullPage />
+
+      {/* ── SECTION: FROM SOURCE TO DISPATCH ─────── */}
+      <ProcessStrip />
 
       {/* ── SECTION 3: HOW IT WORKS ──────────────── */}
       <section className="max-w-7xl mx-auto px-4 md:px-8 py-8">
