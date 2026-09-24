@@ -58,7 +58,7 @@ const Footer = () => {
               </h4>
               <ul className="space-y-1 text-[#f5f0e8]/70 text-sm">
                 <li><MapPin size={14} className="inline mr-2" />Thevaram, Tamil Nadu</li>
-                <li><MapPin size={14} className="inline mr-2" />Nedumkandam, Kerala</li>
+                <li><MapPin size={14} className="inline mr-2" />Idukki, Kerala</li>
               </ul>
             </div>
           </div>
