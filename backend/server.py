@@ -24,6 +24,7 @@ import cloudinary.uploader
 from pywebpush import webpush, WebPushException
 import json
 import asyncio
+import unicodedata
 from market_rate_scraper import fetch_auction_page_html, parse_auction_rows
 
 # Configure logging early
@@ -184,6 +185,7 @@ async def lifespan(app: FastAPI):
         await db.users.create_index("phone", unique=True, sparse=True)
         await db.products.create_index("seller_id")
         await db.products.create_index("listing_status")
+        await db.products.create_index("slug", unique=True, partialFilterExpression={"slug": {"$type": "string"}})
         await db.bids.create_index("product_id")
         await db.bids.create_index("buyer_id")
         await db.bids.create_index([("guest_ip", 1), ("created_at", -1)])
@@ -918,7 +920,7 @@ async def _email_buyers_new_product(product: dict, buyer_emails: list) -> None:
     qty_str = f"{total_qty:,.0f} kg" if total_qty else "On request"
     duration_hrs = product.get("bid_duration_hours", 168)
     product_id = product.get("id", "")
-    product_link = f"https://cardamomspicescentre.com/products/{product_id}"
+    product_link = f"https://cardamomspicescentre.com/products/{product.get('slug') or product_id}"
 
     body = f"""
     <h2 style="color:#2d5a27;margin-top:0;">&#127807; New Cardamom Listing — Act Fast!</h2>
@@ -953,10 +955,25 @@ async def _email_buyers_new_product(product: dict, buyer_emails: list) -> None:
 
 # ==================== MODELS ====================
 
+def slugify(text: str) -> str:
+    text = re.sub(r"[–—]", "-", text or "")
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+
+
+async def _unique_slug(base: str, exclude_id: Optional[str] = None) -> str:
+    base = slugify(base) or "product"
+    slug, n = base, 2
+    while await db.products.find_one({"slug": slug, "id": {"$ne": exclude_id}}, {"_id": 1}):
+        slug, n = f"{base}-{n}", n + 1
+    return slug
+
+
 class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    slug: str = ""
     size: str
     description: str
     features: List[str]
@@ -988,6 +1005,7 @@ class Product(BaseModel):
 
 class ProductCreate(BaseModel):
     name: str
+    slug: Optional[str] = None  # blank -> generated from name
     size: str
     description: str
     features: List[str]
@@ -1003,6 +1021,7 @@ class ProductCreate(BaseModel):
 class ProductPublic(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
+    slug: str = ""
     name: str
     size: str
     description: str
@@ -1445,6 +1464,7 @@ async def create_product_admin(
     raw = product_data.model_dump()
     duration_hrs = raw.pop("bid_duration_hours", 168)
     total_qty = raw.get("total_quantity_kg")
+    raw["slug"] = await _unique_slug(raw.get("slug") or raw["name"])
     now = datetime.now(timezone.utc)
     product = Product(
         **raw,
@@ -1472,9 +1492,17 @@ async def update_product_admin(
     product_data: ProductCreate,
     current_admin: User = Depends(get_current_admin)
 ):
+    update = product_data.model_dump()
+    if update.get("slug"):
+        wanted = slugify(update["slug"])
+        update["slug"] = await _unique_slug(wanted, exclude_id=product_id)
+        if update["slug"] != wanted:
+            raise HTTPException(status_code=409, detail=f"Slug '{wanted}' is already in use")
+    else:
+        update.pop("slug", None)
     result = await db.products.update_one(
         {"id": product_id},
-        {"$set": product_data.model_dump()}
+        {"$set": update}
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -1484,6 +1512,26 @@ async def update_product_admin(
         updated['created_at'] = datetime.fromisoformat(updated['created_at'])
     logger.info(f"Admin updated product: {product_id}")
     return Product(**updated)
+
+# Admin: assign slugs to products that lack one. Dry run by default — nothing is written
+# unless dry_run=false. Idempotent: products that already have a slug are skipped.
+@api_router.post("/admin/products/backfill-slugs")
+async def backfill_product_slugs(
+    dry_run: bool = Query(True),
+    current_admin: User = Depends(get_current_admin)
+):
+    missing = await db.products.find(
+        {"$or": [{"slug": {"$exists": False}}, {"slug": None}, {"slug": ""}]},
+        {"_id": 0, "id": 1, "name": 1}
+    ).sort("created_at", 1).to_list(2000)
+    plan = []
+    for p in missing:
+        slug = await _unique_slug(p["name"], exclude_id=p["id"])
+        plan.append({"id": p["id"], "name": p["name"], "slug": slug})
+        if not dry_run:
+            await db.products.update_one({"id": p["id"]}, {"$set": {"slug": slug}})
+    logger.info(f"Slug backfill (dry_run={dry_run}): {len(plan)} products")
+    return {"dry_run": dry_run, "count": len(plan), "products": plan}
 
 @api_router.delete("/admin/products/{product_id}")
 async def delete_product_admin(
@@ -1881,6 +1929,7 @@ async def create_product_seller(
     raw = product_data.model_dump()
     duration_hrs = raw.pop("bid_duration_hours", 168)
     total_qty = raw.get("total_quantity_kg")
+    raw["slug"] = await _unique_slug(raw.get("slug") or raw["name"])
     product = Product(
         **raw,
         seller_id=current_user.id,
@@ -1922,9 +1971,11 @@ async def update_product_seller(
     if not existing:
         raise HTTPException(status_code=404, detail="Product not found or not yours")
 
+    update = product_data.model_dump()
+    update.pop("slug", None)  # sellers can't change slugs; URLs stay stable
     await db.products.update_one(
         {"id": product_id, "seller_id": current_user.id},
-        {"$set": {**product_data.model_dump(), "approval_status": "pending"}}
+        {"$set": {**update, "approval_status": "pending"}}
     )
 
     updated = await db.products.find_one({"id": product_id}, {"_id": 0})
@@ -2158,6 +2209,15 @@ async def get_products():
         _coerce_product_datetimes(p)
         await _enrich_seller_company(p)
     return [ProductPublic(**p).model_dump() for p in products]
+
+@api_router.get("/products/by-slug/{slug}", response_model=ProductPublic)
+async def get_product_by_slug(slug: str):
+    product = await db.products.find_one({"slug": slug, "approval_status": "approved"}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    _coerce_product_datetimes(product)
+    await _enrich_seller_company(product)
+    return ProductPublic(**product)
 
 @api_router.get("/products/{product_id}", response_model=ProductPublic)
 async def get_product(product_id: str):
