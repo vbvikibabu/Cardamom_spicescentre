@@ -35,7 +35,7 @@ const AdminDashboard = () => {
   // Product form state
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [productForm, setProductForm] = useState({ name: '', size: '', description: '', features: '', base_price: '', minimum_quantity_kg: '1' });
+  const [productForm, setProductForm] = useState({ name: '', slug: '', size: '', description: '', features: '', base_price: '', minimum_quantity_kg: '1' });
   const [mediaFiles, setMediaFiles] = useState([]); // { file, preview, uploading, path, type }
   const [existingMedia, setExistingMedia] = useState([]); // paths from existing product
   const [saving, setSaving] = useState(false);
@@ -94,6 +94,7 @@ const AdminDashboard = () => {
       setEditingProduct(product);
       setProductForm({
         name: product.name,
+        slug: product.slug || '',
         size: product.size,
         description: product.description,
         features: product.features.join(', '),
@@ -107,7 +108,7 @@ const AdminDashboard = () => {
       }
     } else {
       setEditingProduct(null);
-      setProductForm({ name: '', size: '', description: '', features: '', base_price: '', minimum_quantity_kg: '1' });
+      setProductForm({ name: '', slug: '', size: '', description: '', features: '', base_price: '', minimum_quantity_kg: '1' });
       setExistingMedia([]);
     }
     setMediaFiles([]);
@@ -202,6 +203,7 @@ const AdminDashboard = () => {
 
       const payload = {
         name: productForm.name,
+        slug: productForm.slug.trim() || null,
         size: productForm.size,
         description: productForm.description,
         features: productForm.features.split(',').map(f => f.trim()).filter(Boolean),
@@ -820,6 +822,11 @@ const AdminDashboard = () => {
                       <div>
                         <label className="block text-xs font-medium text-foreground mb-1">Size / Grade *</label>
                         <input type="text" required data-testid="product-size-input" value={productForm.size} onChange={e => setProductForm({...productForm, size: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="6 mm to 7 mm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground mb-1">URL Slug</label>
+                        <input type="text" data-testid="product-slug-input" value={productForm.slug} onChange={e => setProductForm({...productForm, slug: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" placeholder="Auto-generated from name if blank" />
+                        <p className="text-[11px] text-muted-foreground mt-1">Page URL: /products/{productForm.slug || 'auto-from-name'}</p>
                       </div>
                     </div>
                     <div>

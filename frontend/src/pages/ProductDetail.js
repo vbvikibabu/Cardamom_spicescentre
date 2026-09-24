@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Leaf, ArrowLeft, ChevronLeft, ChevronRight, Film, Check, BadgeCheck } from 'lucide-react';
 import axios from 'axios';
@@ -50,7 +50,8 @@ const renderTitle = (name) => {
 };
 
 const ProductDetail = () => {
-  const { id } = useParams();
+  const { slug: param } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentMedia, setCurrentMedia] = useState(0);
@@ -59,13 +60,24 @@ const ProductDetail = () => {
   useDocumentHead({
     title: product ? `${product.size} Bodi Green Cardamom — Wholesale | Cardamom Spices Centre` : undefined,
     description: product ? `Bulk ${product.size} green cardamom from Bodinayakanur — wholesale supply. Request a price for your quantity and delivery location.` : undefined,
-    path: `/products/${id}`,
+    // Canonical always points at the slug URL, even when reached via a legacy /products/<uuid> link.
+    path: product ? `/products/${product.slug || param}` : undefined,
   });
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const res = await axios.get(`${API}/products/${id}`);
+        let res;
+        try {
+          res = await axios.get(`${API}/products/by-slug/${param}`);
+        } catch (err) {
+          if (err.response?.status !== 404) throw err;
+          // Legacy /products/<uuid> link — look up by id, then swap in the slug URL.
+          res = await axios.get(`${API}/products/${param}`);
+          if (res.data.slug && res.data.slug !== param) {
+            navigate(`/products/${res.data.slug}`, { replace: true });
+          }
+        }
         setProduct(res.data);
       } catch {
         toast.error('Product not found');
@@ -74,7 +86,7 @@ const ProductDetail = () => {
       }
     };
     fetchProduct();
-  }, [id]);
+  }, [param, navigate]);
 
   if (loading) {
     return (

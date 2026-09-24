@@ -235,7 +235,7 @@ const Products = () => {
                     data-testid={`product-card-${index}`}
                     className="product-card bg-white rounded-xl overflow-hidden border border-primary/10 hover:border-primary/30 transition-colors"
                   >
-                    <Link to={`/products/${product.id}`} className="block cursor-pointer">
+                    <Link to={`/products/${product.slug || product.id}`} className="block cursor-pointer">
                       {/* ── Image ── */}
                       <div className="relative overflow-hidden">
                         {imgSrc ? (

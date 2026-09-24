@@ -270,7 +270,7 @@ export default function Home() {
               <div
                 key={product.id}
                 className="bg-white rounded-xl overflow-hidden border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => navigate(`/products/${product.id}`)}
+                onClick={() => navigate(`/products/${product.slug || product.id}`)}
               >
                 <div className="relative">
                   {getProductImage(product) ? (
