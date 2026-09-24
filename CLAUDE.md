@@ -231,9 +231,9 @@ should not be shown.
 - Small, focused commits. One concern per commit.
 - Use `git mv` when moving files so history is preserved.
 - Work on a feature branch, never directly on `main`.
-- **Commit locally. Never run `git push`, `git push --force` or
-  `git reset --hard`.** Pushing triggers auto-deploy to Render and Vercel and is
-  the owner's call.
+- **Pushing to `bidding-changes` is fine. Never push to `bidding` or `main`** —
+  only `bidding` deploys to production (Render and Vercel). Never run
+  `git push --force` or `git reset --hard`.
 - **Do not build mock backends, start dev servers, or verify in a browser by
   default.** The owner checks the deployed site directly. If a change is complex
   enough that verification is genuinely worthwhile, ask first and wait for a yes
