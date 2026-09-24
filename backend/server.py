@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Query, Header, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Query, Header, Request, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response, RedirectResponse
 from dotenv import load_dotenv
@@ -71,13 +71,13 @@ ALLOWED_MEDIA_TYPES = {
 }
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
-def put_object(data: bytes, content_type: str) -> dict:
+def put_object(data: bytes, content_type: str, folder: str = "cardamom-spices/products") -> dict:
     """Upload bytes to Cloudinary; returns dict with 'path' (secure URL) and 'public_id'."""
     resource_type = "video" if content_type.startswith("video/") else "image"
     result = cloudinary.uploader.upload(
         BytesIO(data),
         resource_type=resource_type,
-        folder="cardamom-spices/products",
+        folder=folder,
         unique_filename=True,
     )
     return {"path": result["secure_url"], "public_id": result["public_id"], "size": result.get("bytes", len(data))}
@@ -185,6 +185,8 @@ async def lifespan(app: FastAPI):
         await db.users.create_index("phone", unique=True, sparse=True)
         await db.products.create_index("seller_id")
         await db.products.create_index("listing_status")
+        # One featured item per gallery category, enforced by the database.
+        await db.gallery_media.create_index("category", unique=True, partialFilterExpression={"featured": True}, name="one_featured_per_category")
         await db.products.create_index("slug", unique=True, partialFilterExpression={"slug": {"$type": "string"}})
         await db.bids.create_index("product_id")
         await db.bids.create_index("buyer_id")
@@ -1038,6 +1040,50 @@ class ProductPublic(BaseModel):
     bid_end_time: Optional[datetime] = None
     listing_status: Literal["active", "expired", "sold", "archived", "pending_approval", "rejected"] = "active"
     total_bids_received: int = 0
+
+# ── Gallery (photos/videos of sourcing, grading, packing, dispatch) ──
+GalleryCategory = Literal["sourcing", "grading", "samples", "packing", "dispatch"]
+GALLERY_CATEGORY_ORDER = ["sourcing", "grading", "samples", "packing", "dispatch"]
+
+class GalleryItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    media_url: str
+    media_type: Literal["image", "video"]
+    poster_url: Optional[str] = None
+    public_id: str = ""  # Cloudinary id — used only to delete the asset; never public
+    category: GalleryCategory
+    caption: str = ""
+    alt_text: str = ""
+    featured: bool = False
+    sort_order: int = 0
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class GalleryItemPublic(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    media_url: str
+    media_type: Literal["image", "video"]
+    poster_url: Optional[str] = None
+    category: GalleryCategory
+    caption: str = ""
+    alt_text: str = ""
+    featured: bool = False
+    sort_order: int = 0
+
+class GalleryItemUpdate(BaseModel):
+    category: Optional[GalleryCategory] = None
+    caption: Optional[str] = None
+    alt_text: Optional[str] = None
+    sort_order: Optional[int] = None
+
+class GalleryFlag(BaseModel):
+    value: bool
+
+class GalleryReorder(BaseModel):
+    category: GalleryCategory
+    ids: List[str]
 
 # ==================== USER MODELS ====================
 class UserRegister(BaseModel):
@@ -2492,6 +2538,142 @@ async def become_seller(current_user: User = Depends(get_current_user)):
         raise HTTPException(400, "Only buyers can request seller access")
     await db.users.update_one({"id": current_user.id}, {"$set": {"role": "both"}})
     return {"message": "Role updated to buyer+seller", "role": "both"}
+
+
+# ==================== GALLERY ====================
+def _video_poster_url(video_url: str) -> str:
+    """Cloudinary serves a still frame of a video by swapping the extension for .jpg."""
+    base = video_url.rsplit(".", 1)[0] + ".jpg"
+    return base.replace("/video/upload/", "/video/upload/so_0,w_800,c_limit/", 1)
+
+def _gallery_public(doc: dict) -> dict:
+    # Blank alt text falls back to the caption (owner-entered text only).
+    doc["alt_text"] = (doc.get("alt_text") or "").strip() or (doc.get("caption") or "").strip()
+    return GalleryItemPublic(**doc).model_dump()
+
+async def _get_gallery_item(item_id: str) -> dict:
+    item = await db.gallery_media.find_one({"id": item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Gallery item not found")
+    return item
+
+async def _clear_featured(category: str, except_id: Optional[str] = None) -> None:
+    await db.gallery_media.update_many(
+        {"category": category, "featured": True, "id": {"$ne": except_id}},
+        {"$set": {"featured": False}},
+    )
+
+def _gallery_sort_key(item: dict):
+    return (GALLERY_CATEGORY_ORDER.index(item["category"]), item.get("sort_order", 0))
+
+@api_router.get("/admin/gallery")
+async def list_gallery_admin(current_admin: User = Depends(get_current_admin)):
+    items = await db.gallery_media.find({}, {"_id": 0}).to_list(2000)
+    items.sort(key=_gallery_sort_key)
+    for i in items:
+        _coerce_product_datetimes(i)
+    return [GalleryItem(**i).model_dump() for i in items]
+
+@api_router.post("/admin/gallery")
+async def create_gallery_item(
+    file: UploadFile = File(...),
+    category: GalleryCategory = Form(...),
+    caption: str = Form(""),
+    alt_text: str = Form(""),
+    featured: bool = Form(False),
+    current_admin: User = Depends(get_current_admin)
+):
+    if file.content_type not in ALLOWED_MEDIA_TYPES:
+        raise HTTPException(status_code=400, detail=f"File type '{file.content_type}' not allowed. Accepted: JPG, PNG, WEBP, MP4, MOV")
+    media_type = "video" if file.content_type.startswith("video/") else "image"
+    if featured and media_type != "image":
+        raise HTTPException(status_code=422, detail="Only images can be featured")
+    data = await file.read()
+    if len(data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="File too large. Max 50MB.")
+
+    result = put_object(data, file.content_type, folder="cardamom-spices/gallery")
+    last = await db.gallery_media.find({"category": category}, {"_id": 0, "sort_order": 1}).sort("sort_order", -1).limit(1).to_list(1)
+    item = GalleryItem(
+        media_url=result["path"],
+        media_type=media_type,
+        poster_url=_video_poster_url(result["path"]) if media_type == "video" else None,
+        public_id=result["public_id"],
+        category=category,
+        caption=caption.strip(),
+        alt_text=alt_text.strip(),
+        featured=featured,
+        sort_order=(last[0]["sort_order"] + 1) if last else 0,
+    )
+    if featured:
+        await _clear_featured(category)
+    doc = item.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.gallery_media.insert_one(doc)
+    logger.info(f"Gallery item added by {current_admin.email}: {category}/{media_type}")
+    return item
+
+@api_router.put("/admin/gallery/{item_id}")
+async def update_gallery_item(item_id: str, data: GalleryItemUpdate, current_admin: User = Depends(get_current_admin)):
+    item = await _get_gallery_item(item_id)
+    update = {k: (v.strip() if isinstance(v, str) else v) for k, v in data.model_dump().items() if v is not None}
+    if update.get("category") and update["category"] != item["category"] and item.get("featured"):
+        update["featured"] = False  # moving a featured item out of its category un-features it
+    if update:
+        await db.gallery_media.update_one({"id": item_id}, {"$set": update})
+    return await _get_gallery_item(item_id)
+
+@api_router.put("/admin/gallery/{item_id}/featured")
+async def set_gallery_featured(item_id: str, flag: GalleryFlag, current_admin: User = Depends(get_current_admin)):
+    item = await _get_gallery_item(item_id)
+    if flag.value:
+        if item["media_type"] != "image":
+            raise HTTPException(status_code=422, detail="Only images can be featured")
+        if not item.get("active", True):
+            raise HTTPException(status_code=409, detail="Show the item before featuring it")
+        await _clear_featured(item["category"], except_id=item_id)
+    await db.gallery_media.update_one({"id": item_id}, {"$set": {"featured": flag.value}})
+    return await _get_gallery_item(item_id)
+
+@api_router.put("/admin/gallery/{item_id}/active")
+async def set_gallery_active(item_id: str, flag: GalleryFlag, current_admin: User = Depends(get_current_admin)):
+    await _get_gallery_item(item_id)
+    update = {"active": flag.value}
+    if not flag.value:
+        update["featured"] = False  # a hidden item can never sit in the home strip
+    await db.gallery_media.update_one({"id": item_id}, {"$set": update})
+    return await _get_gallery_item(item_id)
+
+@api_router.post("/admin/gallery/reorder")
+async def reorder_gallery(data: GalleryReorder, current_admin: User = Depends(get_current_admin)):
+    for position, item_id in enumerate(data.ids):
+        await db.gallery_media.update_one({"id": item_id, "category": data.category}, {"$set": {"sort_order": position}})
+    return {"message": "Reordered"}
+
+@api_router.delete("/admin/gallery/{item_id}")
+async def delete_gallery_item(item_id: str, current_admin: User = Depends(get_current_admin)):
+    item = await _get_gallery_item(item_id)
+    await db.gallery_media.delete_one({"id": item_id})
+    if item.get("public_id"):
+        try:
+            cloudinary.uploader.destroy(item["public_id"], resource_type="video" if item["media_type"] == "video" else "image")
+        except Exception as e:
+            logger.warning(f"Cloudinary delete failed for {item['public_id']}: {e}")
+    return {"message": "Deleted"}
+
+# Public: active gallery items, ordered by category then sort_order
+@api_router.get("/gallery", response_model=List[GalleryItemPublic])
+async def get_gallery(category: Optional[str] = Query(None), featured: Optional[bool] = Query(None)):
+    query: dict = {"active": True}
+    if category:
+        if category not in GALLERY_CATEGORY_ORDER:
+            raise HTTPException(status_code=400, detail="Unknown category")
+        query["category"] = category
+    if featured is not None:
+        query["featured"] = featured
+    items = await db.gallery_media.find(query, {"_id": 0}).to_list(2000)
+    items.sort(key=_gallery_sort_key)
+    return [_gallery_public(i) for i in items]
 
 
 # ==================== FILE UPLOAD & SERVE ====================
